@@ -1,7 +1,7 @@
 "use client";
 
 import { useQueryClient } from "@tanstack/react-query";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Address, Hash } from "viem";
 import { useConfig, useWriteContract } from "wagmi";
@@ -32,7 +32,12 @@ export interface MarketActions {
   readonly pending: ActionKind | null;
   approve(cst: Address, amount: bigint): Promise<boolean>;
   bet(side: BetSide, cstIn: bigint, minTokensOut: bigint): Promise<boolean>;
-  addLiquidity(cstIn: bigint, declaredFeeBps: number, initialYesProbBps: bigint, minSharesOut: bigint): Promise<boolean>;
+  addLiquidity(
+    cstIn: bigint,
+    declaredFeeBps: number,
+    initialYesProbBps: bigint,
+    minSharesOut: bigint,
+  ): Promise<boolean>;
   removeLiquidity(shares: bigint, minYesOut: bigint, minNoOut: bigint): Promise<boolean>;
   updateFeeDeclaration(newFeeBps: number): Promise<boolean>;
   claimFees(): Promise<boolean>;
@@ -61,10 +66,17 @@ export function useMarketActions(series: Address | null, roundId: bigint | null)
   const queryClient = useQueryClient();
   const { writeContractAsync } = useWriteContract();
   const [pending, setPending] = useState<ActionKind | null>(null);
+  const inFlight = useRef(false);
 
   const run = useCallback(
     async (kind: ActionKind, label: string, write: () => Promise<Hash>): Promise<boolean> => {
-      if (pending) return false;
+      if (inFlight.current) return false;
+      if (series === null || roundId === null) {
+        toast.error("The market is still loading. Please try again.");
+        return false;
+      }
+      // React state updates are batched; the ref also blocks same-tick calls.
+      inFlight.current = true;
       setPending(kind);
       const toastId = toast.loading(`${label} — confirm in your wallet…`);
       try {
@@ -88,12 +100,13 @@ export function useMarketActions(series: Address | null, roundId: bigint | null)
         toast.error(describeTxError(error), { id: toastId });
         return false;
       } finally {
+        inFlight.current = false;
         setPending(null);
         // Refresh everything that could have changed: reads and event history.
         void queryClient.invalidateQueries();
       }
     },
-    [config, pending, queryClient],
+    [config, queryClient, series, roundId],
   );
 
   const approve = useCallback(
@@ -129,7 +142,14 @@ export function useMarketActions(series: Address | null, roundId: bigint | null)
           address: series as Address,
           abi: gestureSeriesMarketAbi,
           functionName: "addLiquidity",
-          args: [roundId as bigint, cstIn, declaredFeeBps, initialYesProbBps, minSharesOut, txDeadline()],
+          args: [
+            roundId as bigint,
+            cstIn,
+            declaredFeeBps,
+            initialYesProbBps,
+            minSharesOut,
+            txDeadline(),
+          ],
         }),
       ),
     [run, writeContractAsync, series, roundId],

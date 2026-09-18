@@ -48,7 +48,8 @@ export function MarketApp({ seriesAddress, roundOverride }: MarketAppProps) {
   // The chart and cross-checkable pool history, rebuilt purely from events.
   const history = useMemo(() => replayRound(events.poolEvents).points, [events.poolEvents]);
 
-  if (error && !snapshot) {
+  // A cached snapshot must not keep transaction controls active after a read fails.
+  if (error) {
     return <MarketError message={error.message} onRetry={refetchAll} />;
   }
   if (isLoading || !snapshot) {
@@ -91,7 +92,11 @@ export function MarketApp({ seriesAddress, roundOverride }: MarketAppProps) {
                   pool={snapshot.pool}
                   balance={connected && user ? user.cstBalance : null}
                   allowance={connected && user ? user.cstAllowance : null}
-                  pendingAction={actions.pending === "approve" || actions.pending === "bet" ? actions.pending : null}
+                  pendingAction={
+                    actions.pending === "approve" || actions.pending === "bet"
+                      ? actions.pending
+                      : null
+                  }
                   onConnect={openWalletModal}
                   onApprove={(amount) => actions.approve(snapshot.cstAddress, amount)}
                   onBet={actions.bet}
@@ -131,7 +136,9 @@ export function MarketApp({ seriesAddress, roundOverride }: MarketAppProps) {
             <PositionPanel
               snapshot={snapshot}
               user={user}
-              pendingAction={actions.pending === "redeem" || actions.pending === "claim" ? actions.pending : null}
+              pendingAction={
+                actions.pending === "redeem" || actions.pending === "claim" ? actions.pending : null
+              }
               onRedeemSets={actions.redeemSets}
               onClaim={actions.claim}
             />
@@ -140,7 +147,9 @@ export function MarketApp({ seriesAddress, roundOverride }: MarketAppProps) {
         </div>
       </div>
 
-      {walletModalRequested && <LazyWalletModal open={walletModalOpen} onClose={() => setWalletModalOpen(false)} />}
+      {walletModalRequested && (
+        <LazyWalletModal open={walletModalOpen} onClose={() => setWalletModalOpen(false)} />
+      )}
     </div>
   );
 }

@@ -46,8 +46,18 @@ function buildConnectors(): CreateConnectorFn[] {
  * etc. each show up as their own connector without extra SDKs. WalletConnect
  * is added when a project id is configured, covering mobile wallets.
  */
+// The mock connector obtains its RPC from the chain object, independently of
+// wagmi's transport. Keep both pointed at the same isolated Anvil instance.
+const walletChain =
+  appConfig.chain.id === anvil.id && appConfig.rpcUrl
+    ? {
+        ...appConfig.chain,
+        rpcUrls: { ...appConfig.chain.rpcUrls, default: { http: [appConfig.rpcUrl] } },
+      }
+    : appConfig.chain;
+
 export const wagmiConfig = createConfig({
-  chains: [appConfig.chain],
+  chains: [walletChain],
   connectors: buildConnectors(),
   storage:
     typeof window !== "undefined"

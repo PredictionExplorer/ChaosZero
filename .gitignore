@@ -1,6 +1,15 @@
 # Compiler files
 cache/
 out/
+node_modules/
+coverage/
+*.lcov
+heavy-fuzz.log
+playwright-report/
+test-results/
+.local/
+__pycache__/
+*.py[cod]
 
 # Commonly ignored directories
 .logs/

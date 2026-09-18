@@ -10,6 +10,8 @@ import { MarketGate } from "@/components/market/market-gate";
 import { JsonLd } from "@/components/seo/json-ld";
 import { ConnectButton } from "@/components/wallet/connect-button";
 import { Providers } from "./providers";
+import { sharedMarketAddress } from "@/shared/config";
+import { SharedPage } from "@/shared/shared-page";
 
 /**
  * The market page. Everything explanatory (hero, how-it-works, footer) is
@@ -18,6 +20,7 @@ import { Providers } from "./providers";
  * MarketGate is a client island.
  */
 export default function Home() {
+  if (sharedMarketAddress !== null) return <SharedPage />;
   return (
     <Providers>
       <Header active="market" actions={<ConnectButton />} />

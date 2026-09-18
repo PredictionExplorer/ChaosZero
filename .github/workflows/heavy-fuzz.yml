@@ -1,0 +1,52 @@
+name: Nightly contract fuzzing
+
+permissions: {}
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-contract-fuzzing-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  heavy:
+    name: Heavy fuzz and multi-market invariant campaign
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+          submodules: recursive
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1
+        with:
+          version: v1.7.1
+      - name: Install locked developer tools
+        run: pnpm install --frozen-lockfile
+      - name: Run the heavy profile with a recorded random seed
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm test:heavy 2>&1 | tee heavy-fuzz.log
+      - name: Preserve seed, traces and minimized invariant failures
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: heavy-fuzz-results
+          path: |
+            heavy-fuzz.log
+            cache/invariant/
+            cache/fuzz/
+          if-no-files-found: warn
+          retention-days: 30

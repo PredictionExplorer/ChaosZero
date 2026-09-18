@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+repo_root=$(git rev-parse --show-toplevel)
+export CHAOS_ZERO_PUSH_HOOK=1
+exec node "$repo_root/scripts/check.mjs" pre-push

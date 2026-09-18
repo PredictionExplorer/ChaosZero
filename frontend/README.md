@@ -1,8 +1,42 @@
 # Chaos Zero — frontend
 
+## Shared local prototype
+
+From the repository root, run `pnpm dev:local`. The launcher starts a disposable
+Anvil chain, deploys the test CST token, game simulator, outcome source, and joint
+market, then opens this frontend at `http://127.0.0.1:3000/shared`.
+
+The eight recurring questions share one pool per cycle. The screen supports
+exact buy/sell quotes, explicit CST approvals, irreversible pool gifts, partial
+settlement and retrieval, completed-cycle navigation, and sponsor-residue
+rollover. Local controls provide test CST, ETH/CST gestures, time advances, and
+cycle closure. Connect the **Mock Connector** to use an unlocked local account.
+The local wallet and public reads both use `NEXT_PUBLIC_RPC_URL`.
+
+`NEXT_PUBLIC_SHARED_MARKET_ADDRESS` explicitly selects the new contract. When
+present, `/` displays the shared screen as well. It never falls back to
+`NEXT_PUBLIC_MARKET_ADDRESS` or applies the shared ABI to that legacy address.
+Both the shared screen and its transaction actions reject chains other than 31337. A verified live outcome-source integration is required before this
+prototype can trade on a public chain.
+
+The implementation lives in `src/shared/`. The BigInt quote solver mirrors the
+contract's directed-rounding logarithm bounds and checks all feasible joint
+outcomes. Quotes are recomputed when their economic basis changes; a stale
+exact quote can revert rather than accepting worse output. The frontend shows
+no invented chain values. Unit, component, and property tests include
+Solidity-generated differential vectors in
+`src/test/fixtures/shared-contract-vectors.json`. Run `pnpm test:e2e` from the
+repository root for real browser/wallet/local-chain coverage.
+
+A gift supplies capacity without creating LP shares, fee income, or withdrawal
+rights. It is separate from buying a YES/NO position. The local simulator uses
+shortened durations and test tokens; it is not the deployed Cosmic Signature game.
+
+## Existing deployed market
+
 A Next.js app for the [Chaos Zero series](../README.md): one binary
-prediction market per Cosmic Signature round — *will this round end with more
-gestures than the last one?* — settled in CST on Arbitrum One.
+prediction market per Cosmic Signature round — _will this round end with more
+gestures than the last one?_ — settled in CST on Arbitrum One.
 
 Everything lives on one screen, per round: the live YES probability with its
 history, the count-vs-threshold race, one-click YES/NO bets with exact
@@ -128,16 +162,16 @@ cast send $GAME "setRoundNum(uint256)" 4 --private-key $PK --rpc-url http://127.
 
 All config is env-driven and validated at startup (`src/lib/config.ts`):
 
-| Variable | Required | Purpose |
-|---|---|---|
-| `NEXT_PUBLIC_CHAIN_ID` | no (default 42161) | 42161 Arbitrum One, 31337 anvil |
-| `NEXT_PUBLIC_MARKET_ADDRESS` | no | the GestureSeriesMarket singleton; `?market=0x…` overrides |
-| `NEXT_PUBLIC_RPC_URL` | no | custom RPC (falls back to the chain's public one) |
-| `NEXT_PUBLIC_DEPLOY_BLOCK` | no | series deploy block — speeds up event scans |
-| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | no | enables WalletConnect for mobile wallets |
-| `NEXT_PUBLIC_SITE_URL` | no | canonical origin for SEO metadata, sitemap and social cards (defaults to the production domain) |
-| `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | no | Google Search Console ownership token (emits the verification meta tag) |
-| `NEXT_PUBLIC_BING_SITE_VERIFICATION` | no | Bing Webmaster ownership token (`msvalidate.01` meta tag) |
+| Variable                               | Required           | Purpose                                                                                         |
+| -------------------------------------- | ------------------ | ----------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_CHAIN_ID`                 | no (default 42161) | 42161 Arbitrum One, 31337 anvil                                                                 |
+| `NEXT_PUBLIC_MARKET_ADDRESS`           | no                 | the GestureSeriesMarket singleton; `?market=0x…` overrides                                      |
+| `NEXT_PUBLIC_RPC_URL`                  | no                 | custom RPC (falls back to the chain's public one)                                               |
+| `NEXT_PUBLIC_DEPLOY_BLOCK`             | no                 | series deploy block — speeds up event scans                                                     |
+| `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` | no                 | enables WalletConnect for mobile wallets                                                        |
+| `NEXT_PUBLIC_SITE_URL`                 | no                 | canonical origin for SEO metadata, sitemap and social cards (defaults to the production domain) |
+| `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | no                 | Google Search Console ownership token (emits the verification meta tag)                         |
+| `NEXT_PUBLIC_BING_SITE_VERIFICATION`   | no                 | Bing Webmaster ownership token (`msvalidate.01` meta tag)                                       |
 
 One deployment serves **every** round forever: the app follows the game's
 current round live, and `?round=N` links to any past round (for claims and

@@ -56,7 +56,11 @@ export function useCurrentGameRound(statics: SeriesStatics | null) {
 }
 
 /** Full state of one round: lifecycle flags + the pool. Polls. */
-export function useRoundSnapshot(series: Address | null, statics: SeriesStatics | null, roundId: bigint | null) {
+export function useRoundSnapshot(
+  series: Address | null,
+  statics: SeriesStatics | null,
+  roundId: bigint | null,
+) {
   const contract = { address: series ?? undefined, abi: gestureSeriesMarketAbi } as const;
   const gameContract = { address: statics?.gameAddress, abi: cosmicGameAbi } as const;
 
@@ -71,7 +75,11 @@ export function useRoundSnapshot(series: Address | null, statics: SeriesStatics 
             { ...gameContract, functionName: "roundNum" },
             // The previous round's live count: the FORMING threshold shown
             // while this round is still in the future.
-            { ...gameContract, functionName: "bidderAddresses", args: [roundId === 0n ? 0n : roundId - 1n] },
+            {
+              ...gameContract,
+              functionName: "bidderAddresses",
+              args: [roundId === 0n ? 0n : roundId - 1n],
+            },
           ],
     query: {
       enabled: series !== null && statics !== null && roundId !== null,
@@ -81,7 +89,12 @@ export function useRoundSnapshot(series: Address | null, statics: SeriesStatics 
 
   const snapshot: RoundSnapshot | null = useMemo(() => {
     if (!series || !statics || roundId === null || !result.data) return null;
-    const [state, poolRow, gameRoundNum, prevRoundCount] = result.data as [RoundStateTuple, PoolTuple, bigint, bigint];
+    const [state, poolRow, gameRoundNum, prevRoundCount] = result.data as [
+      RoundStateTuple,
+      PoolTuple,
+      bigint,
+      bigint,
+    ];
     return toRoundSnapshot({
       seriesAddress: series,
       roundId,
@@ -98,7 +111,11 @@ export function useRoundSnapshot(series: Address | null, statics: SeriesStatics 
 }
 
 /** The connected user's balances, allowance and LP position for one round. */
-export function useUserSnapshot(series: Address | null, statics: SeriesStatics | null, roundId: bigint | null) {
+export function useUserSnapshot(
+  series: Address | null,
+  statics: SeriesStatics | null,
+  roundId: bigint | null,
+) {
   const { address } = useConnection();
   const contract = { address: series ?? undefined, abi: gestureSeriesMarketAbi } as const;
   const cstContract = { address: statics?.cstAddress, abi: erc20Abi } as const;
@@ -121,7 +138,7 @@ export function useUserSnapshot(series: Address | null, statics: SeriesStatics |
   });
 
   const user: UserSnapshot | null = useMemo(() => {
-    if (!result.data || !address) return null;
+    if (!result.data || !address || !series || !statics || roundId === null) return null;
     const [balances, lpRow, cstBalance, cstAllowance] = result.data as [
       readonly [bigint, bigint],
       readonly [bigint, bigint, number],
@@ -138,9 +155,9 @@ export function useUserSnapshot(series: Address | null, statics: SeriesStatics |
       lpPendingFees: lpRow[1],
       lpDeclaredFeeBps: Number(lpRow[2]),
     };
-  }, [result.data, address]);
+  }, [result.data, address, series, statics, roundId]);
 
-  return { user, isLoading: result.isLoading, refetch: result.refetch };
+  return { user, isLoading: result.isLoading, error: result.error, refetch: result.refetch };
 }
 
 export interface MarketState {
@@ -162,15 +179,26 @@ export interface MarketState {
  * connected user's stake in it.
  */
 export function useMarket(series: Address | null, roundOverride: bigint | null): MarketState {
-  const { statics, isLoading: staticsLoading, error: staticsError, refetch: refetchStatics } = useSeriesStatics(series);
+  const {
+    statics,
+    isLoading: staticsLoading,
+    error: staticsError,
+    refetch: refetchStatics,
+  } = useSeriesStatics(series);
   const currentRound = useCurrentGameRound(statics);
   const roundId = roundOverride ?? currentRound.data ?? null;
-  const { snapshot, isLoading: snapshotLoading, error: snapshotError, refetch: refetchSnapshot } = useRoundSnapshot(
-    series,
-    statics,
-    roundId,
-  );
-  const { user, refetch: refetchUser } = useUserSnapshot(series, statics, roundId);
+  const {
+    snapshot,
+    isLoading: snapshotLoading,
+    error: snapshotError,
+    refetch: refetchSnapshot,
+  } = useRoundSnapshot(series, statics, roundId);
+  const {
+    user,
+    isLoading: userLoading,
+    error: userError,
+    refetch: refetchUser,
+  } = useUserSnapshot(series, statics, roundId);
 
   return {
     statics,
@@ -178,8 +206,12 @@ export function useMarket(series: Address | null, roundOverride: bigint | null):
     user,
     roundId,
     currentRound: currentRound.data ?? null,
-    isLoading: staticsLoading || currentRound.isLoading || (roundId !== null && snapshotLoading),
-    error: (staticsError ?? currentRound.error ?? snapshotError) as Error | null,
+    isLoading:
+      staticsLoading ||
+      currentRound.isLoading ||
+      (roundId !== null && snapshotLoading) ||
+      userLoading,
+    error: (staticsError ?? currentRound.error ?? snapshotError ?? userError) as Error | null,
     refetchAll: () => {
       void refetchStatics();
       void currentRound.refetch();
