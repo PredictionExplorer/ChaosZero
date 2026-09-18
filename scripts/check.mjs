@@ -4,6 +4,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   assertCleanPushTree,
+  assertContractDependencies,
   assertPushReferencesMatchHead,
   assertStagedMatchesWorktree,
   classifyChanges,
@@ -36,11 +37,7 @@ function prerequisites({ contracts = true, frontend: needsFrontend = true } = {}
       "Root tooling is missing. Run pnpm install --frozen-lockfile in the repository root.",
     );
   }
-  if (contracts && !existsSync(join(root, "lib/forge-std/src/Test.sol"))) {
-    throw new Error(
-      "Foundry dependencies are missing. Run git submodule update --init --recursive.",
-    );
-  }
+  if (contracts) assertContractDependencies(root);
   if (contracts) {
     execute("python3", [
       "-c",

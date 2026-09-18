@@ -2,6 +2,7 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+remappings = ["@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/"]
 # GenerateVectors.s.sol writes the frontend's differential test fixtures.
 fs_permissions = [{ access = "read-write", path = "frontend/src/test/fixtures" }]
 

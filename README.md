@@ -13,7 +13,7 @@ pnpm setup:dev
 pnpm dev:local
 ```
 
-Open <http://127.0.0.1:3000/shared>. Connect the local test wallet and use **Get 1,000 test CST**. Buy or sell positions, make an irreversible gift to the pool, place simulated game gestures, advance local time, retrieve known winning positions, close a cycle, and roll the unused pool funding forward.
+Open <http://127.0.0.1:3000/shared>. Connect a local test wallet and use **Get 1,000 test CST**. Buy or sell positions, split CST into complete YES/NO pairs, merge matching pairs back into CST, or transfer positions to another wallet. You can also make an irreversible gift to the pool, place simulated game gestures, advance local time, retrieve known winning positions, close a cycle, and roll the unused pool funding forward. Three disposable test wallets let you exercise transfers and redemption by the recipient.
 
 The launcher starts a fresh Anvil chain, deploys fake CST and the local game, deploys the shared market, contributes 10,000 fake CST, and starts Next.js with the matching addresses. It uses only Anvil's public unlocked accounts; it never needs a private key. Stop it with Ctrl+C. All development funds are disposable.
 
@@ -50,6 +50,20 @@ There is no market owner, upgrade mechanism, or administrator that can choose re
 
 After finalization, anyone may call `rollover` to move only the sponsor's remaining capital into a later open cycle. All unpaid winning claims remain reserved in the original cycle. Direct token transfers to the market are deliberately excluded from accounting; use the funding method rather than sending CST directly.
 
+## Complete sets and transferable positions
+
+One CST splits into one YES unit and one NO unit for **one question in one cycle**. A matching pair merges back into exactly one CST, without a fee or price change. Splitting and merging change collateral and the corresponding liabilities equally, leaving every virtual AMM reserve unchanged. YES from one question cannot be paired with NO from another question or cycle.
+
+Splitting requires an open cycle and an unresolved question. It works before sponsorship, but does not fund the AMM: a pool containing only split collateral has no trading reserve. Complete sets can still be merged or settled if no sponsor ever funds that cycle. Merging is available after closure, after finalization, and after unused sponsor funds roll forward. It deliberately makes no call to the result source, so matched pairs remain redeemable if that source becomes unavailable. A known-answer retrieval burns the caller's positions on the resolved questions; those burned units cannot also be merged.
+
+Once the market has successfully observed finalization through retrieval or rollover, `claimKnown` pays according to those permanently cached answers without another source call. This also covers winning positions transferred after finalization. Before finalization is cached, retrieval still requires a fresh, consistent source response. The recovery screen currently exposes source-independent merges and transfers; cached-finalization retrieval is also available directly through the contract.
+
+Positions implement ERC-1155 using pinned OpenZeppelin Contracts. Standard `balanceOf`, `balanceOfBatch`, safe single/batch transfers, operator approvals, ERC-165 discovery, and on-chain metadata are available. An approved operator can transfer **all** of an owner's position types, including positions acquired later, until approval is revoked. The web interface sends owner-authorized transfers and requires no operator approval. Smart-contract recipients must implement ERC-1155 acceptance callbacks.
+
+The position ID is `(cycle << 4) | (question << 1) | side`, where question IDs are 0–7, YES is 1 and NO is 0. Supported cycle IDs are at most `2^252 - 1`. Position amounts use the same 18-decimal units as CST. `totalSupply(id)` counts issued user positions, excluding virtual pool reserves. Transfers change the holder, never total liabilities or the odds. The current holder receives sale, merge, or settlement proceeds.
+
+`mergePosition` redeems one question's pairs. `mergePositions` takes a fixed array of eight amounts and redeems pairs from several questions atomically. The browser shows each question's mergeable amount and offers a single merge-all transaction. If the game/result source cannot be read, the recovery view can load a specified cycle directly from the market and allow merges and transfers from freshly read holdings.
+
 ## Shared liquidity and numerical safety
 
 The contract represents up to 256 joint endings internally. It stores collateral and eight pairs of aggregate liabilities rather than writing 256 outcome-token balances for every trade. A feasible ending's virtual reserve is:
@@ -64,7 +78,9 @@ The browser solves for an exact proposed trade using BigInt arithmetic. The cont
 
 Every winning unit pays one CST. Partial claims clear only known questions. Other positions remain backed and tradeable. A known-answer cache rejects sources that reverse answers or reopen a previously closed cycle. Collateral is bounded by `2^120` wei, and supported tokens must transfer exact amounts: fee-on-transfer and rebasing behavior is unsupported.
 
-Cold-state gas tests enforce the execution budget. The initial implementation measures approximately 9.4 million gas for a diverse, full-256-state trade; this is a local EVM measurement, not a live fee quote.
+The dashboard distinguishes **total CST held**, **maximum payout obligation**, and **minimum remaining reserve**. Buying adds CST to custody and issues a payout obligation; it does not make the entire deposit free sponsor capital. Selling, merging, and retrieving winners remove CST. A 100 CST YES purchase followed by a 100 CST NO purchase therefore adds 200 CST to custody, but the shares received need not be equal, since the first trade changes the second price.
+
+Cold-state gas tests enforce the execution budget. With transferable positions, the implementation measures approximately 9.94 million gas for a diverse, full-256-state trade; this is a local EVM measurement, not a live fee quote.
 
 ## Local simulator versus the real game
 

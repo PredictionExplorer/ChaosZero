@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 export function run(command, args, options = {}) {
   const result = spawnSync(command, args, { stdio: "inherit", ...options });
@@ -23,6 +24,19 @@ export function gitFiles(repoRoot, args) {
     .filter(Boolean);
 }
 
+export function assertContractDependencies(repoRoot) {
+  const dependencies = [
+    ["forge-std", "lib/forge-std/src/Test.sol"],
+    ["OpenZeppelin ERC1155", "lib/openzeppelin-contracts/contracts/token/ERC1155/ERC1155.sol"],
+  ];
+  const missing = dependencies.filter(([, path]) => !existsSync(join(repoRoot, path)));
+  if (missing.length) {
+    throw new Error(
+      `Foundry dependencies are missing (${missing.map(([name]) => name).join(", ")}). Run git submodule update --init --recursive.`,
+    );
+  }
+}
+
 export function classifyChanges(files) {
   const tooling = files.some((file) =>
     /^(?:scripts\/|\.githooks\/|\.github\/|playwright\.config\.|package\.json$|pnpm-lock\.yaml$|\.node-version$|\.prettier)/.test(
@@ -33,7 +47,7 @@ export function classifyChanges(files) {
     contracts:
       tooling ||
       files.some((file) =>
-        /^(?:src\/|test\/|script\/|lib\/|foundry\.toml$|\.gitmodules$)/.test(file),
+        /^(?:src\/|test\/|script\/|lib\/|foundry\.(?:toml|lock)$|\.gitmodules$)/.test(file),
       ),
     frontend: tooling || files.some((file) => /^(?:frontend\/|e2e\/)/.test(file)),
     tooling,

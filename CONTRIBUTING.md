@@ -13,7 +13,7 @@ pnpm setup:dev
 pnpm test:e2e:install
 ```
 
-Setup initializes the pinned `forge-std` submodule, installs both lockfiles, and
+Setup initializes the pinned `forge-std` and OpenZeppelin Contracts submodules, installs both lockfiles, and
 sets this clone's `core.hooksPath` to `.githooks`. It does not change global Git
 configuration. After cloning elsewhere, run setup there too. The hook scripts
 and `node /absolute/path/to/ChaosZero/scripts/check.mjs <mode>` work from any
@@ -21,8 +21,12 @@ working directory.
 
 Run `pnpm dev:local` to launch the local prototype with mock CST. The launcher
 starts a disposable chain, deploys the local contracts and starts the frontend.
-`pnpm local:smoke` exercises the locally running stack. Neither command is a
-production deployment workflow.
+`pnpm local:smoke` exercises the locally running stack and compares every browser
+contract signature with the compiled Solidity interface, including tuple fields
+and return values. It verifies split/merge reserve preservation, transfers and
+operator revocation across wallets, and settlement without sponsorship. The
+smoke restores its starting chain snapshot. Neither command is a production
+deployment workflow.
 
 ## Required local checks
 

@@ -23,6 +23,10 @@ import { ConnectButton } from "@/components/wallet/connect-button";
 import { appConfig, resolveRoundOverride } from "@/lib/config";
 import { formatCst, parseCstInput, shortAddress } from "@/lib/format";
 import { sharedMarketAddress } from "./config";
+import { CompleteSetsPanel, TransferPositionPanel } from "./complete-sets-panel";
+import { PositionRecoveryPanel } from "./position-recovery-panel";
+import { collateralBreakdown, portfolioValue } from "./positions";
+import { usePositionRecovery } from "./use-position-recovery";
 import { claimable, MAX_COLLATERAL, MIN_FUNDING, quoteTrade, yesProbabilityBps } from "./math";
 import { answerYes, questionKnown, QUESTIONS, type QuestionId } from "./questions";
 import {
@@ -508,15 +512,28 @@ export function Portfolio({
   pending,
   onClaim,
   onSell,
+  market,
+  sender,
+  onTransfer,
 }: {
   snapshot: SharedSnapshot;
   pending: string | null;
   onClaim: () => Promise<boolean>;
   onSell: (question: QuestionId, yes: boolean) => void;
+  market?: Address;
+  sender?: Address;
+  onTransfer?: (
+    question: QuestionId,
+    yes: boolean,
+    amount: bigint,
+    recipient: string,
+  ) => Promise<boolean>;
 }) {
+  const [transfer, setTransfer] = useState<{ question: QuestionId; yes: boolean } | null>(null);
   const user = snapshot.user;
   if (!user) return null;
-  const redeemable = claimable(user.yes, user.no, snapshot.pool.knownMask, snapshot.pool.values);
+  const valuation = portfolioValue(snapshot.pool, user.yes, user.no);
+  const redeemable = valuation.claimable;
   const hasKnownPositions = QUESTIONS.some(
     (_, i) => questionKnown(snapshot.pool.knownMask, i) && (user.yes[i] > 0n || user.no[i] > 0n),
   );
@@ -556,25 +573,72 @@ export function Portfolio({
                     {formatCst(position.amount)} {position.yes ? "YES" : "NO"}
                   </p>
                 </div>
-                {known ? (
-                  <span className={`text-xs ${winner ? "text-higher" : "text-ink-faint"}`}>
-                    {winner ? "Ready to retrieve" : "Resolved · 0 CST"}
-                  </span>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={!snapshot.open || !!pending}
-                    onClick={() => onSell(position.question, position.yes)}
-                  >
-                    Sell <ArrowUpRight className="size-3" aria-hidden />
-                  </Button>
-                )}
+                <div className="flex shrink-0 flex-col items-end gap-1">
+                  {known ? (
+                    <span className={`text-xs ${winner ? "text-higher" : "text-ink-faint"}`}>
+                      {winner ? "Ready to retrieve" : "Resolved · 0 CST"}
+                    </span>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={!snapshot.open || !!pending}
+                      onClick={() => onSell(position.question, position.yes)}
+                    >
+                      Sell <ArrowUpRight className="size-3" aria-hidden />
+                    </Button>
+                  )}
+                  {market && onTransfer && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Transfer ${position.yes ? "YES" : "NO"}: ${position.title}`}
+                      disabled={!!pending}
+                      onClick={() =>
+                        setTransfer({ question: position.question, yes: position.yes })
+                      }
+                    >
+                      Transfer
+                    </Button>
+                  )}
+                </div>
               </li>
             );
           })}
         </ul>
       )}
+      {transfer && market && onTransfer && (
+        <TransferPositionPanel
+          key={`${transfer.question}-${transfer.yes}`}
+          roundId={snapshot.roundId}
+          question={transfer.question}
+          yes={transfer.yes}
+          available={transfer.yes ? user.yes[transfer.question] : user.no[transfer.question]}
+          market={market}
+          sender={sender}
+          pending={pending}
+          onTransfer={onTransfer}
+          onCancel={() => setTransfer(null)}
+        />
+      )}
+      <dl className="mt-4 space-y-2 border-t border-line pt-4 text-xs text-ink-dim">
+        <div className="flex justify-between">
+          <dt>Matched pairs</dt>
+          <dd className="font-mono text-ink">{formatCst(valuation.matchedCollateral)} CST</dd>
+        </div>
+        <div className="flex justify-between">
+          <dt>Indicative position value</dt>
+          <dd className="font-mono text-ink">
+            {valuation.indicativeValue === null
+              ? "Unavailable"
+              : `${formatCst(valuation.indicativeValue)} CST`}
+          </dd>
+        </div>
+      </dl>
+      <p className="mt-2 text-[11px] leading-5 text-ink-faint">
+        Indicative value uses marginal prices for unmatched open units; a sale can return less.
+        Matched pairs have exact 1:1 value.
+      </p>
       <div className="mt-4 flex items-center justify-between border-t border-line pt-4 text-sm">
         <span className="text-ink-dim">Available to retrieve</span>
         <span className="font-mono text-higher" data-testid="shared-claimable">
@@ -609,7 +673,14 @@ export function SharedDashboard({
 }) {
   const query = useSharedMarket(market, roundOverride);
   const snapshot = query.data;
-  const actions = useSharedActions(market, snapshot);
+  const [manualRecoveryRound, setManualRecoveryRound] = useState<bigint | null>(null);
+  const recoveryRound = manualRecoveryRound ?? roundOverride ?? snapshot?.roundId ?? null;
+  const recovery = usePositionRecovery(market, recoveryRound, !!query.error);
+  const recoveryContext =
+    query.error && recovery.data && !recovery.error && !recovery.isFetching
+      ? recovery.data
+      : undefined;
+  const actions = useSharedActions(market, query.error ? undefined : snapshot, recoveryContext);
   const connection = useConnection();
   const chainId = useChainId();
   const path = usePathname();
@@ -619,16 +690,28 @@ export function SharedDashboard({
   const connected = connection.status === "connected" && chainId === appConfig.chain.id;
   if (query.error)
     return (
-      <Card accent="ended" className="p-8">
-        <h2 className="font-display text-xl font-semibold">Could not load the shared market</h2>
-        <p className="mt-3 text-sm text-ink-dim">
-          Check that the configured shared market and local network are running.
-        </p>
-        <p className="mt-2 break-words text-xs text-ink-faint">{query.error.message}</p>
-        <Button onClick={() => void query.refetch()} className="mt-5" variant="outline">
-          Try again
-        </Button>
-      </Card>
+      <div>
+        <Card accent="ended" className="p-8">
+          <h2 className="font-display text-xl font-semibold">Could not load the shared market</h2>
+          <p className="mt-3 text-sm text-ink-dim">
+            Check that the configured shared market and local network are running.
+          </p>
+          <p className="mt-2 break-words text-xs text-ink-faint">{query.error.message}</p>
+          <Button onClick={() => void query.refetch()} className="mt-5" variant="outline">
+            Try again
+          </Button>
+        </Card>
+        <PositionRecoveryPanel
+          key={`${market}-${recoveryRound?.toString() ?? "unknown"}-${connection.address ?? "disconnected"}`}
+          market={market}
+          sender={connection.address}
+          roundId={recoveryRound}
+          onRound={setManualRecoveryRound}
+          query={recovery}
+          actions={actions}
+          connected={connected}
+        />
+      </div>
     );
   if (!snapshot)
     return (
@@ -637,6 +720,7 @@ export function SharedDashboard({
       </div>
     );
   const nKnown = countKnown(snapshot.pool.knownMask);
+  const treasury = collateralBreakdown(snapshot.pool);
   const residual = snapshot.finalized
     ? snapshot.pool.collateral -
       claimable(snapshot.pool.yes, snapshot.pool.no, snapshot.pool.knownMask, snapshot.pool.values)
@@ -726,9 +810,14 @@ export function SharedDashboard({
           </span>
         </div>
       )}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {[
-          { label: "CST in this pool", value: `${formatCst(snapshot.pool.collateral)} CST` },
+          { label: "Total CST held", value: `${formatCst(treasury.held)} CST` },
+          { label: "Maximum payout obligation", value: `${formatCst(treasury.maximumPayout)} CST` },
+          {
+            label: "Minimum remaining reserve",
+            value: `${formatCst(treasury.minimumReserve)} CST`,
+          },
           { label: "Questions still open", value: `${8 - nKnown} / 8` },
           {
             label: "Your test CST",
@@ -740,7 +829,15 @@ export function SharedDashboard({
             <p className="text-[11px] text-ink-dim">{stat.label}</p>
             <p
               className="mt-2 font-display text-base font-semibold sm:text-lg"
-              data-testid={stat.label === "CST in this pool" ? "shared-collateral" : undefined}
+              data-testid={
+                stat.label === "Total CST held"
+                  ? "shared-collateral"
+                  : stat.label === "Minimum remaining reserve"
+                    ? "shared-reserve"
+                    : stat.label === "Maximum payout obligation"
+                      ? "shared-payout-obligation"
+                      : undefined
+              }
             >
               {stat.value}
             </p>
@@ -869,12 +966,30 @@ export function SharedDashboard({
           />
           {connected && (
             <Portfolio
+              key={`portfolio-${snapshot.roundId}-${connection.address}`}
               snapshot={snapshot}
               pending={actions.pending}
               onClaim={actions.claim}
               onSell={(id, side) => select(id, side, false)}
+              market={market}
+              sender={connection.address}
+              onTransfer={actions.transfer}
             />
           )}
+          <CompleteSetsPanel
+            key={`sets-${snapshot.roundId}-${connection.address}`}
+            roundId={snapshot.roundId}
+            user={snapshot.user}
+            collateral={snapshot.pool.collateral}
+            open={snapshot.open}
+            knownMask={snapshot.pool.knownMask}
+            connected={connected}
+            pending={actions.pending}
+            onApprove={actions.approve}
+            onSplit={actions.split}
+            onMerge={actions.merge}
+            onMergeAll={actions.mergeAll}
+          />
           <FundingPanel
             key={`fund-${snapshot.roundId}`}
             snapshot={snapshot}

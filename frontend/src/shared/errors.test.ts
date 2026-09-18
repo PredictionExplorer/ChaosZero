@@ -18,6 +18,7 @@ describe("shared error explanations", () => {
     ["DeadlineExpired", /quote expired/],
     ["InsufficientPosition", /not enough units/],
     ["NotFunded", /first pool gift/],
+    ["NotInitialized", /no funded or split positions/],
     ["NotFinalized", /must close/],
   ] as const)("explains decoded %s", (errorName, expected) => {
     const cause = new ContractFunctionRevertedError({
@@ -27,6 +28,30 @@ describe("shared error explanations", () => {
     });
     expect(describeSharedError(new BaseError("execution reverted", { cause }))).toMatch(expected);
   });
+  it("explains ERC-1155 receiver and position-balance rejections", () => {
+    const receiver = "0x1111111111111111111111111111111111111111";
+    const invalid = new ContractFunctionRevertedError({
+      abi: sharedMarketAbi,
+      functionName: "safeTransferFrom",
+      data: encodeErrorResult({
+        abi: sharedMarketAbi,
+        errorName: "ERC1155InvalidReceiver",
+        args: [receiver],
+      }),
+    });
+    expect(describeSharedError(invalid)).toMatch(/recipient cannot accept/);
+    const balance = new ContractFunctionRevertedError({
+      abi: sharedMarketAbi,
+      functionName: "mergePosition",
+      data: encodeErrorResult({
+        abi: sharedMarketAbi,
+        errorName: "ERC1155InsufficientBalance",
+        args: [receiver, 1n, 2n, 33n],
+      }),
+    });
+    expect(describeSharedError(balance)).toMatch(/not enough position units/);
+  });
+
   it("explains the local game's closure guard", () => {
     const cause = new ContractFunctionRevertedError({
       abi: localGameAbi,

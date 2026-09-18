@@ -24,16 +24,19 @@ function buildConnectors(): CreateConnectorFn[] {
   // Local sandbox only: anvil auto-signs for its unlocked default accounts,
   // so this "wallet" sends real transactions without a browser extension.
   if (appConfig.chain.id === anvil.id) {
-    connectors.push(
-      mock({
-        accounts: [
-          "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-          "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
-          "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
-        ],
-        features: { defaultConnected: false },
-      }),
-    );
+    const localAccounts = [
+      "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+      "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+      "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+    ] as const;
+    for (const [index, account] of localAccounts.entries()) {
+      const connector = mock({ accounts: [account], features: { defaultConnected: false } });
+      connectors.push((config) => ({
+        ...connector(config),
+        id: `mock-wallet-${index + 1}`,
+        name: `Mock Connector ${index + 1}`,
+      }));
+    }
   }
   return connectors;
 }

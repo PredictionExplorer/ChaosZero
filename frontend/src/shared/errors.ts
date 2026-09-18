@@ -2,6 +2,13 @@ import { BaseError, ContractFunctionRevertedError, UserRejectedRequestError } fr
 import { describeTxError } from "@/lib/errors";
 
 const SHARED_ERRORS: Record<string, string> = {
+  ERC1155InsufficientBalance:
+    "There are not enough position units for this action. Refresh your balances.",
+  ERC1155InvalidReceiver:
+    "The recipient cannot accept these position tokens. Check the address and receiving-contract support.",
+  ERC1155InvalidSender: "The position sender is invalid. Reconnect your wallet and try again.",
+  ERC1155MissingApprovalForAll: "The connected wallet is not authorized to move these positions.",
+  ERC1155InvalidArrayLength: "The batch position amounts do not match. Refresh and try again.",
   AnswerKnown:
     "This answer is already known. Refresh the market and retrieve any winning position.",
   ProductWouldDecrease:
@@ -13,6 +20,7 @@ const SHARED_ERRORS: Record<string, string> = {
     "Trading and funding are closed for this cycle. Known winnings can still be retrieved.",
   DeadlineExpired:
     "This quote expired before the transaction completed. Refresh and request a new quote.",
+  NotInitialized: "There are no funded or split positions in this cycle yet.",
   NotFunded: "This cycle needs its first pool gift before trading can begin.",
   InsufficientPosition:
     "There are not enough units in this position to sell. Refresh your balances.",

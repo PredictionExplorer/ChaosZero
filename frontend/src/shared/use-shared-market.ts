@@ -10,6 +10,8 @@ import { appConfig } from "@/lib/config";
 import { describeSharedError } from "./errors";
 import { localGameAbi, localTokenAbi, outcomeSourceAbi, sharedMarketAbi } from "./abi";
 import type { SharedPool } from "./math";
+import { positionId, validateRecipient, type PositionAmounts } from "./positions";
+import type { PositionRecovery } from "./use-position-recovery";
 
 // Local-only ceilings: the joint invariant traverses up to256 endings; game
 // rewards can take a more expensive path when the mined timestamp advances.
@@ -240,7 +242,11 @@ export function useSharedMarket(market: Address, roundOverride: bigint | null) {
   });
 }
 
-export function useSharedActions(market: Address, snapshot: SharedSnapshot | undefined) {
+export function useSharedActions(
+  market: Address,
+  snapshot: SharedSnapshot | undefined,
+  recovery?: PositionRecovery,
+) {
   const publicClient = usePublicClient();
   const { writeContractAsync: submitContract } = useWriteContract();
   const { address: account, chainId: walletChainId } = useConnection();
@@ -260,7 +266,7 @@ export function useSharedActions(market: Address, snapshot: SharedSnapshot | und
     // Decode a failed preflight before opening the wallet. The explicit local
     // gas ceiling still covers timestamp-dependent work in the mined block.
     await publicClient.simulateContract({ ...parameters, account });
-    return submitContract({ ...parameters, chainId: appConfig.chain.id });
+    return submitContract({ ...parameters, chainId: appConfig.chain.id, account });
   };
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<string | null>(null);
@@ -308,12 +314,68 @@ export function useSharedActions(market: Address, snapshot: SharedSnapshot | und
     return (await publicClient.getBlock()).timestamp + 900n;
   };
   const required = () => {
+    if (recovery)
+      throw new Error(
+        "Outcome data is unavailable. Only merges and owner transfers are available.",
+      );
     if (!snapshot) throw new Error("Market data unavailable");
     return snapshot;
+  };
+  const positionRound = () => {
+    if (recovery) {
+      if (!account) throw new Error("Connect your wallet to continue.");
+      if (recovery.owner.toLowerCase() !== account.toLowerCase())
+        throw new Error("Recovery balances belong to a different wallet. Refresh your positions.");
+      return recovery.roundId;
+    }
+    return required().roundId;
   };
   return {
     pending,
     message,
+    split: (question: number, amount: bigint) =>
+      run("Complete-set split", () =>
+        writeContractAsync({
+          address: market,
+          abi: sharedMarketAbi,
+          functionName: "splitPosition",
+          gas: LOCAL_GAS_LIMIT,
+          args: [required().roundId, question, amount],
+        }),
+      ),
+    merge: (question: number, amount: bigint) =>
+      run("Complete-set merge", () =>
+        writeContractAsync({
+          address: market,
+          abi: sharedMarketAbi,
+          functionName: "mergePosition",
+          gas: LOCAL_GAS_LIMIT,
+          args: [positionRound(), question, amount],
+        }),
+      ),
+    mergeAll: (amounts: PositionAmounts) =>
+      run("Matched-set merge", () =>
+        writeContractAsync({
+          address: market,
+          abi: sharedMarketAbi,
+          functionName: "mergePositions",
+          gas: LOCAL_GAS_LIMIT,
+          args: [positionRound(), amounts],
+        }),
+      ),
+    transfer: (question: number, yes: boolean, amount: bigint, recipient: string) =>
+      run("Position transfer", () => {
+        if (!account) throw new Error("Connect your wallet to continue.");
+        const target = validateRecipient(recipient, account, market);
+        if (!target.address) throw new Error(target.error ?? "Enter a recipient address.");
+        return writeContractAsync({
+          address: market,
+          abi: sharedMarketAbi,
+          functionName: "safeTransferFrom",
+          gas: LOCAL_GAS_LIMIT,
+          args: [account, target.address, positionId(positionRound(), question, yes), amount, "0x"],
+        });
+      }),
     approve: (amount: bigint) =>
       run("CST approval", () =>
         writeContractAsync({

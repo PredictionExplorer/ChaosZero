@@ -6,11 +6,15 @@ Report suspected financial or authorization vulnerabilities privately to the pro
 
 ## Security boundaries
 
-- `SharedOutcomeMarket` has immutable token and outcome-source references. It has no administrator, upgrade mechanism, mint function, or sponsor withdrawal privilege.
+- `SharedOutcomeMarket` has immutable token and outcome-source references. It has no administrator, upgrade mechanism, CST minting authority, or sponsor withdrawal privilege.
 - The outcome source is trusted to describe the game truthfully and monotonically. The market rejects contradictions it has already observed, but this does not make an arbitrary source trustworthy. A production source needs a separately reviewed provenance mechanism.
 - The supported collateral must have standard, exact transfers. Rebasing, transfer taxes, and arbitrary external balance destruction are unsupported. CST's upstream mint/burn authority and the game's upgradeability are part of a future deployment review.
 - The local game, local token, and local source cannot be constructed on a chain other than `31337`. The shared frontend additionally refuses public-chain operation.
-- All token movements are guarded against reentrancy and verified by balance deltas. Direct transfers do not create claims or credited funding.
+- All economic entry points share a reentrancy guard. CST movements are verified by balance deltas. Direct CST transfers do not create claims or credited funding.
+- ERC-1155 transfers retain standard receiver-callback composability: a receiver may forward newly received positions. All collateral and aggregate accounting is complete before safe-mint callbacks, and nested economic operations during a guarded operation revert. A receiver can redeem newly received pairs during a standalone position transfer; receiver rejection rolls back the entire call.
+- ERC-1155 is the sole holder-balance ledger. Issuance and redemption update aggregate liabilities; transfers and operator approvals do not. An operator approved for all positions can transfer them to itself and redeem them. Treat that approval as authority over every current and future position held by the approving wallet.
+- Complete-set merges redeem only equal YES/NO quantities from the same question and cycle. They do not call the outcome source and remain available after finalization or rollover. Splitting requires an unresolved open question, but no sponsor. Split-only cycles support ordinary settlement without first receiving a gift.
+- Once finalization has been successfully cached, winner retrieval uses those fixed answers without calling the source again. Prior to cached finalization, retrieval still synchronizes and validates the source; source failures cannot silently choose new answers.
 - Every trading state must back every feasible final answer. Known-answer payouts and rollover preserve each remaining claim's backing. Unclaimed user funds never become another cycle's sponsorship.
 
 ## Economic limitations

@@ -10,7 +10,7 @@ The eight recurring questions share one pool per cycle. The screen supports
 exact buy/sell quotes, explicit CST approvals, irreversible pool gifts, partial
 settlement and retrieval, completed-cycle navigation, and sponsor-residue
 rollover. Local controls provide test CST, ETH/CST gestures, time advances, and
-cycle closure. Connect the **Mock Connector** to use an unlocked local account.
+cycle closure. Connect **Mock Connector 1**, **2**, or **3** to use separate unlocked local accounts.
 The local wallet and public reads both use `NEXT_PUBLIC_RPC_URL`.
 
 `NEXT_PUBLIC_SHARED_MARKET_ADDRESS` explicitly selects the new contract. When
@@ -18,6 +18,22 @@ present, `/` displays the shared screen as well. It never falls back to
 `NEXT_PUBLIC_MARKET_ADDRESS` or applies the shared ABI to that legacy address.
 Both the shared screen and its transaction actions reject chains other than 31337. A verified live outcome-source integration is required before this
 prototype can trade on a public chain.
+
+YES and NO positions are standard ERC-1155 tokens. The complete-set panel splits
+1 CST into one YES plus one NO for the same question, and merges matched units
+back into CST at exactly 1:1. Splits work before pool sponsorship; merges work
+after settlement too. Batch merge pairs each question independently. Portfolio
+transfers send owner-held tokens directly to another wallet or an ERC-1155 receiver.
+The UI displays total CST custody, maximum payout obligations, and minimum
+remaining reserve separately: splitting a pair increases custody but does not
+add AMM liquidity or change prices.
+
+If outcome reads fail, trading, splitting and sponsorship remain disabled. A
+narrow recovery panel refreshes only the market/token balances for an explicit
+or previously loaded cycle and allows owner merges/transfers. It does not guess
+the current cycle or reuse stale balances; polling preserves drafts while
+transaction controls wait for fresh data. Wallet, market and cycle changes reset
+those drafts. Transactions pin both the connected account and local chain.
 
 The implementation lives in `src/shared/`. The BigInt quote solver mirrors the
 contract's directed-rounding logarithm bounds and checks all feasible joint
@@ -144,7 +160,7 @@ NEXT_PUBLIC_MARKET_ADDRESS=<GestureSeriesMarket address from the script>
 NEXT_PUBLIC_RPC_URL=http://127.0.0.1:8545
 ```
 
-On the anvil chain the wallet modal offers a **Mock Connector** for anvil's
+On the anvil chain the wallet modal offers three **Mock Connector** choices for anvil's
 unlocked default accounts — no browser extension needed. Drive the game from
 the command line:
 

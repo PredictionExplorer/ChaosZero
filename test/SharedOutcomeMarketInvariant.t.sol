@@ -37,6 +37,8 @@ contract SharedMarketHandler is Test {
         question %= 8;
         uint256 id = currentRound;
         if (finalized[id] || (known[id] & (uint256(1) << question)) != 0) return;
+        (, bool funded,,) = market.roundAccounting(id);
+        if (!funded) return;
         uint256 amount = bound(raw, 1e12, 1e18);
         (uint256 minimum, uint256 maximum) = _reserveRange(id);
         // Pair the two sides. a + a*min/(max+a) preserves each pair's product;
@@ -51,6 +53,8 @@ contract SharedMarketHandler is Test {
         question %= 8;
         uint256 id = currentRound;
         if (finalized[id] || (known[id] & (uint256(1) << question)) != 0) return;
+        (, bool funded,,) = market.roundAccounting(id);
+        if (!funded) return;
         address who = actors[actor % 3];
         (uint256[8] memory y, uint256[8] memory n) = market.balancesOf(id, who);
         uint256 owned = yes ? y[question] : n[question];
@@ -86,7 +90,8 @@ contract SharedMarketHandler is Test {
     function sponsor(uint256 raw) external {
         uint256 id = currentRound;
         if (finalized[id] || known[id] == 255) return;
-        uint256 amount = bound(raw, 1, 10e18);
+        (, bool funded,,) = market.roundAccounting(id);
+        uint256 amount = bound(raw, funded ? 1 : market.MIN_FUNDING(), 10e18);
         vm.prank(actors[0]);
         market.fundRound(id, amount);
         cashIn += amount;
@@ -102,9 +107,11 @@ contract SharedMarketHandler is Test {
         if (id == MAX_ROUNDS) return;
         currentRound = ++id;
         source.set(id, true, false, 0, 0);
-        // A new cycle always has its own accounted seed; previous claims persist.
+        // Alternate ordinary sponsor seeds with initialized, unsponsored sets.
+        // Previous claims remain outstanding through both paths.
         vm.prank(actors[0]);
-        market.fundRound(id, 10e18);
+        if (finalValues & 1 == 0) market.fundRound(id, 10e18);
+        else market.splitPosition(id, 0, 10e18);
         cashIn += 10e18;
     }
 
@@ -119,6 +126,8 @@ contract SharedMarketHandler is Test {
             owed += (values[from] & (uint256(1) << q)) != 0 ? y[q] : n[q];
         }
         if (cash == owed) return;
+        (, bool funded,,) = market.roundAccounting(to);
+        if (!funded && cash - owed < market.MIN_FUNDING()) return;
         uint256 beforePoolBalance = token.balanceOf(address(market));
         assertEq(market.rollover(from, to), cash - owed);
         assertEq(token.balanceOf(address(market)), beforePoolBalance, "rollover moved external collateral");
@@ -130,6 +139,81 @@ contract SharedMarketHandler is Test {
         vm.prank(actors[actor % 3]);
         token.transfer(address(market), amount);
         untrackedDonations += amount;
+    }
+
+    function split(uint256 actor, uint8 question, uint256 raw) external {
+        question %= 8;
+        uint256 id = currentRound;
+        if (finalized[id] || (known[id] & (uint256(1) << question)) != 0) return;
+        uint256 amount = bound(raw, 1, 1e18);
+        vm.prank(actors[actor % 3]);
+        market.splitPosition(id, question, amount);
+        cashIn += amount;
+    }
+
+    function merge(uint256 actor, uint256 roundSeed, uint8 question, uint256 raw) external {
+        question %= 8;
+        uint256 id = 1 + roundSeed % currentRound;
+        address who = actors[actor % 3];
+        (uint256[8] memory y, uint256[8] memory n) = market.balancesOf(id, who);
+        uint256 pairs = y[question] < n[question] ? y[question] : n[question];
+        if (pairs == 0) return;
+        uint256 amount = bound(raw, 1, pairs);
+        vm.prank(who);
+        assertEq(market.mergePosition(id, question, amount), amount);
+        cashOut += amount;
+    }
+
+    function mergeBatch(uint256 actor, uint256 roundSeed, uint8 selected, uint8 fraction) external {
+        uint256 id = 1 + roundSeed % currentRound;
+        address who = actors[actor % 3];
+        (uint256[8] memory y, uint256[8] memory n) = market.balancesOf(id, who);
+        uint256[8] memory amounts;
+        uint256 total;
+        for (uint256 q; q < 8; ++q) {
+            if ((selected & (uint256(1) << q)) == 0) continue;
+            amounts[q] = (y[q] < n[q] ? y[q] : n[q]) / (uint256(fraction) + 1);
+            total += amounts[q];
+        }
+        if (total == 0) return;
+        vm.prank(who);
+        assertEq(market.mergePositions(id, amounts), total);
+        cashOut += total;
+    }
+
+    function transfer(uint256 actor, uint256 recipient, uint256 roundSeed, uint8 question, bool yes, uint256 raw)
+        external
+    {
+        question %= 8;
+        uint256 id = market.positionId(1 + roundSeed % currentRound, question, yes);
+        address who = actors[actor % 3];
+        uint256 held = market.balanceOf(who, id);
+        if (held == 0) return;
+        uint256 amount = bound(raw, 1, held);
+        vm.prank(who);
+        market.safeTransferFrom(who, actors[recipient % 3], id, amount, "invariant transfer");
+    }
+
+    function operatorBatchTransfer(uint256 actor, uint256 roundSeed, uint8 question, uint8 fraction) external {
+        question %= 8;
+        uint256 round = 1 + roundSeed % currentRound;
+        address who = actors[actor % 3];
+        address operator = actors[(actor % 3 + 1) % 3];
+        address recipient = actors[(actor % 3 + 2) % 3];
+        uint256[] memory ids = new uint256[](2);
+        uint256[] memory amounts = new uint256[](2);
+        ids[0] = market.positionId(round, question, true);
+        ids[1] = market.positionId(round, uint8((question + 1) % 8), false);
+        amounts[0] = market.balanceOf(who, ids[0]) / (uint256(fraction) + 1);
+        amounts[1] = market.balanceOf(who, ids[1]) / (uint256(fraction) + 1);
+        if (amounts[0] + amounts[1] == 0) return;
+        vm.prank(who);
+        market.setApprovalForAll(operator, true);
+        vm.prank(operator);
+        market.safeBatchTransferFrom(who, recipient, ids, amounts, "operator invariant transfer");
+        vm.prank(who);
+        market.setApprovalForAll(operator, false);
+        assertFalse(market.isApprovedForAll(who, operator));
     }
 
     function finish() external {
@@ -181,7 +265,7 @@ contract SharedOutcomeMarketInvariantTest is StdInvariant, Test {
         token.approve(address(market), type(uint256).max);
         market.fundRound(1, SEED);
         handler = new SharedMarketHandler(market, source, token);
-        bytes4[] memory selectors = new bytes4[](8);
+        bytes4[] memory selectors = new bytes4[](13);
         selectors[0] = handler.buy.selector;
         selectors[1] = handler.sell.selector;
         selectors[2] = handler.reveal.selector;
@@ -190,6 +274,11 @@ contract SharedOutcomeMarketInvariantTest is StdInvariant, Test {
         selectors[5] = handler.advance.selector;
         selectors[6] = handler.rollover.selector;
         selectors[7] = handler.directDonation.selector;
+        selectors[8] = handler.split.selector;
+        selectors[9] = handler.merge.selector;
+        selectors[10] = handler.mergeBatch.selector;
+        selectors[11] = handler.transfer.selector;
+        selectors[12] = handler.operatorBatchTransfer.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
         targetContract(address(handler));
     }
@@ -219,13 +308,15 @@ contract SharedOutcomeMarketInvariantTest is StdInvariant, Test {
             for (uint256 q; q < 8; ++q) {
                 assertEq(y[q], sumY[q]);
                 assertEq(n[q], sumN[q]);
+                assertEq(market.totalSupply(market.positionId(id, uint8(q), true)), sumY[q]);
+                assertEq(market.totalSupply(market.positionId(id, uint8(q), false)), sumN[q]);
             }
         }
     }
 
     function invariant_everyFeasibleEndingOfEveryCycleBacked() public view {
         for (uint256 id = 1; id <= handler.currentRound(); ++id) {
-            (uint256 cash,,,) = market.roundAccounting(id);
+            (uint256 cash, bool funded,,) = market.roundAccounting(id);
             (uint256[8] memory y, uint256[8] memory n) = market.liabilities(id);
             uint8 mask = handler.known(id);
             uint8 val = handler.values(id);
@@ -236,7 +327,7 @@ contract SharedOutcomeMarketInvariantTest is StdInvariant, Test {
                     liability += (s & (uint256(1) << q)) != 0 ? y[q] : n[q];
                 }
                 assertGe(cash, liability, "old or current claims lost backing");
-                if (!handler.finalized(id)) assertGt(cash, liability, "active reserve was drained");
+                if (!handler.finalized(id) && funded) assertGt(cash, liability, "active reserve was drained");
             }
         }
     }

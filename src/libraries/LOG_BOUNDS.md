@@ -71,6 +71,36 @@ analytic or floating-point quote will execute. The contract executes the exact
 cash and token quantities submitted by the user; it does not fill at a different
 quantity and does not charge a separate fee.
 
+## Complete sets and ownership
+
+Splitting amount `a` for question `q` increases `B`, `YES[q]`, and `NO[q]` by
+`a`. Every ending selects exactly one of those two liabilities. Its reserve
+therefore changes by `a - a = 0`. Merging subtracts the same amount from all
+three quantities, again changing every reserve by zero. For a batch of
+questions this argument adds: collateral falls by the sum of the pairs, and
+every ending's winning liability falls by exactly that sum. There is no product
+approximation or quote in either operation.
+
+For any feasible ending, the collateral backing the holder's matched pairs is
+part of the winning liability. The holder's pairs can therefore be paid even
+after sponsor residue is rolled forward. This exit does not require a source
+read, a cached answer, or an open cycle. Existing solvency and the ownership
+checks suffice. Pairing positions from different questions or cycles would not
+have this property and is never allowed.
+
+A cycle may initially contain only split positions. In that case every reserve
+is zero and the pool is not marked funded; trading is unavailable until it
+receives sponsorship. Claims and merges remain available without sponsorship.
+The first gift must meet the funding minimum on its own, independently of
+collateral already backing split positions.
+
+ERC-1155 is the only per-holder ledger. Standard transfers change who owns a
+claim, but never aggregate supply or collateral, so reserves are unchanged.
+Only guarded economic methods mint or burn. Collateral receipt and aggregate
+accounting finish before ERC-1155 mint acceptance callbacks. Transfers retain
+standard callback forwarding; callbacks cannot reenter a guarded economic
+operation while one is already executing. Rejected callbacks revert atomically.
+
 ## Funding, partial answers and claims
 
 Additional sponsorship is an irreversible gift that increases all feasible
@@ -84,6 +114,9 @@ Losing liabilities are removed only for already impossible endings. Every
 remaining feasible reserve therefore stays unchanged. After all answers are
 final, rollover moves only `B - sum(unpaid winning claims)` to a later open
 cycle. Old claims retain their collateral independently of rollover timing.
+Once finalization is cached, retrieval uses its permanently fixed answer vector
+without a further source read. This changes neither the payout nor its backing,
+and preserves redemption if the finalized source later becomes unavailable.
 
 Direct token transfers do not change the accounted collateral. Funding checks
 the actual received balance delta; payouts check both sent and received deltas.

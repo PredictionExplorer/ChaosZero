@@ -5,8 +5,9 @@ import {Test} from "forge-std/Test.sol";
 import {SharedOutcomeMarket, ISharedCollateral} from "../src/SharedOutcomeMarket.sol";
 import {IOutcomeSource} from "../src/interfaces/IOutcomeSource.sol";
 import {MockCst, FalseReturningCst, ReenteringCst, IReentryHook} from "./utils/Mocks.sol";
+import {ERC1155Holder} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155Holder.sol";
 
-contract SharedReentryProbe is IReentryHook {
+contract SharedReentryProbe is IReentryHook, ERC1155Holder {
     SharedOutcomeMarket public market;
     bool public blocked;
 
@@ -101,7 +102,7 @@ contract SharedTestSource is IOutcomeSource {
     }
 }
 
-contract SharedOutcomeMarketTest is Test {
+contract SharedOutcomeMarketTest is Test, ERC1155Holder {
     MockCst internal token;
     SharedTestSource internal source;
     SharedOutcomeMarket internal market;
@@ -342,14 +343,22 @@ contract SharedOutcomeMarketTest is Test {
         callback.approve(address(m), type(uint256).max);
         m.fundRound(1, SEED);
         m.buy(1, 0, true, 10e18, 15e18, type(uint256).max);
-        bytes[5] memory attacks = [
+        m.splitPosition(1, 2, 1e18);
+        m.splitPosition(1, 3, 1e18);
+        uint256[8] memory pairs;
+        pairs[2] = 1e18;
+        pairs[3] = 1e18;
+        bytes[8] memory attacks = [
             abi.encodeCall(m.fundRound, (1, 1e12)),
             abi.encodeCall(m.buy, (1, 1, true, 1e18, 1e18, type(uint256).max)),
             abi.encodeCall(m.sell, (1, 0, true, 1e18, 1e17, type(uint256).max)),
             abi.encodeCall(m.claimKnown, (1)),
-            abi.encodeCall(m.rollover, (1, 2))
+            abi.encodeCall(m.rollover, (1, 2)),
+            abi.encodeCall(m.splitPosition, (1, 4, 1e18)),
+            abi.encodeCall(m.mergePosition, (1, 2, 1e18)),
+            abi.encodeCall(m.mergePositions, (1, pairs))
         ];
-        for (uint256 origin; origin < 4; ++origin) {
+        for (uint256 origin; origin < 7; ++origin) {
             for (uint256 target; target < attacks.length; ++target) {
                 uint256 snap = vm.snapshotState();
                 callback.arm(address(m), attacks[target]);
@@ -359,9 +368,15 @@ contract SharedOutcomeMarketTest is Test {
                     m.buy(1, 1, true, 1e18, 1e18, type(uint256).max);
                 } else if (origin == 2) {
                     m.sell(1, 0, true, 1e18, 1e17, type(uint256).max);
-                } else {
+                } else if (origin == 3) {
                     source.set(1, false, true, 255, 1);
-                    assertEq(m.claimKnown(1), 15e18);
+                    assertEq(m.claimKnown(1), 17e18);
+                } else if (origin == 4) {
+                    m.splitPosition(1, 4, 1e18);
+                } else if (origin == 5) {
+                    m.mergePosition(1, 2, 1e18);
+                } else {
+                    m.mergePositions(1, pairs);
                 }
                 assertTrue(callback.blocked(), "callback bypassed the global mutation guard");
                 assertEq(callback.attempts(), 1);

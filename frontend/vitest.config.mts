@@ -12,6 +12,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       thresholds: {
+        "src/shared/positions.ts": { statements: 98, branches: 95, functions: 100, lines: 99 },
+        "src/shared/use-position-recovery.ts": {
+          statements: 98,
+          branches: 95,
+          functions: 100,
+          lines: 99,
+        },
         "src/shared/math.ts": { statements: 95, branches: 95, functions: 100, lines: 99 },
         "src/hooks/use-market.ts": { statements: 98, branches: 95, functions: 100, lines: 99 },
         "src/hooks/use-market-actions.ts": {

@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 import {
   assertCleanPushTree,
+  assertContractDependencies,
   assertPushReferencesMatchHead,
   assertStagedMatchesWorktree,
   classifyChanges,
@@ -18,6 +19,19 @@ function temporaryDirectory(t) {
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   return directory;
 }
+
+test("contract prerequisites require both the test library and standard token implementation", (t) => {
+  const root = temporaryDirectory(t);
+  assert.throws(() => assertContractDependencies(root), /forge-std, OpenZeppelin ERC1155/);
+  const forge = join(root, "lib/forge-std/src/Test.sol");
+  mkdirSync(dirname(forge), { recursive: true });
+  writeFileSync(forge, "// Test dependency fixture\n");
+  assert.throws(() => assertContractDependencies(root), /missing \(OpenZeppelin ERC1155\)/);
+  const erc1155 = join(root, "lib/openzeppelin-contracts/contracts/token/ERC1155/ERC1155.sol");
+  mkdirSync(dirname(erc1155), { recursive: true });
+  writeFileSync(erc1155, "// Token dependency fixture\n");
+  assert.doesNotThrow(() => assertContractDependencies(root));
+});
 
 test("partially staged source cannot validate different code from the commit", (t) => {
   const root = temporaryDirectory(t);
@@ -66,6 +80,11 @@ test("shared tooling changes require both application and contract checks", () =
   });
   assert.equal(classifyChanges(["src/Market.sol"]).contracts, true);
   assert.equal(classifyChanges(["test/Market.t.sol"]).contracts, true);
+  assert.deepEqual(classifyChanges(["foundry.lock"]), {
+    contracts: true,
+    frontend: false,
+    tooling: false,
+  });
   assert.equal(classifyChanges(["frontend/src/lib/math.ts"]).frontend, true);
   assert.deepEqual(classifyChanges(["README.md"]), {
     contracts: false,

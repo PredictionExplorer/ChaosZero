@@ -9,6 +9,7 @@ import {
   UserRejectedRequestError,
 } from "viem";
 import { sharedMarketAbi } from "./abi";
+import type { PositionRecovery } from "./use-position-recovery";
 import {
   useSharedActions,
   useSharedMarket,
@@ -359,6 +360,28 @@ describe("useSharedMarket snapshot assembly", () => {
 describe("useSharedActions transaction boundaries", () => {
   it.each([
     {
+      label: "split",
+      invoke: (hook: ReturnType<typeof useSharedActions>) => hook.split(2, 3n * ONE),
+      address: MARKET,
+      name: "splitPosition",
+      args: [6n, 2, 3n * ONE],
+    },
+    {
+      label: "merge",
+      invoke: (hook: ReturnType<typeof useSharedActions>) => hook.merge(2, 3n * ONE),
+      address: MARKET,
+      name: "mergePosition",
+      args: [6n, 2, 3n * ONE],
+    },
+    {
+      label: "batch merge",
+      invoke: (hook: ReturnType<typeof useSharedActions>) =>
+        hook.mergeAll([ONE, 0n, 2n * ONE, 0n, 0n, 0n, 0n, 0n]),
+      address: MARKET,
+      name: "mergePositions",
+      args: [6n, [ONE, 0n, 2n * ONE, 0n, 0n, 0n, 0n, 0n]],
+    },
+    {
       label: "approval",
       invoke: (hook: ReturnType<typeof useSharedActions>) => hook.approve(25n * ONE),
       address: TOKEN,
@@ -436,6 +459,141 @@ describe("useSharedActions transaction boundaries", () => {
       expect(mocks.submitContract).toHaveBeenCalledWith(expect.objectContaining(expected));
     },
   );
+
+  it("transfers only the connected owner's exact ERC-1155 position ID and units", async () => {
+    const { result, invalidate } = actions();
+    await act(async () => {
+      expect(await result.current.transfer(2, true, 3n * ONE, GAME)).toBe(true);
+    });
+    expect(mocks.submitContract).toHaveBeenCalledWith(
+      expect.objectContaining({
+        address: MARKET,
+        functionName: "safeTransferFrom",
+        args: [ACCOUNT, GAME, 101n, 3n * ONE, "0x"],
+        gas: 2_000_000n,
+        chainId: 31337,
+      }),
+    );
+    expect(mocks.simulateContract).toHaveBeenCalledOnce();
+    expect(invalidate).toHaveBeenCalledOnce();
+  });
+
+  it.each(["", "not-an-address", "0x0000000000000000000000000000000000000000", ACCOUNT, MARKET])(
+    "rejects invalid transfer recipient %s before preflight",
+    async (recipient) => {
+      const { result } = actions();
+      await act(async () => {
+        expect(await result.current.transfer(0, true, ONE, recipient)).toBe(false);
+      });
+      expect(mocks.simulateContract).not.toHaveBeenCalled();
+      expect(mocks.submitContract).not.toHaveBeenCalled();
+      expect(result.current.message).not.toBeNull();
+    },
+  );
+
+  it("cannot transfer without a connected owner", async () => {
+    mocks.connection.address = undefined;
+    const { result } = actions();
+    await act(async () => {
+      expect(await result.current.transfer(0, true, ONE, GAME)).toBe(false);
+    });
+    expect(result.current.message).toMatch(/Connect your wallet/);
+    expect(mocks.submitContract).not.toHaveBeenCalled();
+  });
+
+  it("merges and transfers freshly read recovery positions without a game snapshot or source reads", async () => {
+    const { wrapper, invalidate } = harness();
+    const recovered: PositionRecovery = {
+      owner: ACCOUNT,
+      roundId: 3n,
+      token: TOKEN,
+      timestamp: 1234n,
+      collateral: 100n * ONE,
+      user: snapshot().user!,
+    };
+    const { result } = renderHook(() => useSharedActions(MARKET, undefined, recovered), {
+      wrapper,
+    });
+    await act(async () => {
+      expect(await result.current.merge(1, ONE)).toBe(true);
+    });
+    expect(mocks.submitContract).toHaveBeenLastCalledWith(
+      expect.objectContaining({ functionName: "mergePosition", args: [3n, 1, ONE] }),
+    );
+    await act(async () => {
+      expect(await result.current.mergeAll([ONE, 0n, 0n, 0n, 0n, 0n, 0n, 0n])).toBe(true);
+    });
+    expect(mocks.submitContract).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        functionName: "mergePositions",
+        args: [3n, [ONE, 0n, 0n, 0n, 0n, 0n, 0n, 0n]],
+      }),
+    );
+    await act(async () => {
+      expect(await result.current.transfer(0, false, ONE, GAME)).toBe(true);
+    });
+    expect(mocks.submitContract).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        functionName: "safeTransferFrom",
+        args: [ACCOUNT, GAME, 48n, ONE, "0x"],
+      }),
+    );
+    expect(mocks.readContract).not.toHaveBeenCalled();
+    expect(mocks.getBlock).not.toHaveBeenCalled();
+    expect(invalidate).toHaveBeenCalledTimes(3);
+    await act(async () => {
+      expect(await result.current.split(0, ONE)).toBe(false);
+    });
+    expect(result.current.message).toMatch(/Only merges and owner transfers/);
+    expect(mocks.submitContract).toHaveBeenCalledTimes(3);
+  });
+
+  it("rejects cached recovery balances belonging to another or disconnected wallet", async () => {
+    const { wrapper } = harness();
+    const recovered: PositionRecovery = {
+      owner: GAME,
+      roundId: 3n,
+      token: TOKEN,
+      timestamp: 1234n,
+      collateral: 100n * ONE,
+      user: snapshot().user!,
+    };
+    const { result, rerender } = renderHook(() => useSharedActions(MARKET, undefined, recovered), {
+      wrapper,
+    });
+    await act(async () => {
+      expect(await result.current.merge(0, ONE)).toBe(false);
+    });
+    expect(result.current.message).toMatch(/different wallet/);
+    expect(mocks.simulateContract).not.toHaveBeenCalled();
+    mocks.connection.address = undefined;
+    rerender();
+    await act(async () => {
+      expect(await result.current.merge(0, ONE)).toBe(false);
+    });
+    expect(result.current.message).toMatch(/Connect your wallet/);
+    expect(mocks.submitContract).not.toHaveBeenCalled();
+  });
+
+  it("pins the original sender when the wallet changes while preflight is in flight", async () => {
+    const preflight = deferred<{ request: object }>();
+    mocks.simulateContract.mockReturnValueOnce(preflight.promise);
+    const { result, rerender } = actions();
+    let first!: Promise<boolean>;
+    act(() => {
+      first = result.current.split(0, ONE);
+    });
+    await waitFor(() => expect(mocks.simulateContract).toHaveBeenCalledOnce());
+    mocks.connection.address = GAME;
+    rerender();
+    await act(async () => {
+      preflight.resolve({ request: {} });
+      expect(await first).toBe(true);
+    });
+    expect(mocks.submitContract).toHaveBeenCalledWith(
+      expect.objectContaining({ account: ACCOUNT, chainId: 31337, functionName: "splitPosition" }),
+    );
+  });
 
   it("does not open the wallet when the contract rejects the preflight", async () => {
     mocks.simulateContract.mockRejectedValueOnce(
