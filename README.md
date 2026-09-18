@@ -109,6 +109,8 @@ Git hooks are installed by `pnpm setup:dev`. Pre-commit verifies the staged sour
 
 ## Before a real-CST pilot
 
+See [the concise game-storage requirements](GAME_STORAGE_REQUIREMENTS.md) for the upgrade path, including reuse of the champion-duration history already present in V3 source.
+
 The live V2 game does not retain all eight historical statistics. The local source must never be substituted for a production resolver. A future integration must either verify historical game receipts against authenticated Arbitrum block hashes, or use game-provided immutable per-cycle statistics after an upgrade. Neither plain indexer responses nor creator-signed results meet the intended trustless design.
 
 An immutable production adapter, its liveness/recovery plan, gas measurements on Arbitrum, and independent financial review are required before a real-CST launch. This branch does not broadcast a public deployment or change the existing production address.
