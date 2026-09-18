@@ -122,6 +122,11 @@ function vectors() {
   for (const [generator, contract, output] of [
     ["script/GenerateVectors.s.sol", "GenerateVectors", "contract-vectors.json"],
     ["script/GenerateSharedVectors.s.sol", "GenerateSharedVectors", "shared-contract-vectors.json"],
+    [
+      "script/GenerateIndependentVectors.s.sol",
+      "GenerateIndependentVectors",
+      "independent-contract-vectors.json",
+    ],
   ]) {
     const fixture = join(frontend, "src/test/fixtures", output);
     step(`Contract/frontend differential fixture consistency: ${output}`, () =>

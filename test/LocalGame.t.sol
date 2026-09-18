@@ -74,6 +74,76 @@ contract LocalGameTest is Test {
         assertEq(values, 0);
     }
 
+    function test_cycleTimesAreCanonicalAndNeverTheLaterObservationTime() public {
+        (uint256 start, uint256 end) = source.cycleTimes(1);
+        assertEq(start, 0);
+        assertEq(end, 0);
+        uint256 first = vm.getBlockTimestamp();
+        _eth();
+        vm.warp(vm.getBlockTimestamp() + 42);
+        _eth();
+        (start, end) = source.cycleTimes(1);
+        assertEq(start, first);
+        assertEq(end, 0);
+        vm.warp(game.mainPrizeTime() + 123);
+        uint256 closed = vm.getBlockTimestamp();
+        vm.prank(alice);
+        game.closeCycle();
+        vm.warp(vm.getBlockTimestamp() + 30 days);
+        (start, end) = source.cycleTimes(1);
+        assertEq(start, first);
+        assertEq(end, closed);
+        (start, end) = source.cycleTimes(2);
+        assertEq(start, 0);
+        assertEq(end, 0);
+        _eth();
+        (start, end) = source.cycleTimes(2);
+        assertEq(start, vm.getBlockTimestamp());
+        assertEq(end, 0);
+        (, end) = source.cycleTimes(1);
+        assertEq(end, closed);
+    }
+
+    function testFuzz_fixtureHistoryNeverEndsInTheFuture(uint64 timestamp) public {
+        vm.warp(timestamp);
+        LocalCosmicGame earlyGame = new LocalCosmicGame();
+        LocalOutcomeSource earlySource = new LocalOutcomeSource(earlyGame);
+        (uint256 start, uint256 end) = earlySource.cycleTimes(0);
+        assertLe(start, end);
+        assertEq(end, timestamp);
+        CycleMetrics.Metrics memory previous = earlyGame.roundStats(0);
+        assertTrue(previous.finalized);
+        assertEq(previous.gestureCount, 6);
+        assertLe(previous.lastGestureTime, end);
+    }
+
+    function test_epochZeroFixtureHasValidCanonicalTimes() public {
+        vm.warp(0);
+        LocalCosmicGame earlyGame = new LocalCosmicGame();
+        LocalOutcomeSource earlySource = new LocalOutcomeSource(earlyGame);
+        (uint256 start, uint256 end) = earlySource.cycleTimes(0);
+        assertEq(start, 0);
+        assertEq(end, 0);
+        assertTrue(earlyGame.roundStats(0).finalized);
+    }
+
+    function testFuzz_cycleTimesFollowGameActionsAcrossCycles(uint32[4] memory waits) public {
+        for (uint256 i; i < waits.length; ++i) {
+            uint256 round = game.roundNum();
+            vm.warp(vm.getBlockTimestamp() + waits[i]);
+            uint256 expectedStart = vm.getBlockTimestamp();
+            _eth();
+            vm.warp(game.mainPrizeTime() + waits[(i + 1) % waits.length]);
+            uint256 expectedEnd = vm.getBlockTimestamp();
+            vm.prank(alice);
+            game.closeCycle();
+            vm.warp(vm.getBlockTimestamp() + waits[(i + 2) % waits.length]);
+            (uint256 start, uint256 end) = source.cycleTimes(round);
+            assertEq(start, expectedStart);
+            assertEq(end, expectedEnd);
+        }
+    }
+
     function test_cannotInventUnsupportedRoundsOrFirstCstGesture() public {
         (bool open, bool final_, uint8 known, uint8 values) = source.outcomeState(2);
         assertFalse(open);

@@ -9,13 +9,15 @@ struct MarketStats {
     uint256 ethPaid;       // More ETH paid than the previous cycle?
     uint256 cstPaid;       // More CST charged/burned than the previous cycle?
     uint256 maxCstPaid;    // Higher largest individual CST payment?
-    uint248 cstGestures;   // More CST gestures than ETH gestures?
+    uint64 cstGestures;    // More CST gestures than ETH gestures?
+    uint64 firstGestureAt; // Canonical beginning of the active cycle.
+    uint64 finalizedAt;   // Actual game closure, not a later market claim.
     uint8 flags;          // TRACKED_FROM_START=1, FINALIZED=2, SAME_GESTURE=4
 }
 mapping(uint256 round => MarketStats) public marketStats;
 ```
 
-This uses **four additional storage slots per cycle**: three amounts and one packed counter/flags word. Keep amounts full-width and use checked arithmetic. Existing per-wallet spending totals are unsuitable for efficient settlement: computing a cycle total requires scanning and deduplicating participants. Event logs alone are not directly readable by another contract.
+This uses **four additional storage slots per cycle**: three amounts and one packed counter/timestamps/flags word. Keep amounts full-width; check arithmetic and timestamp conversions. The timestamps define the previous cycle's 40–60% price-average window. Existing per-wallet spending totals require scanning and deduplicating participants. Event logs alone are not directly readable by another contract.
 
 Implementation:
 

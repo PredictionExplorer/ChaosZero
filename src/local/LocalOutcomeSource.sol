@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.35;
 
-import {IOutcomeSource} from "../interfaces/IOutcomeSource.sol";
+import {IIndependentOutcomeSource} from "../interfaces/IIndependentOutcomeSource.sol";
 import {LocalCosmicGame} from "./LocalCosmicGame.sol";
 import {CycleMetrics} from "./CycleMetrics.sol";
 
 /// @notice Objective adapter for the local simulator. Deliberately impossible to deploy on a live chain.
 /// @dev Production requires authenticated historical game data, not an administrator supplying answers.
-contract LocalOutcomeSource is IOutcomeSource {
+contract LocalOutcomeSource is IIndependentOutcomeSource {
     LocalCosmicGame public immutable game;
     error LocalChainOnly();
     error InvalidGame();
@@ -16,6 +16,10 @@ contract LocalOutcomeSource is IOutcomeSource {
         if (block.chainid != 31337) revert LocalChainOnly();
         if (address(game_).code.length == 0) revert InvalidGame();
         game = game_;
+    }
+
+    function cycleTimes(uint256 roundId) external view returns (uint256 firstGestureAt, uint256 finalizedAt) {
+        return game.cycleTimes(roundId);
     }
 
     function outcomeState(uint256 roundId)

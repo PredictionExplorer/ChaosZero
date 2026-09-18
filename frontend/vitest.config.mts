@@ -19,6 +19,12 @@ export default defineConfig({
           functions: 100,
           lines: 99,
         },
+        "src/shared/independent-math.ts": {
+          statements: 98,
+          branches: 95,
+          functions: 100,
+          lines: 99,
+        },
         "src/shared/math.ts": { statements: 95, branches: 95, functions: 100, lines: 99 },
         "src/hooks/use-market.ts": { statements: 98, branches: 95, functions: 100, lines: 99 },
         "src/hooks/use-market-actions.ts": {
