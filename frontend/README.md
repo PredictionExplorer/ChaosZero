@@ -1,10 +1,49 @@
 # Chaos Zero — frontend
 
-## Shared local prototype
+## Independent local prototype
 
-From the repository root, run `pnpm dev:local`. The launcher starts a disposable
-Anvil chain, deploys the test CST token, game simulator, outcome source, and joint
-market, then opens this frontend at `http://127.0.0.1:3000/shared`.
+`pnpm dev:local` from the repository root now launches `IndependentOutcomeMarket`
+on disposable Anvil with the local game and test CST. Open `/shared` (or `/`).
+`NEXT_PUBLIC_INDEPENDENT_MARKET_ADDRESS` selects the new ABI explicitly; it never
+inherits either older market address. The launcher sets the new address and
+blanks `NEXT_PUBLIC_SHARED_MARKET_ADDRESS` and `NEXT_PUBLIC_MARKET_ADDRESS`.
+
+Each question has its own collateral and weighted binary price. A single funding
+transaction divides new gifts plus available carry across all eight pools. The
+funding preview reports the exact allocations, including integer remainders and
+any carry deferred by capacity limits. Starting odds use the previous cycle’s
+40–60% **time window**; missing coverage uses the prior seed. If the immediately
+preceding game cycle has no initialized market, the fallback is 50%. This is
+recorded-price history, not an external price oracle.
+
+Trading continues until full game closure even when a comparison is already
+clear. Settlement moves normal 1:1 winning claims into a separate immutable vault,
+zeros closed-cycle trading collateral, and carries all remaining funds forward.
+First funding of a new cycle automatically settles the prior funded cycle and
+includes carry before trading. Zero-new-CST startup is supported. Later claims
+from an old cycle use its reserve and never reduce new-cycle pool balances.
+
+The UI includes buys/sells, fixed-rate complete sets, batch merges, owner transfers,
+and local wallet/game controls. Source errors disable trading, splitting and
+funding; fresh source-independent balances still permit merges/transfers, and
+cached settled claims remain retrievable. Every write pins its account and local
+chain. Public-chain writes remain disabled pending a verified live source.
+
+New implementation: `src/independent/`, using the independently verified weighted
+solver in `src/shared/independent-math.ts`. Browser coverage in
+`e2e/independent-market.spec.ts` exercises three cycles, price isolation, exact
+funding, history inheritance, source outages, protected late claims, and carry.
+Every browser run snapshots/restores Anvil for retry isolation.
+
+## Previous shared prototype (regression implementation)
+
+The older joint-pool modules and their tests remain in `src/shared/`. To inspect
+that UI with an explicit compatible old deployment, unset the independent address
+and configure `NEXT_PUBLIC_SHARED_MARKET_ADDRESS`. The default launcher no longer
+deploys this earlier design. The following section documents that retained implementation.
+
+The previous simulator deployment used a joint market backed by one pool per cycle.
+Its explicit-address UI remains available at `/shared` for regression work.
 
 The eight recurring questions share one pool per cycle. The screen supports
 exact buy/sell quotes, explicit CST approvals, irreversible pool gifts, partial
@@ -13,7 +52,7 @@ rollover. Local controls provide test CST, ETH/CST gestures, time advances, and
 cycle closure. Connect **Mock Connector 1**, **2**, or **3** to use separate unlocked local accounts.
 The local wallet and public reads both use `NEXT_PUBLIC_RPC_URL`.
 
-`NEXT_PUBLIC_SHARED_MARKET_ADDRESS` explicitly selects the new contract. When
+`NEXT_PUBLIC_SHARED_MARKET_ADDRESS` explicitly selects the older shared contract. When
 present, `/` displays the shared screen as well. It never falls back to
 `NEXT_PUBLIC_MARKET_ADDRESS` or applies the shared ABI to that legacy address.
 Both the shared screen and its transaction actions reject chains other than 31337. A verified live outcome-source integration is required before this
@@ -41,8 +80,9 @@ outcomes. Quotes are recomputed when their economic basis changes; a stale
 exact quote can revert rather than accepting worse output. The frontend shows
 no invented chain values. Unit, component, and property tests include
 Solidity-generated differential vectors in
-`src/test/fixtures/shared-contract-vectors.json`. Run `pnpm test:e2e` from the
-repository root for real browser/wallet/local-chain coverage.
+`src/test/fixtures/shared-contract-vectors.json`. The default `pnpm test:e2e`
+run exercises the independent deployment and skips the retained shared browser
+spec, which requires a compatible older deployment.
 
 A gift supplies capacity without creating LP shares, fee income, or withdrawal
 rights. It is separate from buying a YES/NO position. The local simulator uses
@@ -50,7 +90,7 @@ shortened durations and test tokens; it is not the deployed Cosmic Signature gam
 
 ## Existing deployed market
 
-A Next.js app for the [Chaos Zero series](../README.md): one binary
+A Next.js app for the [Chaos Zero series](../LEGACY_MARKET.md): one binary
 prediction market per Cosmic Signature round — _will this round end with more
 gestures than the last one?_ — settled in CST on Arbitrum One.
 
@@ -119,10 +159,13 @@ to the contract** (floor/ceil rounding included). Components never compute
 prices themselves — they render what the lib computes, and the lib is what the
 tests hammer. Quotes are instant and RPC-free; the slippage guard
 (`minTokensOut`) submitted with each bet comes from the same math at submit
-time — that guard is what defeats liquidity pulls, sandwiches, and fee-vote
-jumps alike.
+time. It caps the output deterioration the caller accepts; it does not prevent
+sandwiching or other adverse execution within that limit.
 
 ## Develop
+
+Run these commands from `frontend/`; the full local-system launcher above runs
+from the repository root.
 
 ```bash
 pnpm install
@@ -211,8 +254,8 @@ history).
 - `lib/math` carries the same economic properties the Solidity fuzz suite
   enforces (pool never loses, quotes equal execution at any fee vote, the
   vote ledger is exact and monotone, LP joins can't extract value, fee
-  conservation), so a quote shown in the UI is provably the number the
-  contract will honor.
+  conservation). A quote is validated against the sampled state; later state
+  changes can alter execution within the user's slippage limit or cause a revert.
 - On top of the properties, `src/test/fixtures/contract-vectors.json` holds
   hundreds of flows **executed by the actual contract** (via
   `script/GenerateVectors.s.sol`); the TS math must reproduce every reserve,

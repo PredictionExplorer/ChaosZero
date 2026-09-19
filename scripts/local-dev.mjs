@@ -120,7 +120,7 @@ try {
   // Known PUBLIC Anvil account; eth_sendTransaction uses only this disposable unlocked chain.
   await run("forge", [
     "script",
-    "script/DeploySharedLocal.s.sol:DeploySharedLocal",
+    "script/DeployIndependentLocal.s.sol:DeployIndependentLocal",
     "--rpc-url",
     rpcUrl,
     "--sender",
@@ -132,7 +132,7 @@ try {
   ]);
   const broadcast = JSON.parse(
     await readFile(
-      path.join(root, "broadcast/DeploySharedLocal.s.sol/31337/run-latest.json"),
+      path.join(root, "broadcast/DeployIndependentLocal.s.sol/31337/run-latest.json"),
       "utf8",
     ),
   );
@@ -143,14 +143,34 @@ try {
     if (!/^0x[\da-fA-F]{40}$/.test(address ?? "")) throw new Error(`No ${name} deployment found.`);
     return address;
   };
-  const marketAddress = deployed("SharedOutcomeMarket");
+  const marketAddress = deployed("IndependentOutcomeMarket");
   if ((await rpc(rpcUrl, "eth_getCode", [marketAddress, "latest"])) === "0x")
     throw new Error("Market deployment has no bytecode.");
   const firstBlock = BigInt(broadcast.receipts[0].blockNumber).toString();
+  const artifact = JSON.parse(
+    await readFile(
+      path.join(root, "out/IndependentOutcomeMarket.sol/IndependentOutcomeMarket.json"),
+      "utf8",
+    ),
+  );
+  const vaultSelector = artifact.methodIdentifiers["settlementVault()"];
+  if (!/^[\da-fA-F]{8}$/.test(vaultSelector ?? ""))
+    throw new Error("Missing settlement-vault getter.");
+  const vaultResult = await rpc(rpcUrl, "eth_call", [
+    { to: marketAddress, data: `0x${vaultSelector}` },
+    "latest",
+  ]);
+  if (!/^0x[\da-fA-F]{64}$/.test(vaultResult ?? ""))
+    throw new Error("Invalid settlement-vault address.");
+  const vaultAddress = `0x${vaultResult.slice(-40)}`;
+  if ((await rpc(rpcUrl, "eth_getCode", [vaultAddress, "latest"])) === "0x")
+    throw new Error("Settlement vault has no bytecode.");
   const deployment = {
+    marketKind: "independent",
     chainId: 31337,
     rpcUrl,
     marketAddress,
+    vaultAddress,
     sourceAddress: deployed("LocalOutcomeSource"),
     gameAddress: deployed("LocalCosmicGame"),
     deployBlock: firstBlock,
@@ -162,7 +182,7 @@ try {
     `${JSON.stringify(deployment, null, 2)}\n`,
   );
   console.log(
-    `\nLocal eight-market prototype: ${deployment.webUrl}\nAll tokens and ETH here are disposable development funds.\n`,
+    `\nLocal eight-pool prototype: ${deployment.webUrl}\nAll tokens and ETH here are disposable development funds.\n`,
   );
   const web = start(
     process.execPath,
@@ -181,7 +201,8 @@ try {
         NEXT_PUBLIC_CHAIN_ID: "31337",
         NEXT_PUBLIC_RPC_URL: rpcUrl,
         NEXT_PUBLIC_MARKET_ADDRESS: "",
-        NEXT_PUBLIC_SHARED_MARKET_ADDRESS: marketAddress,
+        NEXT_PUBLIC_SHARED_MARKET_ADDRESS: "",
+        NEXT_PUBLIC_INDEPENDENT_MARKET_ADDRESS: marketAddress,
         NEXT_PUBLIC_SHARED_DEPLOY_BLOCK: firstBlock,
         NEXT_PUBLIC_LOCAL_SIMULATOR: "1",
         NEXT_TELEMETRY_DISABLED: "1",

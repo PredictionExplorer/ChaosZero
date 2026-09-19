@@ -17,7 +17,7 @@
     "check:vectors": "node scripts/check.mjs vectors",
     "check:log-bounds": "python3 scripts/check-log-bounds.py",
     "check:format": "node scripts/check.mjs format",
-    "test:tooling": "node --test scripts/checks.test.mjs scripts/local-runtime.test.mjs",
+    "test:tooling": "node --test scripts/checks.test.mjs scripts/local-runtime.test.mjs scripts/browser-abi.test.mjs",
     "test:math-oracle": "python3 scripts/check-log-bounds.py --self-test",
     "test:heavy": "node scripts/check.mjs heavy",
     "test:e2e": "playwright test",

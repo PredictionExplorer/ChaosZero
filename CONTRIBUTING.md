@@ -23,9 +23,10 @@ Run `pnpm dev:local` to launch the local prototype with mock CST. The launcher
 starts a disposable chain, deploys the local contracts and starts the frontend.
 `pnpm local:smoke` exercises the locally running stack and compares every browser
 contract signature with the compiled Solidity interface, including tuple fields
-and return values. It verifies split/merge reserve preservation, transfers and
-operator revocation across wallets, and settlement without sponsorship. The
-smoke restores its starting chain snapshot. Neither command is a production
+and return values. It verifies independent question pricing, split/merge reserve
+preservation, transfers and operator revocation, middle-window price inheritance,
+rollover and late source-independent claims. The smoke restores its starting
+chain snapshot. Neither command is a production
 deployment workflow.
 
 ## Required local checks
@@ -82,6 +83,7 @@ fixtures in the same change:
 ```sh
 forge script script/GenerateVectors.s.sol --tc GenerateVectors
 forge script script/GenerateSharedVectors.s.sol --tc GenerateSharedVectors
+forge script script/GenerateIndependentVectors.s.sol --tc GenerateIndependentVectors
 pnpm check:vectors
 ```
 
@@ -95,10 +97,13 @@ Python's correctly rounded `Decimal.ln` at 170 digits, using directed arithmetic
 to enclose the reference itself. It does not copy the Solidity algorithm or allow
 an empirical epsilon. Corruption tests prove that an incorrect lower or upper
 endpoint fails the command. These finite regression checks support the documented
-rounding argument; they do not replace a proof covering every input.
+rounding argument; they do not replace a proof covering every input. The separate
+independent-market corpus adds 130 compiler-generated weighted-binary cases,
+including asymmetric priors, integer boundaries, reserve checks and marginal prices.
 Avoid editing fixtures while this check runs. Ordinary gates clear the optional
-`ARBITRUM_RPC_URL` for deterministic local tests. Run the opt-in live fork test
-separately when a release needs deployment compatibility verification:
+`ARBITRUM_RPC_URL` for deterministic local tests. The opt-in live fork test
+checks the legacy single-question integration only; there is no live independent
+adapter yet. Run that compatibility check separately when relevant:
 
 ```sh
 ARBITRUM_RPC_URL=<read-only Arbitrum endpoint> forge test --match-contract ForkTest -vv
@@ -120,6 +125,6 @@ libraries as well. Traces, screenshots and an HTML report are retained on failur
 Heavy testing supplements the default per-commit campaign; passing tests are not
 a proof of economic safety or an external security audit. Release review should
 also inspect settlement rules, mint/burn authority, numerical boundaries,
-cross-market isolation, and the upstream game integration. The current shared
+cross-market isolation, and the upstream game integration. The current independent
 market prototype is for local chains and mock CST; successful local gates do not
 authorize deployment with real CST or use of the mock game adapter on a live chain.

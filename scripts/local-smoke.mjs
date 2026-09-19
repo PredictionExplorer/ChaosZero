@@ -4,16 +4,11 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { localRpc } from "./local-runtime.mjs";
+import { assertAbiSubset, readBrowserAbi } from "./browser-abi.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(path.join(root, "frontend/package.json"));
-const {
-  createPublicClient,
-  createWalletClient,
-  createTestClient,
-  http,
-  parseAbi,
-} = require("viem");
+const { createPublicClient, createWalletClient, createTestClient, http } = require("viem");
 const { anvil } = require("viem/chains");
 const ts = require("typescript");
 const ONE = 10n ** 18n;
@@ -21,78 +16,52 @@ const deployment = JSON.parse(
   await readFile(path.join(root, ".local/shared-deployment.json"), "utf8"),
 );
 localRpc(deployment);
+assert.equal(
+  deployment.marketKind,
+  "independent",
+  "Restart dev:local for the independent deployment",
+);
 const transport = http(deployment.rpcUrl);
-const client = createPublicClient({ chain: anvil, transport });
-assert.equal(await client.getChainId(), 31337, "Never send test transactions to a public chain");
+const client = createPublicClient({ chain: anvil, transport, pollingInterval: 100 });
+assert.equal(await client.getChainId(), 31337, "Never send smoke transactions to a public chain");
 const tester = createTestClient({ chain: anvil, mode: "anvil", transport });
 const accounts = await client.request({ method: "eth_accounts" });
-assert.ok(accounts.length >= 3, "Expected unlocked Anvil accounts");
+assert.ok(accounts.length >= 3);
 const wallets = [1, 2].map((index) =>
   createWalletClient({ chain: anvil, account: accounts[index], transport }),
 );
-const abi = async (name) =>
-  JSON.parse(await readFile(path.join(root, "out", `${name}.sol`, `${name}.json`), "utf8")).abi;
-const marketAbi = await abi("SharedOutcomeMarket");
+const abi = async (name, source = name) =>
+  JSON.parse(await readFile(path.join(root, "out", `${source}.sol`, `${name}.json`), "utf8")).abi;
+const marketAbi = await abi("IndependentOutcomeMarket");
 const gameAbi = await abi("LocalCosmicGame");
 const tokenAbi = await abi("LocalCst");
 const sourceAbi = await abi("LocalOutcomeSource");
-
-// Check the interface the browser actually uses against the Solidity compiler.
-// Parameter names/internalType are not wire types; tuple members and return
-// values are. Token errors may bubble through the market or local game.
-const browserAbiSource = ts.createSourceFile(
-  "abi.ts",
-  await readFile(path.join(root, "frontend/src/shared/abi.ts"), "utf8"),
-  ts.ScriptTarget.Latest,
-  true,
-);
-const paramShape = (parameter) => ({
-  type: parameter.type,
-  ...(parameter.components ? { components: parameter.components.map(paramShape) } : {}),
-});
-const signatureShape = (item) => ({
-  type: item.type,
-  name: item.name,
-  inputs: item.inputs?.map(paramShape),
-  ...(item.type === "function"
-    ? { outputs: item.outputs.map(paramShape), stateMutability: item.stateMutability }
-    : {}),
-});
-for (const [exportName, compiledAbi] of [
-  ["sharedMarketAbi", marketAbi],
-  ["outcomeSourceAbi", sourceAbi],
-  ["localGameAbi", gameAbi],
-  ["localTokenAbi", tokenAbi],
+const vaultAbi = await abi("OutcomeSettlementVault");
+const verifierAbi = await abi("IndependentMarketViews", "IndependentOutcomeMarket");
+for (const [file, name, compiled] of [
+  ["frontend/src/independent/abi.ts", "independentMarketAbi", marketAbi],
+  ["frontend/src/independent/abi.ts", "independentSourceAbi", sourceAbi],
+  ["frontend/src/independent/abi.ts", "settlementVaultAbi", vaultAbi],
+  ["frontend/src/shared/abi.ts", "localGameAbi", gameAbi],
+  ["frontend/src/shared/abi.ts", "localTokenAbi", tokenAbi],
 ]) {
-  const declaration = browserAbiSource.statements
-    .filter(ts.isVariableStatement)
-    .flatMap((statement) => [...statement.declarationList.declarations])
-    .find((entry) => ts.isIdentifier(entry.name) && entry.name.text === exportName);
-  const call = declaration?.initializer;
-  assert.ok(call && ts.isCallExpression(call), `Missing browser ABI: ${exportName}`);
-  assert.equal(call.expression.getText(browserAbiSource), "parseAbi");
-  const definitions = call.arguments[0];
-  assert.ok(ts.isArrayLiteralExpression(definitions));
-  const declarations = definitions.elements.map((element) => {
-    assert.ok(ts.isStringLiteral(element), "Browser ABI must use reviewable literal signatures");
-    return element.text;
-  });
-  for (const item of parseAbi(declarations)) {
-    const candidates = item.type === "error" ? [...compiledAbi, ...tokenAbi] : compiledAbi;
-    assert.ok(
-      candidates.some(
-        (candidate) =>
-          JSON.stringify(signatureShape(candidate)) === JSON.stringify(signatureShape(item)),
-      ),
-      `Browser/Solidity ABI drift: ${exportName}.${item.name}`,
-    );
-  }
+  assertAbiSubset(name, await readBrowserAbi(root, file, name), compiled, [
+    tokenAbi,
+    sourceAbi,
+    vaultAbi,
+    verifierAbi,
+  ]);
 }
 const market = deployment.marketAddress;
 const game = deployment.gameAddress;
 const source = deployment.sourceAddress;
 const read = (address, abi_, functionName, args = []) =>
   client.readContract({ address, abi: abi_, functionName, args });
+const token = await read(market, marketAbi, "cst");
+const vault = await read(market, marketAbi, "settlementVault");
+assert.equal(vault.toLowerCase(), deployment.vaultAddress.toLowerCase());
+assert.equal(await read(token, tokenAbi, "name"), "Local Cosmic Signature Token");
+assert.equal(await read(game, gameAbi, "TIME_INCREMENT"), 60n);
 const sendAs = async (wallet, address, abi_, functionName, args = [], value = 0n) => {
   const hash = await wallet.writeContract({
     address,
@@ -104,201 +73,235 @@ const sendAs = async (wallet, address, abi_, functionName, args = [], value = 0n
   });
   const receipt = await client.waitForTransactionReceipt({ hash });
   assert.equal(receipt.status, "success", functionName);
-  assert.ok(receipt.gasUsed < 32_000_000n, "Every operation must fit the chain execution cap");
+  assert.ok(receipt.gasUsed < 32_000_000n);
   return receipt;
 };
 const send = (...args) => sendAs(wallets[0], ...args);
 const receive = (...args) => sendAs(wallets[1], ...args);
-const token = await read(market, marketAbi, "cst");
-assert.equal(await read(token, tokenAbi, "name"), "Local Cosmic Signature Token");
-assert.equal(await read(game, gameAbi, "TIME_INCREMENT"), 60n);
+const states = (round) => read(market, marketAbi, "questionStates", [round]);
+const cash = (qs) => qs.reduce((sum, q) => sum + q.activeCollateral, 0n);
+const pool = (q) => ({
+  collateral: q.activeCollateral,
+  yes: q.yesSupply,
+  no: q.noSupply,
+  initialYesBps: Number(q.initialYesBps),
+});
+const allocation = (amount, q) => amount / 8n + (BigInt(q) < amount % 8n ? 1n : 0n);
 
-// Exercise the real frontend quote implementation, compiled locally without adding a second math copy.
+// Compile the actual browser solver; do not keep a second smoke-test implementation.
 const runtime = path.join(root, ".local/smoke-runtime");
 await mkdir(runtime, { recursive: true });
-for (const module of ["questions", "math"]) {
+for (const module of ["questions", "math", "independent-math"]) {
   const sourceText = await readFile(path.join(root, "frontend/src/shared", `${module}.ts`), "utf8");
   const compiled = ts
     .transpileModule(sourceText, {
       compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
     })
-    .outputText.replaceAll('"./questions"', '"./questions.mjs"');
+    .outputText.replaceAll('"./questions"', '"./questions.mjs"')
+    .replaceAll('"./math"', '"./math.mjs"');
   await writeFile(path.join(runtime, `${module}.mjs`), compiled);
 }
-const { quoteTrade, claimable, feasibleReserves } = await import(
-  pathToFileURL(path.join(runtime, "math.mjs"))
+const { quoteIndependentTrade, questionReserves } = await import(
+  pathToFileURL(path.join(runtime, "independent-math.mjs"))
 );
+const trade = async (round, question, yes, buy, input) => {
+  const before = await states(round);
+  const output = quoteIndependentTrade(pool(before[question]), yes, buy, input);
+  assert.ok(output > 0n, "Browser must find an executable quote");
+  await send(market, marketAbi, buy ? "buy" : "sell", [
+    round,
+    question,
+    yes,
+    input,
+    output,
+    (await client.getBlock()).timestamp + 900n,
+  ]);
+  const after = await states(round);
+  for (let q = 0; q < 8; q++)
+    if (q !== question)
+      assert.deepEqual(
+        after[q],
+        before[q],
+        "A trade changed another question's price or accounting",
+      );
+  return output;
+};
 const snapshot = await tester.snapshot();
 try {
   const round = await read(game, gameAbi, "roundNum");
-  const stats = await read(game, gameAbi, "roundStats", [round]);
-  assert.equal(stats.gestureCount, 0n, "Restart dev:local for a fresh smoke-test cycle");
+  assert.equal(
+    (await read(game, gameAbi, "roundStats", [round])).gestureCount,
+    0n,
+    "Start a fresh local stack before smoke testing",
+  );
+  const initial = await states(round);
+  for (const q of initial) {
+    assert.equal(q.activeCollateral, 1250n * ONE);
+    assert.equal(Number(q.initialYesBps), 5000);
+  }
   await send(token, tokenAbi, "faucet", [10_000n * ONE]);
-  await send(token, tokenAbi, "approve", [market, 1_000n * ONE]);
-  const pool = async () => {
-    const [[collateral], [yes, no], [, , knownMask, values]] = await Promise.all([
-      read(market, marketAbi, "roundAccounting", [round]),
-      read(market, marketAbi, "liabilities", [round]),
-      read(source, sourceAbi, "outcomeState", [round]),
-    ]);
-    return { collateral, yes, no, knownMask, values };
-  };
-  assert.equal(await read(market, marketAbi, "supportsInterface", ["0xd9b67a26"]), true);
-  const initialPool = await pool();
-  const initialReserves = feasibleReserves(initialPool);
-  const initialBalance = await read(token, tokenAbi, "balanceOf", [accounts[1]]);
+  await send(token, tokenAbi, "approve", [market, 10_000n * ONE]);
+  const balanceBeforeSets = await read(token, tokenAbi, "balanceOf", [accounts[1]]);
   await send(market, marketAbi, "splitPosition", [round, 2, 25n * ONE]);
-  assert.equal((await pool()).collateral, initialPool.collateral + 25n * ONE);
-  assert.equal(await read(token, tokenAbi, "balanceOf", [accounts[1]]), initialBalance - 25n * ONE);
   assert.deepEqual(
-    feasibleReserves(await pool()),
-    initialReserves,
-    "Splitting preserves all 256 reserves",
+    questionReserves(pool((await states(round))[2])),
+    questionReserves(pool(initial[2])),
   );
-  const [splitYes, splitNo] = await read(market, marketAbi, "balancesOf", [round, accounts[1]]);
-  assert.equal(splitYes[2], 25n * ONE);
-  assert.equal(splitNo[2], 25n * ONE);
   await send(market, marketAbi, "mergePosition", [round, 2, 10n * ONE]);
-  assert.equal(await read(token, tokenAbi, "balanceOf", [accounts[1]]), initialBalance - 15n * ONE);
-  assert.deepEqual(feasibleReserves(await pool()), initialReserves);
   await send(market, marketAbi, "splitPosition", [round, 1, 7n * ONE]);
-  const batch = Array(8).fill(0n);
-  batch[1] = 7n * ONE;
-  batch[2] = 15n * ONE;
-  await send(market, marketAbi, "mergePositions", [round, batch]);
-  assert.deepEqual(await pool(), initialPool, "Split/merge restores the exact pool accounting");
-  assert.equal(await read(token, tokenAbi, "balanceOf", [accounts[1]]), initialBalance);
+  const matched = Array(8).fill(0n);
+  matched[1] = 7n * ONE;
+  matched[2] = 15n * ONE;
+  await send(market, marketAbi, "mergePositions", [round, matched]);
+  assert.deepEqual(await states(round), initial);
+  assert.equal(await read(token, tokenAbi, "balanceOf", [accounts[1]]), balanceBeforeSets);
 
-  const receiverBalance = await read(token, tokenAbi, "balanceOf", [accounts[2]]);
-  await send(market, marketAbi, "splitPosition", [round, 3, 5n * ONE]);
-  for (const side of [false, true]) {
-    const id = await read(market, marketAbi, "positionId", [round, 3, side]);
-    assert.equal(id, (round << 4n) | 6n | (side ? 1n : 0n));
-    await send(market, marketAbi, "safeTransferFrom", [
-      accounts[1],
-      accounts[2],
-      id,
-      5n * ONE,
-      "0x",
-    ]);
-    assert.equal(await read(market, marketAbi, "balanceOf", [accounts[2], id]), 5n * ONE);
-    assert.equal(await read(market, marketAbi, "totalSupply", [id]), 5n * ONE);
+  const receiverStart = await read(token, tokenAbi, "balanceOf", [accounts[2]]);
+  for (const [q, amount, operator] of [
+    [3, 5n * ONE, false],
+    [4, 3n * ONE, true],
+  ]) {
+    await send(market, marketAbi, "splitPosition", [round, q, amount]);
+    const ids = await Promise.all(
+      [false, true].map((yes) => read(market, marketAbi, "positionId", [round, q, yes])),
+    );
+    if (operator) {
+      await send(market, marketAbi, "setApprovalForAll", [accounts[2], true]);
+      await receive(market, marketAbi, "safeBatchTransferFrom", [
+        accounts[1],
+        accounts[2],
+        ids,
+        [amount, amount],
+        "0x",
+      ]);
+      await send(market, marketAbi, "setApprovalForAll", [accounts[2], false]);
+      assert.equal(
+        await read(market, marketAbi, "isApprovedForAll", [accounts[1], accounts[2]]),
+        false,
+      );
+    } else {
+      for (const id of ids)
+        await send(market, marketAbi, "safeTransferFrom", [
+          accounts[1],
+          accounts[2],
+          id,
+          amount,
+          "0x",
+        ]);
+    }
+    await receive(market, marketAbi, "mergePosition", [round, q, amount]);
   }
-  await receive(market, marketAbi, "mergePosition", [round, 3, 5n * ONE]);
-  assert.equal(await read(token, tokenAbi, "balanceOf", [accounts[2]]), receiverBalance + 5n * ONE);
-  assert.deepEqual(await pool(), initialPool);
+  assert.equal(await read(token, tokenAbi, "balanceOf", [accounts[2]]), receiverStart + 8n * ONE);
+  assert.deepEqual(await states(round), initial);
+  await trade(round, 0, true, true, 100n * ONE);
+  const q5Units = await trade(round, 5, false, true, 100n * ONE);
+  await trade(round, 5, false, false, q5Units / 4n);
+  await trade(round, 6, true, true, 25n * ONE);
+  await trade(round, 7, true, true, 50n * ONE);
+  const beforeGift = await states(round);
+  await send(market, marketAbi, "fundRound", [round, 8n * ONE + 3n]);
+  const afterGift = await states(round);
+  for (let q = 0; q < 8; q++)
+    assert.equal(
+      afterGift[q].activeCollateral - beforeGift[q].activeCollateral,
+      allocation(8n * ONE + 3n, q),
+    );
 
-  await send(market, marketAbi, "splitPosition", [round, 4, 3n * ONE]);
-  const ids = await Promise.all(
-    [false, true].map((side) => read(market, marketAbi, "positionId", [round, 4, side])),
-  );
-  await send(market, marketAbi, "setApprovalForAll", [accounts[2], true]);
-  assert.equal(await read(market, marketAbi, "isApprovedForAll", [accounts[1], accounts[2]]), true);
-  await receive(market, marketAbi, "safeBatchTransferFrom", [
-    accounts[1],
-    accounts[2],
-    ids,
-    [3n * ONE, 3n * ONE],
-    "0x",
-  ]);
-  await receive(market, marketAbi, "mergePosition", [round, 4, 3n * ONE]);
-  await send(market, marketAbi, "setApprovalForAll", [accounts[2], false]);
-  assert.equal(
-    await read(market, marketAbi, "isApprovedForAll", [accounts[1], accounts[2]]),
-    false,
-  );
-  assert.equal(await read(token, tokenAbi, "balanceOf", [accounts[2]]), receiverBalance + 8n * ONE);
-  assert.deepEqual(await pool(), initialPool, "Transfers and merges preserve sponsor capital");
-
-  for (const question of [0, 5, 6, 7]) {
-    const input = 10n * ONE;
-    const units = quoteTrade(await pool(), question, true, true, input);
-    assert.ok(units > input);
-    const deadline = (await client.getBlock()).timestamp + 900n;
-    await send(market, marketAbi, "buy", [round, question, true, input, units, deadline]);
-    const [yes] = await read(market, marketAbi, "balancesOf", [round, accounts[1]]);
-    assert.equal(yes[question], units, "Frontend quote exactly equals executed position");
-  }
-  const [owned] = await read(market, marketAbi, "balancesOf", [round, accounts[1]]);
-  const sold = owned[5] / 2n;
-  const proceeds = quoteTrade(await pool(), 5, true, false, sold);
-  assert.ok(proceeds > 0n);
-  await send(market, marketAbi, "sell", [
-    round,
-    5,
-    true,
-    sold,
-    proceeds,
-    (await client.getBlock()).timestamp + 900n,
-  ]);
-  const collateralBeforeGift = (await pool()).collateral;
-  await send(market, marketAbi, "fundRound", [round, 25n * ONE]);
-  assert.equal((await pool()).collateral, collateralBeforeGift + 25n * ONE);
-
-  await send(game, gameAbi, "bidEth", [], await read(game, gameAbi, "getNextEthPrice"));
-  await send(game, gameAbi, "bidCst", [await read(game, gameAbi, "getNextCstPrice")]);
-  const partial = await pool();
-  assert.equal(
-    partial.knownMask & 128,
-    128,
-    "Highest CST question resolves directly from game action",
-  );
-  const beforePartial = await read(token, tokenAbi, "balanceOf", [accounts[1]]);
-  const [yes, no] = await read(market, marketAbi, "balancesOf", [round, accounts[1]]);
-  const partialPayout = claimable(yes, no, partial.knownMask, partial.values);
-  await send(market, marketAbi, "claimKnown", [round]);
-  assert.equal(
-    await read(token, tokenAbi, "balanceOf", [accounts[1]]),
-    beforePartial + partialPayout,
+  for (let i = 0; i < 7; i++)
+    await send(game, gameAbi, "bidEth", [], await read(game, gameAbi, "getNextEthPrice"));
+  const [startedAt] = await read(source, sourceAbi, "cycleTimes", [round]);
+  const closeAt = (await read(game, gameAbi, "mainPrizeTime")) + 1n;
+  const [, finalized, known] = await read(source, sourceAbi, "outcomeState", [round]);
+  assert.equal(finalized, false);
+  assert.ok((known & 1) !== 0, "The gesture-count answer is mathematically known");
+  await trade(round, 0, true, true, 20n * ONE);
+  await assert.rejects(
+    client.simulateContract({
+      address: market,
+      abi: marketAbi,
+      functionName: "claimKnown",
+      args: [round],
+      account: accounts[1],
+    }),
+    /NotFinalized|not finalized|revert/i,
   );
 
-  const deadline = await read(game, gameAbi, "mainPrizeTime");
-  await tester.setNextBlockTimestamp({ timestamp: deadline + 1n });
-  await tester.mine({ blocks: 1 });
+  await tester.setNextBlockTimestamp({ timestamp: startedAt + 700n });
+  await trade(round, 0, true, true, 80n * ONE);
+  const priceBeforeMiddle = Number((await states(round))[0].currentYesBps);
+  await tester.setNextBlockTimestamp({ timestamp: startedAt + 900n });
+  await trade(round, 0, false, true, 40n * ONE);
+  const priceAfterMiddle = Number((await states(round))[0].currentYesBps);
+  await tester.setNextBlockTimestamp({ timestamp: startedAt + 1100n });
+  await trade(round, 0, true, true, 10n * ONE);
+  const t40 = startedAt + ((closeAt - startedAt) * 2n) / 5n;
+  const t60 = startedAt + ((closeAt - startedAt) * 3n) / 5n;
+  const expectedMiddle = Number(
+    (BigInt(priceBeforeMiddle) * (startedAt + 900n - t40) +
+      BigInt(priceAfterMiddle) * (t60 - startedAt - 900n)) /
+      (t60 - t40),
+  );
+  await tester.setNextBlockTimestamp({ timestamp: closeAt });
   await send(game, gameAbi, "closeCycle");
-  const [, finalized, knownMask, values] = await read(source, sourceAbi, "outcomeState", [round]);
-  assert.equal(finalized, true);
-  assert.equal(knownMask, 255);
-  assert.equal(values & 32, 0, "Equal ETH/CST gesture counts resolve NO");
-  assert.equal(values & 64, 64, "One local performance earns both titles in this trajectory");
-  const beforeFinal = await read(token, tokenAbi, "balanceOf", [accounts[1]]);
-  const [remainingYes, remainingNo] = await read(market, marketAbi, "balancesOf", [
-    round,
-    accounts[1],
-  ]);
-  const payout = claimable(remainingYes, remainingNo, knownMask, values);
+  const beforeSettlement = await states(round);
+  const [, final, , answers] = await read(source, sourceAbi, "outcomeState", [round]);
+  assert.equal(final, true);
+  const owed = beforeSettlement.map((q, i) =>
+    (answers & (1 << i)) !== 0 ? q.yesSupply : q.noSupply,
+  );
+  const owedTotal = owed.reduce((sum, amount) => sum + amount, 0n);
+  const carry = cash(beforeSettlement) - owedTotal;
+  assert.ok(carry > 0n);
+  const nextRound = await read(game, gameAbi, "roundNum");
+  await send(market, marketAbi, "fundRound", [nextRound, 8n * ONE]);
+  const next = await states(nextRound);
+  assert.equal(
+    cash(await states(round)),
+    0n,
+    "Old active liquidity must be zero immediately after settlement",
+  );
+  assert.equal(await read(token, tokenAbi, "balanceOf", [vault]), owedTotal);
+  for (let q = 0; q < 8; q++) {
+    assert.equal(await read(vault, vaultAbi, "remaining", [round, q]), owed[q]);
+    assert.equal(next[q].activeCollateral, allocation(carry + 8n * ONE, q));
+  }
+  assert.equal(
+    Number(next[0].initialYesBps),
+    expectedMiddle,
+    "Next cycle inherits the actual 40–60% time-weighted price",
+  );
+  assert.equal(await read(market, marketAbi, "pendingCarry"), 0n);
+  await send(market, marketAbi, "settleRound", [round]);
+  assert.deepEqual(await states(nextRound), next, "Duplicate settlement must not allocate again");
+
+  // Only this disposable Anvil source is made unavailable. Cached old payouts
+  // must still succeed without touching the newly funded cycle's liquidity.
+  const sourceCode = await client.getCode({ address: source });
+  await tester.setCode({ address: source, bytecode: "0x60006000fd" });
+  const beforeClaim = await read(token, tokenAbi, "balanceOf", [accounts[1]]);
   await send(market, marketAbi, "claimKnown", [round]);
-  assert.equal(await read(token, tokenAbi, "balanceOf", [accounts[1]]), beforeFinal + payout);
-  const cleared = await read(market, marketAbi, "balancesOf", [round, accounts[1]]);
-  assert.ok([...cleared[0], ...cleared[1]].every((n) => n === 0n));
-  const splitOnlyRound = await read(game, gameAbi, "roundNum");
-  await send(market, marketAbi, "splitPosition", [splitOnlyRound, 0, 4n * ONE]);
-  const [splitOnlyCash, splitOnlyFunded] = await read(market, marketAbi, "roundAccounting", [
-    splitOnlyRound,
-  ]);
-  assert.equal(splitOnlyCash, 4n * ONE);
-  assert.equal(splitOnlyFunded, false, "Complete sets do not sponsor a pool");
-  await send(market, marketAbi, "mergePosition", [splitOnlyRound, 0, 2n * ONE]);
+  assert.equal(await read(token, tokenAbi, "balanceOf", [accounts[1]]), beforeClaim + owedTotal);
+  assert.equal(await read(token, tokenAbi, "balanceOf", [vault]), 0n);
+  assert.deepEqual(await states(nextRound), next);
+  await tester.setCode({ address: source, bytecode: sourceCode });
+
+  // A cycle with no trades rolls all its sponsor capital forward. No new CST
+  // payment or token approval is needed to activate the following cycle.
   await send(game, gameAbi, "bidEth", [], await read(game, gameAbi, "getNextEthPrice"));
   await tester.setNextBlockTimestamp({
     timestamp: (await read(game, gameAbi, "mainPrizeTime")) + 1n,
   });
-  await tester.mine({ blocks: 1 });
   await send(game, gameAbi, "closeCycle");
-  const beforeUnfundedClaim = await read(token, tokenAbi, "balanceOf", [accounts[1]]);
-  await send(market, marketAbi, "claimKnown", [splitOnlyRound]);
-  assert.equal(
-    await read(token, tokenAbi, "balanceOf", [accounts[1]]),
-    beforeUnfundedClaim + 2n * ONE,
-  );
-  const [splitOnlyRemainder] = await read(market, marketAbi, "roundAccounting", [splitOnlyRound]);
-  assert.equal(splitOnlyRemainder, 0n, "Unsponsored complete sets settle without trapped CST");
-  const next = await read(game, gameAbi, "roundNum");
-  await send(market, marketAbi, "rollover", [round, next]);
-  const [nextCash, funded] = await read(market, marketAbi, "roundAccounting", [next]);
-  assert.ok(funded && nextCash > 0n);
+  const thirdRound = await read(game, gameAbi, "roundNum");
+  const walletBeforeCarry = await read(token, tokenAbi, "balanceOf", [accounts[1]]);
+  await send(market, marketAbi, "fundRound", [thirdRound, 0n]);
+  assert.equal(await read(token, tokenAbi, "balanceOf", [accounts[1]]), walletBeforeCarry);
+  assert.equal(cash(await states(nextRound)), 0n);
+  assert.equal(cash(await states(thirdRound)), cash(next));
+  assert.equal(await read(token, tokenAbi, "balanceOf", [market]), cash(next));
+  assert.equal(await read(token, tokenAbi, "balanceOf", [vault]), 0n);
   console.log(
-    "Local smoke passed: exact splits, individual/batch merges, ERC-1155 transfers and operators, reserve preservation, quotes, buys, sell, sponsorship, partial/final claims, split-only settlement, and rollover.",
+    "Independent smoke passed: exact quotes, isolation, split/merge, transfers/operators, remainder funding, end-only payouts, midpoint inheritance, automatic carry, source-outage late claims, and empty-cycle rollover.",
   );
 } finally {
   await tester.revert({ id: snapshot });

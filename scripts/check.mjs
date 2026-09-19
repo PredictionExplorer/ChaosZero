@@ -95,6 +95,7 @@ function tooling() {
     "--test",
     "scripts/checks.test.mjs",
     "scripts/local-runtime.test.mjs",
+    "scripts/browser-abi.test.mjs",
   ]);
 }
 

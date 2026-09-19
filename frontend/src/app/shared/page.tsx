@@ -1,12 +1,17 @@
 import type { Metadata } from "next";
 import { SharedPage } from "@/shared/shared-page";
+import { sharedMarketAddress } from "@/shared/config";
+import { independentMarketAddress } from "@/independent/config";
+import { IndependentPage } from "@/independent/page";
 
 export const metadata: Metadata = {
-  title: "Eight shared markets",
+  title: "Eight independent markets",
   description:
-    "Explore eight recurring Cosmic Signature questions backed by one shared pool in the local Chaos Zero prototype.",
+    "Explore eight recurring Cosmic Signature questions with separate liquidity, inherited starting odds, and protected claims in the local prototype.",
   alternates: { canonical: "/shared" },
   robots: { index: false, follow: false },
 };
 
-export default SharedPage;
+export default function MarketsPage() {
+  return independentMarketAddress || !sharedMarketAddress ? <IndependentPage /> : <SharedPage />;
+}

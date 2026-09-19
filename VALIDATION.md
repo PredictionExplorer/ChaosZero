@@ -1,56 +1,79 @@
-# Local prototype validation — 18 September 2026
+# Independent local prototype validation — 19 September 2026
 
-This records local checks for the eight-question prototype with complete-set split/merge and transferable ERC-1155 positions. It is not an external audit, formal verification, or authorization to deploy the local outcome source with real assets.
+This records local checks for eight independent pools, ordinary winning payouts,
+protected claim escrow, inherited prices and surplus rollover. It is not an
+external audit, formal verification or approval for a real-CST deployment.
 
-## Final checks
+## Release checks
 
-| Check                                  | Result                                                                                                                                                                                                                                                                                                          |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Complete repository gate, `pnpm check` | Passed: formatting, contracts, differential fixtures, mathematical oracle, lint, types, coverage, production build, browser lifecycle, dependency audits.                                                                                                                                                       |
-| Default Solidity suite                 | 204 tests passed.                                                                                                                                                                                                                                                                                               |
-| Heavy Solidity suite                   | 204 tests passed; 50,000 inputs for each of 32 fuzz properties, totaling 1,600,000 generated cases.                                                                                                                                                                                                             |
-| Heavy stateful invariants              | Eight invariant properties, each with 512 campaigns of 256 calls; no handler reverts or invariant failures.                                                                                                                                                                                                     |
-| Final outcome enumeration              | All 256 answers exercised.                                                                                                                                                                                                                                                                                      |
-| Partial outcome enumeration            | All 6,561 unknown/NO/YES assignments exercised, including payouts and remaining reserves.                                                                                                                                                                                                                       |
-| Transfer callback attacks              | 56 CST callback combinations plus 16 nested economic attempts from ERC-1155 mint callbacks; standard receiver forwarding and receipt-time redemption remain supported.                                                                                                                                          |
-| Frontend suite                         | 1,167 tests passed across 50 files.                                                                                                                                                                                                                                                                             |
-| Critical frontend math and hooks       | Position helpers and source-independent recovery hooks have 100% statement, branch, function and line coverage; shared math and shared transaction/data hooks have 100% line coverage; both legacy market hooks have 100% statement, branch, function and line coverage. Critical-file thresholds are enforced. |
-| Numerical differential corpus          | 631 actual Solidity logarithm intervals and 12 trade cases checked against TypeScript; logarithms independently checked with 170-digit Decimal arithmetic.                                                                                                                                                      |
-| Oracle failure tests                   | Eight tests, including deliberate interval corruption that must fail the command.                                                                                                                                                                                                                               |
-| Developer tooling                      | Thirteen regression tests covering staged/pushed contents, pinned dependency availability, lockfile gates, fixture restoration, local-only endpoints and occupied-port refusal.                                                                                                                                 |
-| Browser lifecycle                      | Passed with fresh contracts: quotes, sponsorship, trades, split/merge, batch merges, two-wallet transfers and recipient redemption, source-outage recovery, settlement and rollover. Two consecutive runs also passed on the same server with full chain restoration between them.                              |
-| Independent local-chain smoke          | Four trading questions plus exact complete-set operations, operator transfers/revocation, split-only settlement and custody/reserve reconciliation. Browser ABI signatures match Solidity compiler outputs. The test restores its starting snapshot.                                                            |
-| Production builds                      | Both default legacy configuration and configured local shared-market configuration passed.                                                                                                                                                                                                                      |
-| Legacy live-game compatibility         | The earlier baseline passed on a read-only Arbitrum fork. That opt-in live check was not repeated for this local-only position extension; no public-chain transaction was submitted.                                                                                                                            |
-| Dependency audits                      | No reported vulnerabilities in the JavaScript root tools, frontend dependencies, or production dependencies. OpenZeppelin Contracts is pinned to v5.7.0 and tested with the market; npm audits do not audit Solidity.                                                                                           |
+| Check                       | Result                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Complete repository gate    | `pnpm check` passed: formatting, build and sizes, contract suites, generated fixtures, independent math oracle, frontend lint/types/coverage/build, browser lifecycle and dependency audits.                                                                                                                                                                                      |
+| Default Solidity suite      | 306 tests passed across 21 suites, including the retained legacy and shared engines.                                                                                                                                                                                                                                                                                              |
+| Extended Solidity campaigns | In progress; final counts will be recorded before release.                                                                                                                                                                                                                                                                                                                        |
+| Frontend suite              | 1,419 tests passed across 59 files, including 110 new independent-interface tests.                                                                                                                                                                                                                                                                                                |
+| Critical frontend coverage  | Independent models and pricing have 100% statement, branch, function and line coverage. Independent action/read hooks have 100% function and line coverage; statements are 98.29% / 100%, branches 97.14% / 99.05%. Enforced thresholds are 98% statements, 95% branches, 100% functions and 99% lines. Existing critical-file gates remain enabled.                              |
+| Differential execution      | All three Solidity-generated fixture sets reproduce exactly, including 130 weighted-binary cases. The logarithm oracle independently verifies 631 compiler-generated intervals with 170-digit Decimal arithmetic; deliberate-corruption regressions pass.                                                                                                                         |
+| Developer tooling           | 17 tests passed, including staged/pushed revision integrity, fixture restoration, local-only endpoints, occupied-port refusal and compiler/browser ABI agreement rules.                                                                                                                                                                                                           |
+| Browser lifecycle           | Fresh Anvil deployment passed buys/sells, isolated prices, transfers and complete-set recovery, continued trading on early-known facts, full settlement, exact eight-way remainder allocation, inherited prices, late source-offline claims and carry-only startup across three cycles. The retained shared-browser spec is explicitly skipped for this independent deployment.   |
+| Local-chain smoke           | The actual browser solver executes against compiled contracts. Every declared browser ABI is compared with compiler outputs, including tuple names/types, return values and event indexing. Tests independently reconcile claim escrow, carry, time-window prices and unchanged neighboring pools, then restore the initial snapshot. The browser gate also runs this smoke test. |
+| Production builds           | Both the default legacy configuration and the configured independent local-market build passed.                                                                                                                                                                                                                                                                                   |
+| Dependency audits           | Root, frontend and production dependency audits reported no known vulnerabilities. OpenZeppelin Contracts is pinned to v5.7.0; JavaScript dependency audits do not audit Solidity.                                                                                                                                                                                                |
 
-The heavy campaign completed in approximately 17.7 minutes on the development machine. Reproduce the recorded seed and execution settings with:
+## Financial scenarios
+
+The independent engine tests all 256 final answer vectors with asymmetric holdings
+across three holders. Stateful tests use four actors and six cycles, checking an
+independent cash/holdings ledger after trades, gifts, pair operations, transfers,
+source outages, settlements and claims. Additional properties compare merging
+before/after settlement, skipped unfunded cycles, no-bet rollover, duplicate
+settlement, capacity-limited deferred carry and claims far into the future.
+
+Seventy-two token-callback attack combinations cover active transfers, vault
+transfers and automatic settlement during funding. ERC-1155 receiver tests keep
+standard forwarding and receipt-time pair redemption available while preventing
+nested guarded financial operations. Exact incoming and outgoing collateral
+checks reject short/taxed transfers without consuming claims or borrowing prior
+surplus. The earlier shared engine's complete terminal and 6,561 partial-answer
+enumerations remain regression coverage.
+
+## Reproduction
+
+The extended campaigns use this seed:
 
 ```sh
-FOUNDRY_PROFILE=heavy FOUNDRY_FUZZ_SEED=0x589e470dbd723bf51ae34932b67ea90457a09cef690b77acb80d6821f4129253 ARBITRUM_RPC_URL= forge test --threads 4 -vv
+FOUNDRY_PROFILE=heavy \
+FOUNDRY_FUZZ_SEED=0xc18ba92570efdb6b84d0929a275cf11b0749d452e38a7f0a63d970e8bd59e248 \
+ARBITRUM_RPC_URL= forge test --threads 4 -vv
 ```
 
-The local validation environment used Node 24.2.0, Python 3.13.5, pnpm 10.32.0, Foundry 1.7.1 and Solidity 0.8.35. CI pins Node 22.23.2. The contract compiler configuration and optimizer are identical for tests and builds.
+The recorded main campaign began before the new integrated properties file was
+added. That file ran separately with the same seed/profile and `--threads 2
+--match-contract IndependentMarketPropertiesTest`. No financial logic changed
+during either run; a later comment and metadata-spacing cleanup was covered by
+the complete default gate. A fresh reproduction now includes both in one run.
 
-## Issues found and retained as regressions
+Environment: Node 24.2.0, Python 3.13.5, pnpm 10.32.0, Foundry 1.7.1 and Solidity
+0.8.35. CI pins Node 22.23.2. Tests and deployment builds use the same compiler
+and optimizer settings. Git hooks and CI enforce the default suites; scheduled
+CI runs the heavy profile and retains its seed and failure artifacts.
 
-- Finalized claims no longer depend on the outcome source remaining available after answers are permanently cached. Transferred winners remain redeemable after rollover.
-- Recovery polling preserves in-progress forms while blocking writes until fresh balances arrive; wallet, market and cycle changes reset those forms.
-- Transactions bind the sender through wallet submission, preventing a wallet switch during preflight from silently changing the sending account.
-- Split/merge confirmations preserve all 18 decimals rather than rounding tiny or large exact payouts.
-- Browser retries restore the whole chain, avoiding state leakage from a failed previous attempt.
+## Limits
 
-- Conservative interval arithmetic has a valid dust acceptance point that an ordinary monotone quote search can miss. The frontend explicitly verifies cancellation candidates.
-- An adversarial sequence of immediate CST gestures exceeded the local fuzz harness's original funding. The harness now funds that path and tests it directly instead of discarding it.
-- The local mock wallet needed the configured RPC in its chain metadata, not only the read transport.
-- Time-sensitive game actions could need more gas in the mined block than an estimate made at the preceding timestamp. Local actions use bounded gas headroom and preflight simulation.
-- Cached market data must not leave transaction controls active after RPC or source-consistency errors.
-- Shared writes validate both wallet and RPC network identity and include an explicit chain ID.
-- The existing market's React-state-only pending flag permitted same-tick duplicate calls. A synchronous ref guard now prevents them.
-- Missing legacy targets and failed wallet balance/allowance reads now fail closed instead of forwarding invalid requests or silently hiding positions.
+The independent market runtime is **24,467 bytes**, leaving **109 bytes** below
+the 24,576-byte EIP-170 limit. Its immutable helper contains read-only previews,
+metadata and pure product verification; no fund custody or configurable
+permissions are delegated to it. The separate immutable payout vault holds old
+claims. A measured cold weighted-binary buy used **181,358 gas** on the local EVM;
+this is not an Arbitrum fee quote or a guarantee for every state.
 
-## Limits of these results
+The live eight-question result adapter remains unimplemented. The local source
+and shortened simulator are development tools. The opt-in read-only Arbitrum
+fork check concerns the legacy single-question adapter and was not repeated in
+this local-only release. No public-chain transaction was submitted.
 
-The shared market's result adapter remains a local simulator adapter. Historical proof verification for the live game is not implemented. The local simulator intentionally shortens timers and simplifies nonessential game mechanics; the separate champion reference tests validate its record logic.
-
-The shared market runtime is 18,840 bytes, below the 24,576-byte limit. Measured full-state trades use approximately 9.94 million gas on the local EVM. This is not an Arbitrum transaction-fee quote or a public-network performance certification. Tests establish the covered accounting and execution properties, not resistance to participants economically influencing the underlying game.
+After settlement, an old cycle's active collateral is zero. Unpaid winnings
+remain in its vault, and surplus remains accounted as carry or new-cycle
+funding. This does not mean every contract's CST balance is zero. Passing tests
+establish the covered accounting/execution properties, not accurate next-cycle
+probabilities or resistance to economic influence over the underlying game.

@@ -21,6 +21,10 @@ test.beforeEach(async () => {
   const deployment = JSON.parse(
     await readFile(path.resolve(".local/shared-deployment.json"), "utf8"),
   );
+  test.skip(
+    deployment.marketKind === "independent",
+    "Legacy shared-pool regression needs a shared-pool deployment.",
+  );
   const rpcUrl = new URL(deployment.rpcUrl);
   expect(deployment.chainId).toBe(31337);
   expect(rpcUrl.protocol).toBe("http:");

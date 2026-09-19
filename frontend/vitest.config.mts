@@ -12,6 +12,19 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       thresholds: {
+        "src/independent/models.ts": { statements: 98, branches: 95, functions: 100, lines: 99 },
+        "src/independent/use-independent-actions.ts": {
+          statements: 98,
+          branches: 95,
+          functions: 100,
+          lines: 99,
+        },
+        "src/independent/use-independent-market.ts": {
+          statements: 98,
+          branches: 95,
+          functions: 100,
+          lines: 99,
+        },
         "src/shared/positions.ts": { statements: 98, branches: 95, functions: 100, lines: 99 },
         "src/shared/use-position-recovery.ts": {
           statements: 98,
@@ -40,7 +53,13 @@ export default defineConfig({
           lines: 99,
         },
       },
-      include: ["src/lib/**", "src/components/**", "src/hooks/**", "src/shared/**"],
+      include: [
+        "src/lib/**",
+        "src/components/**",
+        "src/hooks/**",
+        "src/shared/**",
+        "src/independent/**",
+      ],
     },
   },
 });

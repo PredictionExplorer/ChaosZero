@@ -10,7 +10,7 @@ fs_permissions = [{ access = "read-write", path = "frontend/src/test/fixtures" }
 # CI and deployments must all exercise the exact bytecode that ships.
 solc = "0.8.35"             # pinned for reproducible, verifiable builds
 optimizer = true
-optimizer_runs = 1_000_000  # deploy-once singleton, far under the size limit: favor runtime gas
+optimizer_runs = 1_000_000  # immutable contracts: favor runtime gas; enforce deployment size in the build gate
 via_ir = true               # Yul IR pipeline: whole-contract optimization
 evm_version = "osaka"       # supported on Arbitrum One since ArbOS 51 "Dia" (Jan 2026)
 

@@ -1,5 +1,8 @@
 # Integer product verification
 
+The original shared engine remains covered below. The independent engine uses
+the same enclosing logarithms, with the per-question extension at the end.
+
 `SharedOutcomeMarket` stores eight YES liabilities, eight NO liabilities and
 accounted collateral `B` for a cycle. For a feasible eight-bit ending `s`, the
 pool's virtual reserve is `B - sum(winning liabilities in s)`. Uniform sponsorship
@@ -126,3 +129,83 @@ This is an implementation argument, not an external security audit. The tests
 cover high-precision reference vectors, powers of two, a boundary regression,
 all 256 terminal endings, source consistency, custody and liability invariants,
 and full-state execution gas.
+
+## Independent question pools
+
+For each question, let `C` be its active collateral and `Y, N` its actual issued
+YES/NO supply. Its reserves are `rY = C - Y` and `rN = C - N`. No other question
+enters either reserve or its trade verification. First funding creates equal
+reserves with fixed positive weights `p` and `10000 - p`, where `p` is the
+previous cycle's middle-window price in basis points. The invariant is
+
+```text
+rY^p * rN^(10000-p).
+```
+
+Multiplying each existing logarithm interval by a positive weight preserves its
+bound direction. Comparing the weighted new lower sum with the weighted old
+upper sum therefore proves non-decrease. Unchanged reserve factors still cancel
+exactly. Both reserves must remain positive during trading; `C <= 2^120` bounds
+all logarithms, and the weights sum to 10,000. The weighted sums fit below
+`2^85`. The marginal YES price is
+
+```text
+10000 * p * rN / (p * rN + (10000-p) * rY).
+```
+
+Integer floor division gives the displayed basis-point quote. Exact trade
+quantities continue to use the enclosing invariant check, not a rounded display
+price. Initial weights stay in 1..9999 and never change after initialization.
+Additional voluntary gifts can move prices toward those fixed initial odds.
+
+## Settlement and rollover conservation
+
+When the full game result is final, set `O` to this question's winning supply and
+`R = C - O`. Solvency guarantees `R >= 0`. Reserve `O` in that question's closed
+cycle vault, set its active collateral to zero, and credit `R` to future funding.
+Across the eight questions, the exact identity is
+
+```text
+old active collateral = new claim escrow + new carry credit.
+```
+
+No holder enumeration or prior withdrawal is needed. Every claim later pays
+one CST per winning unit from its own escrow. A pair merged before settlement
+reduces both `C` and `O` equally, preserving `R`; after settlement it reduces the
+winning supply and escrow equally, without touching carry. Transfers alter only
+the claim owner. Claim order and multiple wallets cannot gain extra rollover.
+
+Before a new funded cycle starts, the latest previously funded cycle must be
+settled. All eligible carry is included before first trading, divided into eight
+equal allocations with at most one base-unit difference for the remainder. Old
+split-only cycles have no sponsor reserve, so settling them later adds no carry.
+Unfunded game-cycle gaps need no unbounded catch-up loop. Extreme carry above the
+initial funding headroom cap remains explicitly pending for later cycles; it is
+never silently injected into an already-funded pool.
+
+The custody invariants are:
+
+```text
+market CST = active question collateral + pending carry + unsolicited transfers
+vault CST  = outstanding winning claims + unsolicited vault transfers.
+```
+
+Direct CST transfers are excluded from funding; all authorized transfers must
+match exact sent and received amounts. The same transaction guard covers
+funding, trades, split/merge, settlement and claims.
+
+## Middle-window history
+
+Each question records its own quoted YES price and cumulative basis-point-seconds
+at each price-changing market operation. Same-timestamp writes replace the last
+quote without adding duration. Given canonical game times `start, end`, sample
+`t40 = start + floor(2*(end-start)/5)` and
+`t60 = start + floor(3*(end-start)/5)`. The average is the difference of the two
+cumulative values divided by `t60-t40`, rounded down. Each endpoint uses binary
+search and constant-price extrapolation from the preceding checkpoint, so query
+cost grows logarithmically rather than with the number of trades in the window.
+
+Missing coverage of the window or a zero-width interval uses the prior initial
+seed, or 50% if the immediately preceding cycle has no initialized market. The seed is clamped to the strictly
+positive weight range. This is an average of recorded market quotes, not a
+claim that old prices correctly forecast the next cycle's different thresholds.

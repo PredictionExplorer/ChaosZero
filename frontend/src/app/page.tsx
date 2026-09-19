@@ -12,6 +12,8 @@ import { ConnectButton } from "@/components/wallet/connect-button";
 import { Providers } from "./providers";
 import { sharedMarketAddress } from "@/shared/config";
 import { SharedPage } from "@/shared/shared-page";
+import { independentMarketAddress } from "@/independent/config";
+import { IndependentPage } from "@/independent/page";
 
 /**
  * The market page. Everything explanatory (hero, how-it-works, footer) is
@@ -20,6 +22,7 @@ import { SharedPage } from "@/shared/shared-page";
  * MarketGate is a client island.
  */
 export default function Home() {
+  if (independentMarketAddress !== null) return <IndependentPage />;
   if (sharedMarketAddress !== null) return <SharedPage />;
   return (
     <Providers>
