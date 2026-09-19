@@ -24,10 +24,11 @@ return their original CST without capturing a share of the surplus. Voluntary
 additional gifts can move prices; automatic carry is applied only at startup.
 Numerical capacity limits retain exceptional excess carry for later cycles.
 
-The integrated local deployment and browser lifecycle have passed. Final full
-repository and extended fuzz campaigns are in progress; the release results
-will be recorded in [VALIDATION.md](VALIDATION.md). The prior shared engine and
-its tests remain as regression coverage.
+The complete repository gate, both production configurations and the integrated
+local browser lifecycle passed. Extended campaigns passed 2,800,000 fuzz cases
+and 1,441,792 stateful actions without failures. Results and reproduction
+commands are recorded in [VALIDATION.md](VALIDATION.md). The prior shared engine
+and its tests remain as regression coverage.
 
 The live game's eight-question result adapter is still future work. Local
 validation does not authorize using the simulator with real CST.
