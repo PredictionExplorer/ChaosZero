@@ -25,7 +25,10 @@ starts a disposable chain, deploys the local contracts and starts the frontend.
 contract signature with the compiled Solidity interface, including tuple fields
 and return values. It verifies independent question pricing, split/merge reserve
 preservation, transfers and operator revocation, middle-window price inheritance,
-rollover and late source-independent claims. The smoke restores its starting
+rollover and late source-independent claims. It also sends CST straight to the
+market and checks that the next buy absorbs it before pricing, that a cycle opens
+with its first buy, and that every absorption matches `fundingPreview` and the
+`RoundFunded` event exactly. The smoke restores its starting
 chain snapshot. Neither command is a production
 deployment workflow.
 
@@ -75,6 +78,16 @@ frontend. Set `CHECK_BASE=<commit>` to explicitly choose the formatting comparis
 baseline; otherwise it uses the default tracked branch. CI uses the pull request
 base or the previous pushed commit.
 
+## Contract size
+
+`IndependentOutcomeMarket` is 24,393 runtime bytes on the production settings
+in `foundry.toml`, 183 below the 24,576-byte EIP-170 limit; `forge build --sizes`
+in the contract gate fails past it. Never pass a literal or constant argument to
+the private `_absorb`: the IR optimizer then clones it for that call site. Trades
+pass the immutable `_noDonation` instead of `0`; a literal measured 789 bytes
+larger, over the limit. New callers must pass a variable or an immutable.
+Re-measure after every engine change and record the margin in `VALIDATION.md`.
+
 ## Differential fixtures
 
 When contract behavior intentionally changes, regenerate and review the frontend
@@ -100,6 +113,8 @@ endpoint fails the command. These finite regression checks support the documente
 rounding argument; they do not replace a proof covering every input. The separate
 independent-market corpus adds 130 compiler-generated weighted-binary cases,
 including asymmetric priors, integer boundaries, reserve checks and marginal prices.
+It also exports `MIN_AUTO_TOP_UP`, which has no on-chain getter; a frontend test
+pins the browser's copy of that 1 CST absorption threshold to the exported value.
 Avoid editing fixtures while this check runs. Ordinary gates clear the optional
 `ARBITRUM_RPC_URL` for deterministic local tests. The opt-in live fork test
 checks the legacy single-question integration only; there is no live independent

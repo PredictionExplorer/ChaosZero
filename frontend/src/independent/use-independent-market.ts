@@ -9,6 +9,7 @@ import { localGameAbi } from "@/shared/abi";
 import { independentMarketAbi, independentSourceAbi, settlementVaultAbi } from "./abi";
 import {
   fixedAmounts,
+  heldContributions,
   type FundingPreview,
   type IndependentRecovery,
   type IndependentSnapshot,
@@ -66,7 +67,7 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
           blockNumber,
         }),
       ]);
-      const [game, decimals, claimEscrow] = await Promise.all([
+      const [game, decimals, claimEscrow, marketBalance] = await Promise.all([
         client.readContract({
           address: source,
           abi: independentSourceAbi,
@@ -83,6 +84,14 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
           address: vault,
           abi: settlementVaultAbi,
           functionName: "totalEscrowed",
+          blockNumber,
+        }),
+        // Same block as the custody reads, so held CST is exact rather than racy.
+        client.readContract({
+          address: token,
+          abi: erc20Abi,
+          functionName: "balanceOf",
+          args: [market],
           blockNumber,
         }),
       ]);
@@ -213,6 +222,10 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
               blockNumber,
             })
           : null;
+      const held = heldContributions(marketBalance, poolCustody, pendingCarry);
+      // The preview measures the same saturating surplus at the same block.
+      if (funding && funding.unallocated !== held)
+        throw new Error("The market's CST custody is inconsistent.");
       const questions = states.map((state, question) => {
         const initialYesBps = round.initialized ? state.initialYesBps : seeds![0][question];
         if (
@@ -254,6 +267,7 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
         claimEscrow,
         pendingCarry,
         availableCarry: funding?.availableCarry ?? pendingCarry,
+        heldContributions: held,
         funding: funding ? { ...funding, allocations: fixedAmounts(funding.allocations) } : null,
         user:
           wallet && address

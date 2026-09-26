@@ -4,6 +4,7 @@ pragma solidity 0.8.35;
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 import {BinaryMarketMath} from "../src/libraries/BinaryMarketMath.sol";
+import {MIN_AUTO_TOP_UP} from "../src/IndependentOutcomeMarket.sol";
 
 /// @dev External calls let the generator record actual library acceptance/reverts.
 contract IndependentVectorHarness {
@@ -24,8 +25,11 @@ contract IndependentVectorHarness {
     }
 }
 
-/// @notice Actual compiled Solidity results for the independent TypeScript solver.
+/// @notice Actual compiled Solidity results for the independent TypeScript solver,
+/// plus the engine constants the frontend must not hard-code silently.
 /// @dev Deterministic local simulation only: no broadcast, RPC, or signing key.
+/// Output: `{"constants": {...}, "vectors": [...]}`. `MIN_AUTO_TOP_UP` is a
+/// decimal string because it has no on-chain getter.
 /// Run forge script script/GenerateIndependentVectors.s.sol --tc GenerateIndependentVectors.
 contract GenerateIndependentVectors is Script {
     struct State {
@@ -43,14 +47,19 @@ contract GenerateIndependentVectors is Script {
     function run() external {
         harness = new IndependentVectorHarness();
         count = 0;
-        vm.writeFile(PATH, "[\n");
+        vm.writeFile(
+            PATH,
+            string.concat(
+                "{\n\"constants\":{\"MIN_AUTO_TOP_UP\":\"", vm.toString(MIN_AUTO_TOP_UP), "\"},\n\"vectors\":[\n"
+            )
+        );
         _weightedCases();
         _dustCases();
         _invalidCases();
         _boundaryCases();
         _randomCases();
         require(count == EXPECTED_COUNT, "incomplete independent vectors");
-        vm.writeLine(PATH, "]");
+        vm.writeLine(PATH, "]\n}");
     }
 
     function _weightedCases() private {

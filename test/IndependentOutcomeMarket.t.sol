@@ -345,16 +345,17 @@ contract IndependentOutcomeMarketTest is Test, ERC1155Holder {
         }
     }
 
-    function test_untrackedTransfersNeverBecomeCarryOrFunding() public {
+    function test_untrackedTransfersJoinTheNextAbsorptionAndThenRollOver() public {
         token.transfer(address(market), 100e18);
         market.fundRound(1, SEED);
+        assertEq(market.totalActiveCollateral(), SEED + 100e18);
         _close(1, 0, 100, 200);
         market.settleRound(1);
-        assertEq(market.pendingCarry(), SEED);
+        assertEq(market.pendingCarry(), SEED + 100e18);
         assertEq(token.balanceOf(address(market)), SEED + 100e18);
         _open(2, 200);
         market.fundRound(2, 0);
-        assertEq(market.totalActiveCollateral(), SEED);
+        assertEq(market.totalActiveCollateral(), SEED + 100e18);
         assertEq(token.balanceOf(address(market)), SEED + 100e18);
     }
 

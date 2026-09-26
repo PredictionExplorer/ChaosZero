@@ -70,4 +70,9 @@ export const localGameAbi = parseAbi([
   "error InsufficientAllowance()",
   "error InsufficientBalance()",
 ]);
-export const localTokenAbi = parseAbi(["function faucet(uint256 amount)"]);
+export const localTokenAbi = parseAbi([
+  "function faucet(uint256 amount)",
+  "function transfer(address to,uint256 amount) returns (bool)",
+  "error InsufficientBalance()",
+  "error InvalidRecipient()",
+]);

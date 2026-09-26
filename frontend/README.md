@@ -8,10 +8,15 @@ on disposable Anvil with the local game and test CST. Open `/shared` (or `/`).
 inherits either older market address. The launcher sets the new address and
 blanks `NEXT_PUBLIC_SHARED_MARKET_ADDRESS` and `NEXT_PUBLIC_MARKET_ADDRESS`.
 
-Each question has its own collateral and weighted binary price. A single funding
-transaction divides new gifts plus available carry across all eight pools. The
-funding preview reports the exact allocations, including integer remainders and
-any carry deferred by capacity limits. Starting odds use the previous cycle’s
+Each question has its own collateral and weighted binary price. A `fundRound`
+gift enters all eight pools at once. CST sent directly to the market, and carry
+when a cycle starts, enter at the next buy, sell or `fundRound` on an open cycle
+(see the root README). `fundingPreview(cycle, 0)` reports exactly what the next
+trade absorbs. When its `canFund` is set, quotes, card prices and payouts use the
+effective pools after that absorption (on an unstarted cycle, its allocations
+with `seedPreview` seeds), and the allocations are part of the quote cache key.
+The preview reports exact allocations, including integer remainders and anything
+deferred by capacity limits. Starting odds use the previous cycle’s
 40–60% **time window**; missing coverage uses the prior seed. If the immediately
 preceding game cycle has no initialized market, the fallback is 50%. This is
 recorded-price history, not an external price oracle.
@@ -19,12 +24,23 @@ recorded-price history, not an external price oracle.
 Trading continues until full game closure even when a comparison is already
 clear. Settlement moves normal 1:1 winning claims into a separate immutable vault,
 zeros closed-cycle trading collateral, and carries all remaining funds forward.
-First funding of a new cycle automatically settles the prior funded cycle and
-includes carry before trading. Zero-new-CST startup is supported. Later claims
-from an old cycle use its reserve and never reduce new-cycle pool balances.
+An unstarted cycle that can start is tradeable: its first trade settles the prior
+funded cycle, opens the pools from carry and held contributions, and costs a
+higher network fee, which the trade panel states. Later claims from an old cycle
+use its reserve and never reduce new-cycle pool balances.
+
+The funding panel adds new CST to all eight pools, or calls `fundRound(cycle, 0)`
+to open the pools or distribute held CST without trading. That trigger is
+enabled only when `canFund` is set; otherwise it says why, for example that
+under 1 CST waits until a gift sweeps it. The panel shows the market address for
+direct CST-only transfers, which are irrevocable gifts. The dashboard separates
+carried CST from held contributions. The 1 CST threshold (`MIN_AUTO_TOP_UP`) has
+no on-chain getter; a test pins the frontend copy to the Solidity-generated
+`src/test/fixtures/independent-contract-vectors.json`.
 
 The UI includes buys/sells, fixed-rate complete sets, batch merges, owner transfers,
-and local wallet/game controls. Source errors disable trading, splitting and
+and local wallet/game controls, including a local-chain-only direct transfer of
+100 test CST to the market. Source errors disable trading, splitting and
 funding; fresh source-independent balances still permit merges/transfers, and
 cached settled claims remain retrievable. Every write pins its account and local
 chain. Public-chain writes remain disabled pending a verified live source.
@@ -32,7 +48,8 @@ chain. Public-chain writes remain disabled pending a verified live source.
 New implementation: `src/independent/`, using the independently verified weighted
 solver in `src/shared/independent-math.ts`. Browser coverage in
 `e2e/independent-market.spec.ts` exercises three cycles, price isolation, exact
-funding, history inheritance, source outages, protected late claims, and carry.
+funding, history inheritance, source outages, protected late claims, carry, a
+cycle started by its first buy, and a direct transfer absorbed by the next buy.
 Every browser run snapshots/restores Anvil for retry isolation.
 
 ## Previous shared prototype (regression implementation)

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { ArrowDownLeft, ArrowUpRight, Layers3, Wallet } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowDownLeft, ArrowUpRight, Check, Copy, Layers3, Wallet } from "lucide-react";
+import type { Address } from "viem";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConnectButton } from "@/components/wallet/connect-button";
@@ -14,10 +15,15 @@ import { matchedSets } from "@/shared/positions";
 import { formatQuestionMetric } from "@/shared/question-metrics";
 import { answerYes, QUESTIONS, type QuestionId } from "@/shared/questions";
 import {
+  effectiveQuestions,
   exactCst,
+  fundingBreakdown,
   independentPortfolioValue,
+  MIN_AUTO_TOP_UP,
+  nextAbsorption,
   parseFundingAmount,
   questionExposure,
+  tradeAccess,
   winningClaims,
   type IndependentActions,
   type IndependentSnapshot,
@@ -46,24 +52,28 @@ export function IndependentQuestionCard({
 }) {
   const item = QUESTIONS[question];
   const state = snapshot.questions[question];
+  const access = tradeAccess(snapshot);
+  // Prices are those the next trade meets: after any pending absorption.
+  const effective = effectiveQuestions(snapshot)[question];
+  const incoming = effective.pool.collateral - state.pool.collateral;
   const yesWon = answerYes(snapshot.values, question);
   const probability = snapshot.finalized
     ? yesWon
       ? 10_000n
       : 0n
-    : state.funded
-      ? independentYesProbabilityBps(state.pool)
+    : effective.funded
+      ? independentYesProbabilityBps(effective.pool)
       : null;
   const noProbability = snapshot.finalized
     ? yesWon
       ? 0n
       : 10_000n
-    : state.funded
+    : effective.funded
       ? independentYesProbabilityBps({
-          ...state.pool,
-          yes: state.pool.no,
-          no: state.pool.yes,
-          initialYesBps: 10_000 - state.pool.initialYesBps,
+          ...effective.pool,
+          yes: effective.pool.no,
+          no: effective.pool.yes,
+          initialYesBps: 10_000 - effective.pool.initialYesBps,
         })
       : null;
   const exposure = questionExposure(state, snapshot.settled, snapshot.finalized, yesWon);
@@ -84,7 +94,9 @@ export function IndependentQuestionCard({
             ? `Resolved ${yesWon ? "YES" : "NO"}`
             : state.funded
               ? "Trading"
-              : "Needs funding"}
+              : access.opensPools
+                ? "Opens with the first trade"
+                : "Needs funding"}
         </span>
       </div>
       <h2 className="font-display text-lg font-semibold">{item.title}</h2>
@@ -110,6 +122,14 @@ export function IndependentQuestionCard({
             {formatCst(snapshot.settled ? state.escrowRemaining : exposure.collateral)} CST
           </span>
         </div>
+        {incoming > 0n && (
+          <div className="flex justify-between text-signal-bright">
+            <span>{state.funded ? "Joins with the next trade" : "Opens with"}</span>
+            <span className="font-mono" data-testid={`question-incoming-${question}`}>
+              +{formatCst(incoming)} CST
+            </span>
+          </div>
+        )}
         <div className="flex justify-between">
           <span>Remaining reserve</span>
           <span className="font-mono" data-testid={`question-reserve-${question}`}>
@@ -173,24 +193,28 @@ export function IndependentTradePanel({
 }) {
   const [input, setInput] = useState("");
   const parsed = parseCstInput(input);
-  const state = snapshot.questions[question];
+  const access = tradeAccess(snapshot);
+  // Quote only the pool the trade will meet: it absorbs held CST before pricing.
+  // Memoized so the quote effect reruns only when the effective pool itself changes.
+  const pool = useMemo(() => effectiveQuestions(snapshot)[question].pool, [snapshot, question]);
+  const allocation = nextAbsorption(snapshot)?.allocations[question] ?? 0n;
   const amount = parsed.value ?? 0n;
   const available = buy
     ? snapshot.user?.balance
     : yes
       ? snapshot.user?.yes[question]
       : snapshot.user?.no[question];
-  const enabled = snapshot.open && !snapshot.finalized && state.funded && amount > 0n;
+  const enabled = access.tradeable && amount > 0n;
   const [computed, setComputed] = useState<{ key: string; value: bigint } | null>(null);
-  const key = `${snapshot.roundId}:${question}:${state.pool.collateral}:${state.pool.yes}:${state.pool.no}:${state.pool.initialYesBps}:${yes}:${buy}:${amount}:${enabled}`;
+  const key = `${snapshot.roundId}:${question}:${pool.collateral}:${pool.yes}:${pool.no}:${pool.initialYesBps}:${allocation}:${yes}:${buy}:${amount}:${enabled}`;
   useEffect(() => {
     if (!enabled) return;
     const timer = setTimeout(
-      () => setComputed({ key, value: quoteIndependentTrade(state.pool, yes, buy, amount) }),
+      () => setComputed({ key, value: quoteIndependentTrade(pool, yes, buy, amount) }),
       150,
     );
     return () => clearTimeout(timer);
-  }, [key, enabled, state.pool, yes, buy, amount]);
+  }, [key, enabled, pool, yes, buy, amount]);
   const calculating = enabled && computed?.key !== key;
   const output = enabled && computed?.key === key ? computed.value : 0n;
   const approval = buy && amount > (snapshot.user?.allowance ?? 0n);
@@ -241,12 +265,24 @@ export function IndependentTradePanel({
         </p>
       ) : !snapshot.open ? (
         <p className="text-sm text-ink-dim">Trading is unavailable for this cycle.</p>
-      ) : !state.funded ? (
-        <p className="text-sm text-ink-dim">
-          Start this cycle’s eight pools with carried funds or a new gift before trading.
+      ) : !access.tradeable ? (
+        <p className="text-sm text-ink-dim" data-testid="independent-trade-unfunded">
+          This cycle’s eight pools have not opened. An “Add CST” gift opens them; so does the first
+          trade once carried or held CST is waiting.
         </p>
       ) : (
         <>
+          {access.absorbed > 0n && (
+            <p
+              className="mb-4 rounded-xl border border-signal/30 bg-signal/5 p-3 text-xs leading-5 text-ink-dim"
+              data-testid="independent-trade-absorption"
+            >
+              {access.opensPools
+                ? `This trade opens this cycle’s eight pools first${access.settlesPrevious ? ", after settling the preceding cycle and reserving its winning claims" : ""}. It places ${formatCst(access.absorbed)} CST of carried and held funds across them before pricing, so it costs a higher network fee than a normal trade.`
+                : `This trade first distributes ${formatCst(access.absorbed)} CST of held contributions across all eight pools, then prices against the deeper pool. The network fee is higher than a normal trade.`}{" "}
+              The quote below already includes this.
+            </p>
+          )}
           <label
             htmlFor="independent-trade-amount"
             className="mb-2 flex justify-between text-xs text-ink-dim"
@@ -313,6 +349,84 @@ export function IndependentTradePanel({
   );
 }
 
+/** What the permissionless trigger will place, or why it is unavailable. */
+function triggerExplanation(snapshot: IndependentSnapshot): string {
+  const trigger = nextAbsorption(snapshot);
+  const held = snapshot.heldContributions;
+  if (trigger) {
+    const { carry, held: joining } = fundingBreakdown(trigger, 0n);
+    return snapshot.funded
+      ? `${exactCst(trigger.totalFunding)} CST of held contributions enters all eight pools. Anyone can trigger this; the next trade does the same before it is priced.`
+      : `Opens the eight pools with ${exactCst(carry)} carried and ${exactCst(joining)} held CST${trigger.needsSettlement ? ", after settling the preceding cycle" : ""}. Anyone can trigger this; the first trade does the same.`;
+  }
+  if (snapshot.funded) {
+    if (held === 0n)
+      return "Nothing is waiting. CST sent directly to the market joins the pools with the next trade or when anyone distributes it.";
+    if (held < MIN_AUTO_TOP_UP)
+      return `${exactCst(held)} CST is held. Amounts under ${formatCst(MIN_AUTO_TOP_UP)} CST wait: any “Add CST” gift sweeps them in, otherwise they join the next cycle’s pools.`;
+    return "The pools are at capacity, so held CST waits for the next cycle’s pools.";
+  }
+  if (snapshot.funding?.needsSettlement)
+    return "The preceding funded cycle cannot be settled yet, so this cycle’s pools cannot open. Try again once its closure data is available.";
+  if (!snapshot.funding?.totalFunding)
+    return "Nothing is carried or held for this cycle yet. An “Add CST” gift opens its pools.";
+  return `${exactCst(snapshot.funding.totalFunding)} CST is waiting but cannot open this cycle’s pools yet; it may be below the opening minimum. An “Add CST” gift adds to it.`;
+}
+
+/** Market address for plain CST transfers, with the irrevocable-gift warning. */
+export function DirectTransferNotice({ market }: { market: Address }) {
+  const [copied, setCopied] = useState<boolean | null>(null);
+  return (
+    <div className="mt-5 border-t border-line pt-4" data-testid="independent-direct-transfer">
+      <h3 className="text-sm font-semibold">Or send CST directly</h3>
+      <div className="mt-2 flex items-center gap-2">
+        <code
+          className="min-w-0 flex-1 break-all rounded-lg bg-void/70 px-2 py-1.5 font-mono text-[11px] text-ink"
+          data-testid="independent-market-address"
+        >
+          {market}
+        </code>
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label="Copy market address"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(market);
+              setCopied(true);
+            } catch {
+              setCopied(false);
+            }
+          }}
+        >
+          {copied ? (
+            <Check className="size-4" aria-hidden />
+          ) : (
+            <Copy className="size-4" aria-hidden />
+          )}
+        </Button>
+      </div>
+      <p role="status" className="mt-1 min-h-4 text-[11px] text-ink-faint">
+        {copied === null
+          ? ""
+          : copied
+            ? "Address copied."
+            : "Copy failed. Select the address instead."}
+      </p>
+      <p className="mt-1 text-[11px] leading-5 text-ended">
+        Send only CST: any other token sent here is lost. A direct transfer is an irrevocable gift
+        with no shares, fees or withdrawal rights, and a mistaken transfer cannot be returned.
+      </p>
+      <p className="mt-2 text-[11px] leading-5 text-ink-faint">
+        A plain transfer runs no market code. While a cycle is trading, it joins all eight pools
+        with the next trade or when anyone distributes it; under {formatCst(MIN_AUTO_TOP_UP)} CST
+        waits for a gift or the next cycle. Otherwise it joins the next cycle’s pools when they
+        open.
+      </p>
+    </div>
+  );
+}
+
 export function IndependentFundingPanel({
   snapshot,
   connected,
@@ -326,15 +440,17 @@ export function IndependentFundingPanel({
   const [acknowledged, setAcknowledged] = useState(false);
   const parsed = parseFundingAmount(input);
   const amount = parsed.value ?? 0n;
+  const live = snapshot.open && !snapshot.finalized;
   const previewQuery = useIndependentFundingPreview(
     snapshot.market,
     snapshot.roundId,
-    parsed.value,
-    snapshot.open && !snapshot.finalized,
+    amount > 0n ? amount : null,
+    live,
   );
-  const preview = previewQuery.data;
-  const carry = preview?.carryUsed ?? 0n;
-  const total = preview?.totalFunding ?? 0n;
+  const preview = amount > 0n ? previewQuery.data : undefined;
+  const breakdown = preview ? fundingBreakdown(preview, amount) : null;
+  const trigger = nextAbsorption(snapshot);
+  const held = snapshot.heldContributions;
   const approval = amount > (snapshot.user?.allowance ?? 0n);
   const error =
     parsed.error ??
@@ -342,39 +458,72 @@ export function IndependentFundingPanel({
       ? "Not enough CST."
       : amount > MAX_COLLATERAL * 8n || (preview && amount > preview.maxNewAmount)
         ? "This amount exceeds capacity after carried funds are included."
-        : previewQuery.error
+        : amount > 0n && previewQuery.error
           ? "Funding preview is unavailable. Refresh before sending CST."
           : null);
   const ready =
-    snapshot.open &&
-    !snapshot.finalized &&
-    total > 0n &&
-    !!preview?.canFund &&
-    !previewQuery.isFetching &&
-    !error &&
-    (amount === 0n || acknowledged);
+    live && amount > 0n && !!preview?.canFund && !previewQuery.isFetching && !error && acknowledged;
+  const distributeLabel = snapshot.funded
+    ? trigger || held > 0n
+      ? `Distribute ${formatCst(trigger?.totalFunding ?? held)} CST now`
+      : "Distribute held CST now"
+    : "Open pools now";
   return (
     <Card className="p-5" data-testid="independent-funding-panel">
       <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
-        <Layers3 className="size-4 text-signal" aria-hidden />{" "}
-        {snapshot.funded ? "Fund all eight pools" : "Start this cycle’s pools"}
+        <Layers3 className="size-4 text-signal" aria-hidden /> Fund all eight pools
       </h2>
       <p className="mt-2 text-xs leading-5 text-ink-dim">
-        One transaction divides new funding equally across eight independent questions. Unclaimed
-        old winnings remain separately reserved.
+        Every contribution is divided equally across eight independent questions. Unclaimed old
+        winnings remain separately reserved.
       </p>
-      {!snapshot.open || snapshot.finalized ? (
-        <p className="mt-4 text-sm text-ink-dim">Funding is closed for this cycle.</p>
+      {!live ? (
+        <p className="mt-4 text-sm text-ink-dim">
+          Funding is closed for this cycle. CST sent to the market now waits and joins the next
+          cycle’s pools when they open.
+        </p>
       ) : (
         <>
-          <div className="my-4 flex justify-between text-xs">
-            <span className="text-ink-dim">Carried CST included</span>
-            <span className="font-mono" data-testid="funding-carry">
-              {preview ? formatCst(carry) : "—"} CST
-            </span>
+          <div className="mt-4 rounded-xl border border-line p-3" data-testid="funding-waiting">
+            <dl className="space-y-2 text-xs">
+              {!snapshot.funded && (
+                <div className="flex justify-between gap-2">
+                  <dt className="text-ink-dim">Carried CST waiting</dt>
+                  <dd className="font-mono" data-testid="funding-available-carry">
+                    {formatCst(snapshot.funding?.availableCarry ?? snapshot.availableCarry)} CST
+                  </dd>
+                </div>
+              )}
+              <div className="flex justify-between gap-2">
+                <dt className="text-ink-dim">Held contributions waiting</dt>
+                <dd className="font-mono" data-testid="funding-held">
+                  {formatCst(held)} CST
+                </dd>
+              </div>
+            </dl>
+            {connected && (
+              <Button
+                className="mt-3 w-full"
+                variant="ghost"
+                size="sm"
+                disabled={!trigger || !!actions.pending}
+                loading={actions.pending === "Pool distribution"}
+                onClick={() => void actions.distribute()}
+                aria-describedby="independent-trigger-explanation"
+              >
+                {distributeLabel}
+              </Button>
+            )}
+            <p
+              id="independent-trigger-explanation"
+              className="mt-2 break-words text-[11px] leading-5 text-ink-faint"
+              data-testid="trigger-explanation"
+            >
+              {triggerExplanation(snapshot)}
+            </p>
           </div>
-          <label htmlFor="independent-fund-amount" className="mb-2 block text-xs text-ink-dim">
-            New CST to add · 0 uses carry only
+          <label htmlFor="independent-fund-amount" className="mb-2 mt-4 block text-xs text-ink-dim">
+            New CST to add
           </label>
           <input
             id="independent-fund-amount"
@@ -389,32 +538,51 @@ export function IndependentFundingPanel({
           <p role={error ? "alert" : undefined} className="mt-2 min-h-4 text-xs text-lower">
             {error}
           </p>
-          <p className="my-3 break-words text-xs text-ink-dim">
-            Total funding: {preview ? exactCst(total) : "—"} CST across all eight questions.
-          </p>
-          {preview && (
-            <div
-              className="mb-3 grid grid-cols-2 gap-1 text-[10px] text-ink-dim"
-              data-testid="funding-allocations"
-            >
-              {preview.allocations.map((allocation, question) => (
-                <span key={question}>
-                  Q{question + 1}: {exactCst(allocation)} CST
-                </span>
-              ))}
-            </div>
-          )}
-          {preview?.needsSettlement && (
-            <p className="mb-3 text-xs leading-5 text-ink-dim">
-              This transaction first settles the preceding funded cycle and reserves its unpaid
-              winnings.
-            </p>
-          )}
-          {preview && preview.deferredCarry > 0n && (
-            <p className="mb-3 break-all text-xs leading-5 text-ink-dim">
-              {exactCst(preview.deferredCarry)} CST stays carried for a later cycle because this
-              funding has reached its capacity.
-            </p>
+          {breakdown && preview && (
+            <>
+              <dl className="my-3 space-y-1 text-xs">
+                <div className="flex justify-between gap-2">
+                  <dt className="text-ink-dim">Carried CST included</dt>
+                  <dd className="font-mono" data-testid="funding-carry">
+                    {formatCst(breakdown.carry)} CST
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-2">
+                  <dt className="text-ink-dim">Held contributions included</dt>
+                  <dd className="font-mono" data-testid="funding-held-included">
+                    {formatCst(breakdown.held)} CST
+                  </dd>
+                </div>
+              </dl>
+              <p className="mb-3 break-words text-xs text-ink-dim">
+                Total funding: {exactCst(preview.totalFunding)} CST across all eight questions.
+              </p>
+              <div
+                className="mb-3 grid grid-cols-2 gap-1 text-[10px] text-ink-dim"
+                data-testid="funding-allocations"
+              >
+                {preview.allocations.map((allocation, question) => (
+                  <span key={question}>
+                    Q{question + 1}: {exactCst(allocation)} CST
+                  </span>
+                ))}
+              </div>
+              {!snapshot.funded && (
+                <p className="mb-3 text-xs leading-5 text-ink-dim">
+                  This gift opens this cycle’s pools
+                  {preview.needsSettlement
+                    ? ", first settling the preceding funded cycle and reserving its unpaid winnings"
+                    : ""}
+                  .
+                </p>
+              )}
+              {preview.deferredCarry > 0n && (
+                <p className="mb-3 break-all text-xs leading-5 text-ink-dim">
+                  {exactCst(preview.deferredCarry)} CST stays carried for a later cycle because this
+                  funding has reached its capacity.
+                </p>
+              )}
+            </>
           )}
           {amount > 0n && (
             <label className="mb-4 flex items-start gap-3 text-xs leading-5 text-ink-dim">
@@ -447,21 +615,17 @@ export function IndependentFundingPanel({
                 }
               }}
             >
-              {approval
-                ? "Approve CST for funding"
-                : snapshot.funded
-                  ? "Fund all eight pools"
-                  : amount === 0n
-                    ? "Start pools with carried CST"
-                    : "Start and fund all eight pools"}
+              {approval ? "Approve CST for funding" : "Add CST to all eight pools"}
             </Button>
           )}
           <p className="mt-3 text-[11px] leading-5 text-ink-faint">
-            A first funding transaction settles the preceding funded cycle if needed, then includes
-            all carried funds. Every question keeps its own liquidity.
+            A gift also sweeps every held contribution in with it. The first funding of a cycle, by
+            gift or by trade, settles the preceding funded cycle if needed and includes all carried
+            funds. Every question keeps its own liquidity.
           </p>
         </>
       )}
+      <DirectTransferNotice market={snapshot.market} />
     </Card>
   );
 }
@@ -643,7 +807,11 @@ export function IndependentPortfolio({
   const [transfer, setTransfer] = useState<{ question: QuestionId; yes: boolean } | null>(null);
   const user = snapshot.user;
   if (!user) return null;
-  const valuation = independentPortfolioValue(snapshot);
+  // Indicative values use the pools the next sale would meet.
+  const valuation = independentPortfolioValue({
+    ...snapshot,
+    questions: effectiveQuestions(snapshot),
+  });
   const positions = QUESTIONS.flatMap((item, question) =>
     [true, false].flatMap((yes) => {
       const amount = yes ? user.yes[question] : user.no[question];

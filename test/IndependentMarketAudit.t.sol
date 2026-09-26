@@ -104,8 +104,9 @@ contract IndependentAuditReceiver is IERC1155Receiver {
         _inside = true;
         uint256[8] memory amounts;
         amounts[1] = 1;
-        bytes[8] memory attempts = [
+        bytes[9] memory attempts = [
             abi.encodeCall(market.fundRound, (1, 1)),
+            abi.encodeCall(market.fundRound, (1, 0)),
             abi.encodeCall(market.buy, (1, 0, true, 1, 1, type(uint256).max)),
             abi.encodeCall(market.sell, (1, 0, true, 1, 1, type(uint256).max)),
             abi.encodeCall(market.splitPosition, (1, 0, 1)),
@@ -244,6 +245,14 @@ contract IndependentMarketAuditTest is Test {
         assertEq(market.pendingCarry(), SEED - 5e18);
         vm.prank(ALICE);
         assertEq(market.claimKnown(1), 0);
+        // The sub-threshold market donation stayed held through settlement, never
+        // carry, and joins the next cycle's first funding; vault donations stay inert.
+        _open(2, 1101);
+        market.fundRound(2, 0);
+        assertEq(market.totalActiveCollateral(), SEED - 5e18 + 17);
+        assertEq(market.pendingCarry(), 0);
+        assertEq(token.balanceOf(address(market)), SEED - 5e18 + 17);
+        assertEq(token.balanceOf(address(vault)), 19);
     }
 
     function test_zeroCashFundingSkipsSplitOnlyCyclesWithoutReusingTheirCollateral() public {
@@ -349,6 +358,30 @@ contract IndependentMarketAuditTest is Test {
         assertEq(token.balanceOf(address(vault)), 1e18);
     }
 
+    function test_autoStartingTradeSurfacesAShortSettlementTransferAtomically() public {
+        vm.prank(ALICE);
+        market.buy(1, 0, true, 10e18, 15e18, type(uint256).max);
+        _close(1, 1100, 1);
+        _open(2, 1101);
+        token.transfer(address(market), 3e18);
+        token.tax(address(vault));
+        vm.prank(BOB);
+        vm.expectRevert(IndependentOutcomeMarket.TransferFailed.selector);
+        market.buy(2, 0, true, 1e18, 1e18, type(uint256).max);
+        assertFalse(market.roundState(1).settled);
+        assertFalse(market.roundState(2).initialized);
+        assertEq(market.totalActiveCollateral(), SEED + 10e18);
+        assertEq(market.pendingCarry(), 0);
+        assertEq(token.balanceOf(address(market)), SEED + 10e18 + 3e18);
+        assertEq(vault.totalEscrowed(), 0);
+        token.tax(address(0));
+        vm.prank(BOB);
+        market.buy(2, 0, true, 1e18, 1e18, type(uint256).max);
+        assertEq(vault.totalEscrowed(), 15e18);
+        assertEq(market.totalActiveCollateral(), SEED + 10e18 - 15e18 + 3e18 + 1e18);
+        assertEq(token.balanceOf(address(market)), market.totalActiveCollateral() + market.pendingCarry());
+    }
+
     function test_initialCarryCapacityRespectsExistingPairsAndTheFirstTightQuestion() public {
         _close(1, 1100, 0);
         _open(2, 1101);
@@ -380,7 +413,7 @@ contract IndependentMarketAuditTest is Test {
         token.mint(address(receiver), 19e18);
         receiver.buy();
         receiver.split();
-        assertEq(receiver.blocked(), 16);
+        assertEq(receiver.blocked(), 18);
         assertEq(market.balanceOf(BOB, market.positionId(1, 0, true)), 15e18);
         assertEq(market.balanceOf(BOB, market.positionId(1, 1, true)), 9e18);
         assertEq(market.balanceOf(BOB, market.positionId(1, 1, false)), 9e18);
@@ -400,8 +433,9 @@ contract IndependentMarketAuditTest is Test {
         market.splitPosition(1, 1, 9e18);
         uint256[8] memory amounts;
         amounts[1] = 1;
-        bytes[8] memory attempts = [
+        bytes[9] memory attempts = [
             abi.encodeCall(market.fundRound, (1, 1)),
+            abi.encodeCall(market.fundRound, (1, 0)),
             abi.encodeCall(market.buy, (1, 0, true, 1, 1, type(uint256).max)),
             abi.encodeCall(market.sell, (1, 0, true, 1, 1, type(uint256).max)),
             abi.encodeCall(market.splitPosition, (1, 0, 1)),
@@ -410,12 +444,19 @@ contract IndependentMarketAuditTest is Test {
             abi.encodeCall(market.settleRound, (1)),
             abi.encodeCall(market.claimKnown, (1))
         ];
-        for (uint256 origin; origin < 9; ++origin) {
+        // Origins 9-10 absorb held CST before pricing; 11-12 auto-start cycle 2, so
+        // their first callback fires during settlement's escrow push to the vault.
+        for (uint256 origin; origin < 13; ++origin) {
             for (uint256 target; target < attempts.length; ++target) {
                 uint256 snapshot = vm.snapshotState();
-                if (origin >= 5) _close(1, 1100, 1);
+                if ((origin >= 5 && origin <= 8) || origin >= 11) _close(1, 1100, 1);
                 if (origin == 6 || origin == 7) market.settleRound(1);
-                if (origin == 8) _open(2, 1101);
+                if (origin == 8 || origin >= 11) _open(2, 1101);
+                if (origin == 9 || origin == 10) token.transfer(address(market), 2e18);
+                if (origin == 12) {
+                    vm.prank(ALICE);
+                    market.splitPosition(2, 3, 2e18); // Positions in cycle 2 without starting it.
+                }
                 token.arm(address(market), attempts[target]);
                 if (origin == 0) {
                     market.fundRound(1, 1);
@@ -436,8 +477,24 @@ contract IndependentMarketAuditTest is Test {
                 } else if (origin == 6) {
                     vm.prank(ALICE);
                     market.claimKnown(1);
-                } else {
+                } else if (origin == 8) {
                     market.fundRound(2, 1e18); // Automatic escrow transfer followed by a new funding pull.
+                } else if (origin == 9) {
+                    vm.prank(ALICE);
+                    market.buy(1, 2, true, 1e18, 1e18, type(uint256).max);
+                } else if (origin == 10) {
+                    vm.prank(ALICE);
+                    market.sell(1, 0, true, 1e18, 1e17, type(uint256).max);
+                } else if (origin == 11) {
+                    vm.prank(ALICE);
+                    market.buy(2, 2, true, 1e18, 1e18, type(uint256).max);
+                } else {
+                    vm.prank(ALICE);
+                    market.sell(2, 3, true, 1e18, 1e17, type(uint256).max);
+                }
+                if (origin >= 11) {
+                    assertEq(token.callbackCount(), 2, "no callback during the settlement push");
+                    assertTrue(market.roundState(1).settled && market.roundState(2).funded);
                 }
                 assertGt(token.callbackCount(), 0);
                 assertEq(token.callbackSuccesses(), 0);

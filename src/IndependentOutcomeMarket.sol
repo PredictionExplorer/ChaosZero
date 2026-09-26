@@ -9,6 +9,13 @@ import {OutcomeSettlementVault, ISettlementCollateral} from "./OutcomeSettlement
 import {BinaryMarketMath} from "./libraries/BinaryMarketMath.sol";
 import {PriceHistory} from "./libraries/PriceHistory.sol";
 
+/// @dev Smallest held contribution that an implicit trigger (a buy, a sell or a bare
+/// `fundRound(cycle, 0)`) absorbs into an already-funded cycle. Smaller amounts wait
+/// for a later absorption, an explicit gift (which sweeps everything held) or the
+/// next cycle's first funding (which needs only MIN_FUNDING), so dust transfers
+/// cannot force eight pool writes (about 320k gas measured) onto traders at negligible cost.
+uint256 constant MIN_AUTO_TOP_UP = 1e18;
+
 interface IIndependentCollateral {
     function balanceOf(address user) external view returns (uint256);
     function transfer(address to, uint256 amount) external returns (bool);
@@ -29,6 +36,10 @@ contract IndependentOutcomeMarket is ERC1155 {
     uint256 public constant MAX_INITIAL_QUESTION_FUNDING = MAX_COLLATERAL / 2;
     uint256 public constant MIN_FUNDING = 8e12;
     uint256 public constant MAX_ROUND_ID = type(uint256).max >> 4;
+    /// @dev The zero `donated` argument trades pass to `_absorb`. Load-bearing: it is an
+    /// immutable, not a literal or constant, because a literal argument makes the IR
+    /// optimizer clone `_absorb` for that call site (measured +789 bytes, over EIP-170).
+    uint256 private immutable _noDonation = 0;
 
     IIndependentCollateral public immutable cst;
     IIndependentOutcomeSource public immutable source;
@@ -87,6 +98,17 @@ contract IndependentOutcomeMarket is ERC1155 {
         bool seedUsedHistory;
     }
 
+    /// @dev Preview of `fundRound(roundId, newAmount)`. With `newAmount == 0` it is
+    /// exactly what the next buy or sell (or a bare trigger) absorbs before pricing:
+    /// `canFund` means that call places CST now, and `allocations` are the per-pool
+    /// additions (`totalFunding` in all, computed as if the call ran). `carryUsed`
+    /// is the carry placed (first funding only; `availableCarry` includes a previous
+    /// cycle that must settle first), `maxNewAmount` the capacity left after carry
+    /// and `deferredCarry` the pendingCarry after the call. A larger `newAmount`
+    /// reverts FundingCapacity, so only `availableCarry`, `carryUsed`, `maxNewAmount`,
+    /// `needsSettlement` and `unallocated` are then set. `unallocated` is the held
+    /// unsolicited CST now: `cst.balanceOf(market) - totalActiveCollateral -
+    /// pendingCarry`, saturating at zero.
     struct FundingPreview {
         uint256 availableCarry;
         uint256 carryUsed;
@@ -96,6 +118,7 @@ contract IndependentOutcomeMarket is ERC1155 {
         uint256[8] allocations;
         bool needsSettlement;
         bool canFund;
+        uint256 unallocated;
     }
     mapping(uint256 => Round) private _rounds;
 
@@ -116,8 +139,19 @@ contract IndependentOutcomeMarket is ERC1155 {
     error ProductWouldDecrease();
 
     event RoundInitialized(uint256 indexed roundId, uint16[8] initialYesBps, bool[8] usedHistory);
+    /// @dev `caller` triggered the absorption (a sponsor, a trader or anyone) and
+    /// is never evidence of having given `transfersUsed`. `donated` is the caller's
+    /// own pulled CST (zero for trades and bare triggers), `transfersUsed` the held
+    /// unsolicited CST placed and `carryUsed` the pending carry placed (first
+    /// funding only). Their sum equals the sum of `allocations`; whatever carry or
+    /// unsolicited CST did not fit stays in pendingCarry.
     event RoundFunded(
-        uint256 indexed roundId, address indexed sponsor, uint256 donated, uint256 carryUsed, uint256[8] allocations
+        uint256 indexed roundId,
+        address indexed caller,
+        uint256 donated,
+        uint256 transfersUsed,
+        uint256 carryUsed,
+        uint256[8] allocations
     );
     event Trade(
         uint256 indexed roundId,
@@ -149,41 +183,21 @@ contract IndependentOutcomeMarket is ERC1155 {
         _marketViews = new IndependentMarketViews();
     }
 
-    /// @notice Irrevocable eight-way sponsorship. Zero new CST may start a carry-funded cycle.
-    /// @dev All automatic carry is considered before first funding. Only the
-    /// amount fitting the initial headroom cap is used; excess awaits a later
-    /// new cycle. Further voluntary gifts never inject pending carry.
+    /// @notice Irrevocable eight-way sponsorship of `newAmount` CST, which also sweeps
+    /// every held contribution into the pools. With zero it is the permissionless
+    /// trigger that starts a cycle from carry or distributes held CST without trading.
+    /// @dev Pulls first (balance-delta verified); `_absorb`, the only route into pools,
+    /// then places carry (first funding only), `newAmount`, then held CST. Reverts
+    /// FundingCapacity if `newAmount` exceeds the capacity left after carry, and
+    /// InvalidParameters if nothing is placed: a first funding needs MIN_FUNDING and
+    /// a bare trigger on a funded cycle needs MIN_AUTO_TOP_UP held.
     function fundRound(uint256 roundId, uint256 newAmount) external nonReentrant {
         _validRound(roundId);
         if (newAmount > MAX_ROUND_COLLATERAL) revert InvalidParameters();
         Round storage r = _rounds[roundId];
         if (!_sync(roundId, r)) revert RoundNotOpen();
-        if (hasFunded && roundId < lastFundedRound) revert OutOfOrderRound();
-        if (!r.funded && hasFunded && roundId != lastFundedRound && !_rounds[lastFundedRound].settled) {
-            _settleRound(lastFundedRound);
-        }
-        _initialize(roundId, r);
-        uint256 capacity = _capacity(r, !r.funded);
-        uint256 carried;
-        if (!r.funded) carried = pendingCarry < capacity ? pendingCarry : capacity;
-        if (newAmount > capacity - carried) revert FundingCapacity();
-        uint256 total = newAmount + carried;
-        if (total == 0 || (!r.funded && total < MIN_FUNDING)) revert InvalidParameters();
-        if (!r.funded) {
-            pendingCarry -= carried;
-            r.funded = true;
-            hasFunded = true;
-            lastFundedRound = roundId;
-        }
-        uint256[8] memory allocations = _allocate(total);
-        totalActiveCollateral += total;
-        for (uint8 q; q < QUESTION_COUNT; ++q) {
-            if (allocations[q] == 0) continue;
-            r.questions[q].collateral += allocations[q];
-            _observe(r.questions[q]);
-        }
         if (newAmount != 0) _pull(msg.sender, newAmount);
-        emit RoundFunded(roundId, msg.sender, newAmount, carried, allocations);
+        if (_absorb(roundId, r, newAmount) == 0) revert InvalidParameters();
     }
 
     function buy(uint256 roundId, uint8 question, bool yes, uint256 cstIn, uint256 tokensOut, uint256 deadline)
@@ -361,11 +375,8 @@ contract IndependentOutcomeMarket is ERC1155 {
         }
     }
 
-    function questionStates(uint256 roundId) external view returns (QuestionView[8] memory result) {
-        _validRound(roundId);
-        for (uint8 q; q < QUESTION_COUNT; ++q) {
-            result[q] = questionState(roundId, q);
-        }
+    function questionStates(uint256 roundId) external view returns (QuestionView[8] memory) {
+        _forwardView(abi.encodeCall(_marketViews.questionStates, (this, roundId)));
     }
 
     function previewClaim(uint256 roundId, address user) external view returns (bool, uint256, uint256[8] memory) {
@@ -385,11 +396,8 @@ contract IndependentOutcomeMarket is ERC1155 {
         return _seeds(roundId);
     }
 
-    function initialPrices(uint256 roundId) external view returns (uint16[8] memory prices) {
-        _validRound(roundId);
-        for (uint8 q; q < QUESTION_COUNT; ++q) {
-            prices[q] = _rounds[roundId].questions[q].initialYesBps;
-        }
+    function initialPrices(uint256 roundId) external view returns (uint16[8] memory) {
+        _forwardView(abi.encodeCall(_marketViews.initialPrices, (this, roundId)));
     }
 
     function historyLength(uint256 roundId, uint8 question) external view returns (uint256) {
@@ -407,16 +415,8 @@ contract IndependentOutcomeMarket is ERC1155 {
         return (p.cumulative, p.timestamp, p.price);
     }
 
-    function balancesOf(uint256 roundId, address user)
-        external
-        view
-        returns (uint256[8] memory yes, uint256[8] memory no)
-    {
-        _validRound(roundId);
-        for (uint8 q; q < QUESTION_COUNT; ++q) {
-            yes[q] = balanceOf(user, _id(roundId, q, true));
-            no[q] = balanceOf(user, _id(roundId, q, false));
-        }
+    function balancesOf(uint256 roundId, address user) external view returns (uint256[8] memory, uint256[8] memory) {
+        _forwardView(abi.encodeCall(_marketViews.balancesOf, (this, roundId, user)));
     }
 
     function positionId(uint256 roundId, uint8 question, bool yes) public pure returns (uint256) {
@@ -440,8 +440,10 @@ contract IndependentOutcomeMarket is ERC1155 {
         return yes ? _rounds[round].questions[q].yes : _rounds[round].questions[q].no;
     }
 
+    /// @dev Forwards the helper's raw returndata and ends in an assembly `return`,
+    /// so it must never be called internally (OpenZeppelin's ERC1155 does not).
     function uri(uint256 id) public view override returns (string memory) {
-        return _marketViews.uri(id, address(source));
+        _forwardView(abi.encodeCall(_marketViews.uri, (id, address(source))));
     }
 
     function _merge(uint256 roundId, uint256[8] memory amounts) private returns (uint256 total) {
@@ -519,9 +521,63 @@ contract IndependentOutcomeMarket is ERC1155 {
         if (block.timestamp > deadline) revert DeadlineExpired();
         if (cash == 0 || units == 0 || cash > MAX_COLLATERAL || units > MAX_COLLATERAL) revert InvalidParameters();
         Round storage r = _rounds[roundId];
-        if (!r.funded) revert NotFunded();
         if (!_sync(roundId, r)) revert RoundNotOpen();
+        // Held contributions enter before pricing; an unstarted cycle starts here.
+        _absorb(roundId, r, _noDonation);
+        if (!r.funded) revert NotFunded();
         return r.questions[question];
+    }
+
+    /// @dev The single path from "CST arrived" to "CST is in a pool or pendingCarry".
+    /// `roundId` is open (the caller synced it). All held, unaccounted CST (direct
+    /// transfers, mints, or a sponsor's just-verified pull) always joins; pending
+    /// carry joins only at first funding, after the previous funded cycle settles.
+    /// Placement priority is carry, then the caller's own just-pulled `donated`, then
+    /// unsolicited CST. `donated` that does not fit reverts FundingCapacity; only
+    /// carry and unsolicited CST over capacity wait in pendingCarry, so an implicit
+    /// absorption (`donated == 0`) never reverts for capacity. Nothing moves below
+    /// MIN_FUNDING at first funding, or on a funded cycle below MIN_AUTO_TOP_UP
+    /// (implicit) or 1 wei (explicit, so a gift sweeps all held CST with it).
+    function _absorb(uint256 roundId, Round storage r, uint256 donated) private returns (uint256 placed) {
+        bool initial = !r.funded;
+        if (initial && hasFunded) {
+            if (roundId < lastFundedRound) revert OutOfOrderRound();
+            if (!_rounds[lastFundedRound].settled) _settleRound(lastFundedRound);
+        }
+        uint256 carry = pendingCarry;
+        uint256 accounted = totalActiveCollateral + carry;
+        uint256 held = cst.balanceOf(address(this));
+        // Saturates if CST was destroyed externally (unsupported): later inflows
+        // first restore the missing backing, and a deficit never blocks trading.
+        uint256 fresh = held > accounted ? held - accounted : 0;
+        // Settling above moved collateral to carry and escrow but left `fresh` unchanged.
+        uint256 offered = initial ? carry : 0;
+        uint256 minimum = initial ? MIN_FUNDING : (donated != 0 ? 1 : MIN_AUTO_TOP_UP);
+        // Gas shortcut for implicit triggers; an explicit gift checks capacity first.
+        if (donated == 0 && fresh + offered < minimum) return 0;
+        uint256 capacity = _capacity(r, initial);
+        uint256 carryUsed = offered < capacity ? offered : capacity;
+        if (donated > capacity - carryUsed) revert FundingCapacity();
+        placed = fresh + offered < capacity ? fresh + offered : capacity;
+        if (placed < minimum) return 0;
+        if (initial) {
+            _initialize(roundId, r);
+            r.funded = true;
+            hasFunded = true;
+            lastFundedRound = roundId;
+        }
+        pendingCarry = carry + fresh - placed;
+        totalActiveCollateral += placed;
+        uint256[8] memory allocations = _allocate(placed);
+        for (uint8 q; q < QUESTION_COUNT; ++q) {
+            if (allocations[q] == 0) continue;
+            r.questions[q].collateral += allocations[q];
+            _observe(r.questions[q]);
+        }
+        // `fresh >= donated` unless unsupported destruction left a deficit, which the
+        // pull restored first; `donated + transfersUsed + carryUsed == placed`.
+        if (donated > fresh) donated = fresh;
+        emit RoundFunded(roundId, msg.sender, donated, placed - carryUsed - donated, carryUsed, allocations);
     }
 
     function _initialize(uint256 roundId, Round storage r) private {
@@ -700,6 +756,38 @@ contract IndependentMarketViews {
         BinaryMarketMath.verifyProduct(beforeC, beforeY, beforeN, afterC, afterY, afterN, initialYesBps);
     }
 
+    /// @dev Forwarded batch getters: identical ABI output, no market bytecode.
+    function questionStates(IndependentOutcomeMarket market, uint256 roundId)
+        external
+        view
+        returns (IndependentOutcomeMarket.QuestionView[8] memory result)
+    {
+        for (uint8 q; q < 8; ++q) {
+            result[q] = market.questionState(roundId, q);
+        }
+    }
+
+    function initialPrices(IndependentOutcomeMarket market, uint256 roundId)
+        external
+        view
+        returns (uint16[8] memory prices)
+    {
+        for (uint8 q; q < 8; ++q) {
+            prices[q] = market.questionState(roundId, q).initialYesBps;
+        }
+    }
+
+    function balancesOf(IndependentOutcomeMarket market, uint256 roundId, address user)
+        public
+        view
+        returns (uint256[8] memory yes, uint256[8] memory no)
+    {
+        for (uint8 q; q < 8; ++q) {
+            yes[q] = market.balanceOf(user, market.positionId(roundId, q, true));
+            no[q] = market.balanceOf(user, market.positionId(roundId, q, false));
+        }
+    }
+
     function previewSettlement(IndependentOutcomeMarket market, uint256 roundId)
         external
         view
@@ -722,7 +810,7 @@ contract IndependentMarketViews {
             _times(market, roundId);
             values = observed;
         }
-        (uint256[8] memory y, uint256[8] memory n) = market.balancesOf(roundId, user);
+        (uint256[8] memory y, uint256[8] memory n) = balancesOf(market, roundId, user);
         for (uint8 q; q < 8; ++q) {
             amounts[q] = (values & (uint8(1) << q)) != 0 ? y[q] : n[q];
             total += amounts[q];
@@ -818,15 +906,36 @@ contract IndependentMarketViews {
             }
         }
         uint256 capacity = minimum * 8 + firstMinimum;
-        if (!r.funded) result.carryUsed = result.availableCarry < capacity ? result.availableCarry : capacity;
-        result.deferredCarry = result.availableCarry - result.carryUsed;
+        uint256 accounted = market.totalActiveCollateral() + market.pendingCarry();
+        uint256 balance = market.cst().balanceOf(address(market));
+        result.unallocated = balance > accounted ? balance - accounted : 0;
+        uint256 offered = r.funded ? 0 : result.availableCarry;
+        result.carryUsed = offered < capacity ? offered : capacity;
         result.maxNewAmount = capacity - result.carryUsed;
+        // fundRound reverts FundingCapacity: the caller's own CST ranks after carry only.
         if (newAmount > result.maxNewAmount) return result;
-        result.totalFunding = result.carryUsed + newAmount;
+        _absorption(result, balance + newAmount, accounted, offered, capacity);
+        result.canFund =
+            ready && result.totalFunding >= (r.funded ? (newAmount != 0 ? 1 : MIN_AUTO_TOP_UP) : market.MIN_FUNDING());
+    }
+
+    /// @dev Mirrors `_absorb`. fundRound pulls first, so `balance` already holds the
+    /// caller's CST. Carry (first funding only) ranks first; held CST fills the
+    /// capped remainder, and whatever does not fit stays pending.
+    function _absorption(
+        IndependentOutcomeMarket.FundingPreview memory result,
+        uint256 balance,
+        uint256 accounted,
+        uint256 offered,
+        uint256 capacity
+    ) private pure {
+        uint256 fresh = balance > accounted ? balance - accounted : 0;
+        uint256 available = fresh + offered;
+        result.totalFunding = available < capacity ? available : capacity;
+        result.deferredCarry = result.availableCarry + fresh - result.totalFunding;
         for (uint8 q; q < 8; ++q) {
             result.allocations[q] = result.totalFunding / 8 + (q < result.totalFunding % 8 ? 1 : 0);
         }
-        result.canFund = ready && result.totalFunding != 0 && (r.funded || result.totalFunding >= market.MIN_FUNDING());
     }
 
     function uri(uint256 id, address outcomeSource) external pure returns (string memory) {

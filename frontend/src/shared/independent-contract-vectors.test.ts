@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
-import vectors from "@/test/fixtures/independent-contract-vectors.json";
+import fixture from "@/test/fixtures/independent-contract-vectors.json";
 import {
   independentYesProbabilityBps,
   weightedProductAccepts,
   type BinaryQuestionPool,
 } from "./independent-math";
+
+const { vectors } = fixture;
 
 function state(
   value: { collateral: string; yes: string; no: string },

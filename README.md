@@ -13,7 +13,7 @@ pnpm setup:dev
 pnpm dev:local
 ```
 
-Open <http://127.0.0.1:3000/shared>. Connect a local test wallet and use **Get 1,000 test CST**. Buy or sell positions, split CST into complete YES/NO pairs, merge matching pairs back into CST, or transfer positions to another wallet. You can also make an irreversible gift to the pool, place simulated game gestures, advance local time, close a cycle, retrieve winning positions, and carry unused funding into the next funded cycle. Three disposable test wallets let you exercise transfers and redemption by the recipient.
+Open <http://127.0.0.1:3000/shared>. Connect a local test wallet and use **Get 1,000 test CST**. Buy or sell positions, split CST into complete YES/NO pairs, merge matching pairs back into CST, or transfer positions to another wallet. You can also make an irreversible gift to all eight pools, send test CST directly to the market and watch the next trade distribute it, place simulated game gestures, advance local time, close a cycle, retrieve winning positions, and start the next cycle with its first trade, which carries unused funding into the new pools. Three disposable test wallets let you exercise transfers and redemption by the recipient.
 
 The launcher starts a fresh Anvil chain, deploys fake CST and the local game, deploys the independent market and its payout vault, contributes 10,000 fake CST divided equally across eight pools, and starts Next.js with the matching addresses. It uses only Anvil's public unlocked accounts; it never needs a private key. Stop it with Ctrl+C. All development funds are disposable.
 
@@ -47,17 +47,19 @@ Questions 0–4 and 7 can become permanently YES before closure. The independent
 
 ## Funding, settlement and rollover
 
-`IndependentOutcomeMarket` does not mint CST. Anyone may call `fundRound(cycle, newAmount)` to contribute existing CST. Contributions are irreversible gifts: no LP shares, fees, refunds, or sponsor withdrawal authority. Each contribution is divided equally across eight questions; indivisible base-unit remainders go to the lowest question IDs, with at most one unit difference.
+`IndependentOutcomeMarket` does not mint CST. Anyone may contribute existing CST by calling `fundRound(cycle, newAmount)` or by sending or minting CST directly to the market address. Contributions are irreversible gifts: no LP shares, fees, refunds, or sponsor withdrawal authority. A mistaken direct transfer is a gift too and cannot be recovered. Each contribution is divided equally across eight questions; indivisible base-unit remainders go to the lowest question IDs, with at most one unit difference.
+
+A plain transfer cannot run market code, so distribution is automatic but not instant. CST held above active collateral and pending carry enters the pools at the next `buy`, `sell` or `fundRound` on an open cycle, before that call prices anything. On a trading cycle, a buy, a sell or the permissionless trigger `fundRound(cycle, 0)` absorbs held CST once it totals at least 1 CST (`MIN_AUTO_TOP_UP`); smaller amounts wait for more, for an explicit gift, or for the next cycle's start. Any `fundRound` with new CST also sweeps everything held. When no cycle is trading, contributions wait and join the next cycle's pools when it starts. Splits, merges, claims, settlement and position transfers never absorb held CST.
 
 Each question keeps its own collateral and YES/NO liabilities. A trade in one question changes none of the other seven pools. All positions remain standard ERC-1155 tokens, and one winning unit pays exactly one CST.
 
 After actual game closure, anyone can call `settleRound`. For each question, the contract reserves all outstanding winning shares in `OutcomeSettlementVault`, zeros its active collateral, and adds the remaining CST to `pendingCarry`. There is no winner bonus. Claimants never need to coordinate or claim first; old claims have no expiry and cannot become another cycle's funding.
 
-The next first funding transaction automatically settles the latest previously funded cycle and combines its surplus with new CST before trading starts. Carry is divided equally across the new eight pools. `fundRound(cycle, 0)` can start a market using carry alone when sufficient funds exist. If game cycles pass without funded markets, the credit waits for the next funded cycle without an unbounded catch-up loop.
+The first buy, sell or funding transaction of a new cycle automatically settles the latest previously funded cycle, then combines its surplus with held contributions and any new `fundRound` CST before anything is priced. Carry is divided equally across the new eight pools. `fundRound(cycle, 0)` starts a cycle without trading. Starting needs at least `MIN_FUNDING` in total. The first transaction pays for settlement and startup (about 1.24M gas in the local probe, where an ordinary cold buy used about 209k) and reverts while the previous cycle cannot yet settle. If game cycles pass without funded markets, the credit waits for the next funded cycle without an unbounded catch-up loop.
 
-Automatic carry never arrives later as a price-changing top-up to an already-funded cycle. Voluntary additional gifts are separate: they can move prices toward the cycle's fixed initial odds. Initial funding has a numerical headroom cap; exceptional excess carry stays explicitly pending for later cycles instead of trapping the next pool at its collateral ceiling.
+Carry never arrives later as a price-changing top-up to an already-funded cycle. `fundRound` gifts and held contributions can: they move prices toward the cycle's fixed initial odds. Because they enter before pricing, an exact-amount trade executes as quoted or reverts; a gift can make a stale quote fail, never fill worse. Placement order is carry (first funding only), then the caller's own new CST, then held contributions. Initial funding has a numerical headroom cap and every pool a collateral ceiling. Carry and held CST that do not fit stay explicitly pending for later cycles; new `fundRound` CST that does not fit after carry reverts with `FundingCapacity`. Held amounts under 1 CST can be partly captured by one transaction that pre-positions, sweeps them with a 1-wei `fundRound` gift, and unwinds; see [SECURITY.md](SECURITY.md).
 
-The token, source, payout vault and read-only helper contracts are fixed at deployment. The market has no administrator or upgrade mechanism. Direct CST transfers are excluded from accounting; use `fundRound`.
+The token, source, payout vault and read-only helper contracts are fixed at deployment. The market has no administrator or upgrade mechanism. Only CST held by the market is distributed; CST sent to the payout vault stays there uncredited.
 
 ## Complete sets and transferable positions
 
@@ -118,4 +120,4 @@ The live V2 game does not retain all eight historical statistics. The local sour
 
 An immutable production adapter, its liveness/recovery plan, gas measurements on Arbitrum, and independent financial review are required before a real-CST launch. This branch does not broadcast a public deployment or change the existing production address.
 
-A future game upgrade can issue a fixed funding budget to the same market interface. That is separate from this version's creator-contributed funding and must not grant the market unlimited minting authority.
+A future game upgrade can issue a fixed funding budget by transferring or minting CST to the market, which distributes it like any other contribution. That is separate from this version's creator-contributed funding and must not grant the market unlimited minting authority.

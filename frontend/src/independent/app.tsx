@@ -13,6 +13,7 @@ import { formatCst, shortAddress } from "@/lib/format";
 import { formatDuration } from "@/shared/question-metrics";
 import { QUESTIONS, type QuestionId } from "@/shared/questions";
 import { independentMarketAddress } from "./config";
+import { LOCAL_DIRECT_TRANSFER, MIN_AUTO_TOP_UP } from "./models";
 import {
   IndependentFundingPanel,
   IndependentPortfolio,
@@ -196,9 +197,21 @@ export function IndependentDashboard({
             id: "independent-escrow",
           },
           {
-            label: "Carried toward next funding",
-            value: `${formatCst(snapshot.pendingCarry)} CST`,
-            id: "independent-carry",
+            label: "Waiting to enter pools",
+            value: `${formatCst(snapshot.pendingCarry + snapshot.heldContributions)} CST`,
+            id: "independent-waiting",
+            detail: [
+              {
+                label: "Carried from settled cycles",
+                value: snapshot.pendingCarry,
+                id: "independent-carry",
+              },
+              {
+                label: "Held contributions",
+                value: snapshot.heldContributions,
+                id: "independent-held",
+              },
+            ],
           },
           {
             label: "Your test CST",
@@ -214,9 +227,32 @@ export function IndependentDashboard({
             >
               {item.value}
             </p>
+            {item.detail && (
+              <dl className="mt-2 space-y-1 text-[11px] text-ink-dim">
+                {item.detail.map((row) => (
+                  <div key={row.id} className="flex justify-between gap-2">
+                    <dt>{row.label}</dt>
+                    <dd className="font-mono" data-testid={row.id}>
+                      {formatCst(row.value)} CST
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            )}
           </Card>
         ))}
       </div>
+      {snapshot.heldContributions > 0n && (
+        <p
+          className="-mt-3 text-[11px] leading-5 text-ink-faint"
+          data-testid="independent-held-note"
+        >
+          Held contributions are CST sent straight to the market. They join all eight pools with the
+          next trade on a trading cycle or when anyone distributes them (under{" "}
+          {formatCst(MIN_AUTO_TOP_UP)} CST waits for a gift); otherwise they join the next cycle’s
+          pools when they open.
+        </p>
+      )}
       {snapshot.finalized && (
         <Card accent="higher" className="flex flex-wrap items-center justify-between gap-3 p-4">
           <p className="max-w-2xl text-sm leading-6 text-ink-dim">
@@ -260,7 +296,8 @@ export function IndependentDashboard({
               </h2>
               <p className="mt-2 text-xs leading-5 text-ink-dim">
                 Test CST and shortened cycle durations let you explore independent prices, carry,
-                and later claims.
+                and later claims. A direct transfer is a plain ERC-20 send with no market call, so
+                it stays held until a trade or a Distribute absorbs it.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
@@ -290,6 +327,18 @@ export function IndependentDashboard({
                   onClick={() => void actions.local("cst")}
                 >
                   CST gesture · {formatCst(snapshot.local.cstPrice)} CST
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    !connected ||
+                    !!actions.pending ||
+                    (snapshot.user?.balance ?? 0n) < LOCAL_DIRECT_TRANSFER
+                  }
+                  onClick={() => void actions.local("direct")}
+                >
+                  Send {formatCst(LOCAL_DIRECT_TRANSFER)} test CST directly to the market
                 </Button>
                 <Button
                   size="sm"

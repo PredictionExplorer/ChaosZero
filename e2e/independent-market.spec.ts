@@ -44,7 +44,7 @@ test.afterEach(async () => {
   ).toBe(saved.block);
 });
 
-test("independent pools: isolated prices, full closure, protected late claims, history and carry", async ({
+test("independent pools: isolated prices, direct transfers, full closure, protected late claims, history and carry", async ({
   page,
 }) => {
   test.setTimeout(300_000);
@@ -119,6 +119,53 @@ test("independent pools: isolated prices, full closure, protected late claims, h
   expect((await walletPositions(1n))[0][0]).toBe(quote - ONE);
   expect((await qs(1n)).slice(1)).toEqual(before.slice(1));
   await trade.getByRole("button", { name: "Buy", exact: true }).click();
+  // A plain CST transfer runs no market code. The next buy absorbs it before
+  // pricing, deepening all eight pools by exactly the previewed allocation.
+  const fund = page.getByTestId("independent-funding-panel");
+  await page
+    .getByRole("button", { name: "Send 100 test CST directly to the market", exact: true })
+    .click();
+  await expect(
+    page.getByText("Local direct CST transfer confirmed.", { exact: true }).first(),
+  ).toBeVisible();
+  await expect(page.getByTestId("independent-held")).toHaveText("100 CST");
+  const heldPreview = await client.readContract({
+    address: market,
+    abi: independentMarketAbi,
+    functionName: "fundingPreview",
+    args: [1n, 0n],
+  });
+  expect(heldPreview.canFund).toBe(true);
+  expect(heldPreview.unallocated).toBe(100n * ONE);
+  expect(heldPreview.allocations).toEqual(Array(8).fill((100n * ONE) / 8n));
+  await expect(fund.getByRole("button", { name: "Distribute 100 CST now" })).toBeEnabled();
+  await expect(trade.getByTestId("independent-trade-absorption")).toContainText("100 CST");
+  const beforeAbsorb = await qs(1n);
+  const unitsBeforeAbsorb = (await walletPositions(1n))[0][0];
+  const absorbQuote = quoteIndependentTrade(
+    {
+      collateral: beforeAbsorb[0].activeCollateral + heldPreview.allocations[0],
+      yes: beforeAbsorb[0].yesSupply,
+      no: beforeAbsorb[0].noSupply,
+      initialYesBps: beforeAbsorb[0].initialYesBps,
+    },
+    true,
+    true,
+    2n * ONE,
+  );
+  await trade.getByLabel(/CST to spend/).fill("2");
+  await trade.getByRole("button", { name: "Approve CST to trade" }).click();
+  await trade.getByRole("button", { name: "Buy YES", exact: true }).click();
+  await expect(trade.getByLabel(/CST to spend/)).toHaveValue("");
+  const afterAbsorb = await qs(1n);
+  for (let q = 0; q < 8; q++) {
+    expect(afterAbsorb[q].activeCollateral).toBe(
+      beforeAbsorb[q].activeCollateral + heldPreview.allocations[q] + (q === 0 ? 2n * ONE : 0n),
+    );
+    if (q !== 0) expect(afterAbsorb[q].yesSupply).toBe(beforeAbsorb[q].yesSupply);
+  }
+  expect((await walletPositions(1n))[0][0]).toBe(unitsBeforeAbsorb + absorbQuote);
+  await expect(page.getByTestId("independent-held")).toHaveText("0 CST");
   // Standard ERC1155 and fixed-rate sets remain available without moving prices.
   const sets = page.getByTestId("independent-sets-panel");
   await sets.getByRole("combobox").selectOption("2");
@@ -240,11 +287,10 @@ test("independent pools: isolated prices, full closure, protected late claims, h
     functionName: "fundingPreview",
     args: [2n, newMoney],
   });
-  const fund = page.getByTestId("independent-funding-panel");
   await fund.getByLabel(/New CST to add/).fill("8.000000000000000003");
   await fund.getByRole("checkbox").check();
   await fund.getByRole("button", { name: "Approve CST for funding" }).click();
-  await fund.getByRole("button", { name: "Start and fund all eight pools" }).click();
+  await fund.getByRole("button", { name: "Add CST to all eight pools" }).click();
   await expect(page.getByText("Cycle funding confirmed.", { exact: true }).first()).toBeVisible();
   const second = await qs(2n);
   expect(second.map((q) => q.activeCollateral)).toEqual(preview.allocations);
@@ -304,7 +350,8 @@ test("independent pools: isolated prices, full closure, protected late claims, h
   await page.getByRole("button", { name: "Try again", exact: true }).click();
   await page.getByRole("link", { name: "Follow current cycle" }).click();
   await expect(page.getByTestId("independent-cycle")).toHaveText("Cycle 2");
-  // No-trade cycle: every remaining CST can start the next pools with no new money.
+  // No-trade cycle: its first buy settles it and opens the next pools from carry,
+  // with no start transaction and no new sponsor money.
   await page.getByRole("button", { name: /^ETH gesture/ }).click();
   await expect(page.getByTestId("current-0")).toHaveText("1");
   await page.getByRole("button", { name: "Advance 1 hour" }).click();
@@ -316,19 +363,46 @@ test("independent pools: isolated prices, full closure, protected late claims, h
     functionName: "fundingPreview",
     args: [3n, 0n],
   });
-  await page
-    .getByTestId("independent-funding-panel")
-    .getByRole("button", { name: "Start pools with carried CST" })
-    .click();
-  await expect(page.getByText("Cycle funding confirmed.", { exact: true }).first()).toBeVisible();
-  await expect
-    .poll(async () => (await qs(3n)).map((q) => q.activeCollateral))
-    .toEqual(carryPreview.allocations);
-  await expect(
-    page
-      .getByTestId("independent-funding-panel")
-      .getByRole("button", { name: "Fund all eight pools", exact: true }),
-  ).toBeVisible();
+  expect(carryPreview.canFund).toBe(true);
+  expect(carryPreview.needsSettlement).toBe(true);
+  const [seeds] = await client.readContract({
+    address: market,
+    abi: independentMarketAbi,
+    functionName: "seedPreview",
+    args: [3n],
+  });
+  await expect(page.getByTestId("question-0")).toContainText("Opens with the first trade");
+  await expect(fund.getByRole("button", { name: "Open pools now" })).toBeEnabled();
+  await expect(trade.getByTestId("independent-trade-absorption")).toContainText(
+    "opens this cycle’s eight pools first, after settling the preceding cycle",
+  );
+  const firstQuote = quoteIndependentTrade(
+    { collateral: carryPreview.allocations[0], yes: 0n, no: 0n, initialYesBps: seeds[0] },
+    true,
+    true,
+    ONE,
+  );
+  await trade.getByLabel(/CST to spend/).fill("1");
+  await trade.getByRole("button", { name: "Approve CST to trade" }).click();
+  await trade.getByRole("button", { name: "Buy YES", exact: true }).click();
+  await expect(trade.getByLabel(/CST to spend/)).toHaveValue("");
+  expect((await qs(3n)).map((q) => q.activeCollateral)).toEqual(
+    carryPreview.allocations.map((amount, q) => amount + (q === 0 ? ONE : 0n)),
+  );
+  expect((await qs(3n)).map((q) => q.initialYesBps)).toEqual([...seeds]);
+  expect((await walletPositions(3n))[0][0]).toBe(firstQuote);
+  expect(
+    (
+      await client.readContract({
+        address: market,
+        abi: independentMarketAbi,
+        functionName: "roundState",
+        args: [2n],
+      })
+    ).settled,
+  ).toBe(true);
+  await expect(page.getByTestId("question-0")).toContainText("Trading");
+  await expect(fund.getByRole("button", { name: "Add CST to all eight pools" })).toBeVisible();
   expect(
     await client.readContract({ address: game, abi: localGameAbi, functionName: "roundNum" }),
   ).toBe(3n);

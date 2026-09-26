@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.35;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, Vm} from "forge-std/Test.sol";
 import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {IERC1155Receiver} from "@openzeppelin/contracts/token/ERC1155/IERC1155Receiver.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import {IndependentOutcomeMarket, IIndependentCollateral} from "../src/IndependentOutcomeMarket.sol";
+import {IndependentOutcomeMarket, IIndependentCollateral, MIN_AUTO_TOP_UP} from "../src/IndependentOutcomeMarket.sol";
 import {IIndependentOutcomeSource} from "../src/interfaces/IIndependentOutcomeSource.sol";
 import {OutcomeSettlementVault} from "../src/OutcomeSettlementVault.sol";
 import {MockCst} from "./utils/Mocks.sol";
@@ -125,6 +125,23 @@ contract IndependentMarketHandler is Test {
     uint256 public carry;
     uint256 public vaultCash;
     uint256 public marketDonations;
+    /// @dev Plain market transfers not yet absorbed into any pool or carry.
+    uint256 public unallocated;
+    uint256 public absorptions;
+    /// @dev Cycles started by a buy or sell rather than by fundRound.
+    uint256 public autoStarts;
+    /// @dev Held transfers placed into a trading cycle by a buy or sell.
+    uint256 public tradeAbsorptions;
+    /// @dev Bare `fundRound(cycle, 0)` calls that distributed held transfers.
+    uint256 public triggerAbsorptions;
+    /// @dev Bare triggers below MIN_AUTO_TOP_UP that correctly moved nothing.
+    uint256 public idleTriggers;
+    /// @dev RoundFunded events the engine emitted, each matched field by field.
+    uint256 public fundingEvents;
+    bool private _expectFunding;
+    uint256 private _expectDonated;
+    uint256 private _expectTransfers;
+    uint256 private _expectCarry;
     uint256 public vaultDonations;
     uint256 public carryOnlyFundings;
     uint256 public lateClaims;
@@ -162,44 +179,123 @@ contract IndependentMarketHandler is Test {
 
     function fundFromCarry(uint256 actor) external {
         ModelRound storage r = _model[currentCycle];
-        if (r.gameClosed || r.funded) return;
-        uint256 available = carry;
-        if (lastFundedCycle != 0 && !_model[lastFundedCycle].settled) {
-            if (!_model[lastFundedCycle].gameClosed) return;
-            (, uint256 residue) = _settlementAmounts(lastFundedCycle);
-            available += residue;
-        }
-        if (available < market.MIN_FUNDING()) return;
+        if (r.gameClosed || r.funded || !_startable()) return;
         _fund(actor % 4, 0);
         ++carryOnlyFundings;
     }
 
-    function _fund(uint256 actor, uint256 amount) private {
+    /// @dev Bare `fundRound(cycle, 0)`: distributes held transfers into a trading
+    /// cycle, and moves nothing (InvalidParameters) below MIN_AUTO_TOP_UP.
+    function trigger(uint256 actor) external {
         ModelRound storage r = _model[currentCycle];
-        bool firstFunding = !r.funded;
-        if (firstFunding && lastFundedCycle != 0 && !_model[lastFundedCycle].settled) {
-            _modelSettle(lastFundedCycle);
+        if (r.gameClosed || !r.funded) return;
+        if (unallocated < MIN_AUTO_TOP_UP) {
+            vm.prank(actors[actor % 4]);
+            vm.expectRevert(IndependentOutcomeMarket.InvalidParameters.selector);
+            market.fundRound(currentCycle, 0);
+            ++idleTriggers;
+            return;
         }
-        uint256 consumed = firstFunding ? carry : 0;
-        uint256 total = amount + consumed;
+        _fund(actor % 4, 0);
+        ++triggerAbsorptions;
+    }
+
+    function _fund(uint256 actor, uint256 amount) private {
+        unallocated += amount; // Pulled first; then absorbed like any held CST.
+        wallets[actor] -= amount;
+        require(_modelAbsorb(amount), "model expected no funding");
+        vm.recordLogs();
         vm.prank(actors[actor]);
         market.fundRound(currentCycle, amount);
-        _touch(currentCycle);
-        carry -= consumed;
+        _checkFunding(actors[actor]);
+    }
+
+    /// @dev The engine emitted RoundFunded exactly when the model absorbed, with the
+    /// model's caller, donated/transfers/carry split and eight-way allocations.
+    function _checkFunding(address caller) private {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        uint256 seen;
+        uint256 total = _expectDonated + _expectTransfers + _expectCarry;
+        for (uint256 i; i < logs.length; ++i) {
+            if (
+                logs[i].emitter != address(market) || logs[i].topics[0] != IndependentOutcomeMarket.RoundFunded.selector
+            ) {
+                continue;
+            }
+            ++seen;
+            assertEq(uint256(logs[i].topics[1]), currentCycle);
+            assertEq(address(uint160(uint256(logs[i].topics[2]))), caller);
+            (uint256 donated, uint256 transfersUsed, uint256 carryUsed, uint256[8] memory allocations) =
+                abi.decode(logs[i].data, (uint256, uint256, uint256, uint256[8]));
+            assertEq(donated, _expectDonated, "donated");
+            assertEq(transfersUsed, _expectTransfers, "transfersUsed");
+            assertEq(carryUsed, _expectCarry, "carryUsed");
+            for (uint8 q; q < 8; ++q) {
+                assertEq(allocations[q], total / 8 + (q < total % 8 ? 1 : 0));
+            }
+        }
+        assertEq(seen, _expectFunding ? 1 : 0, "engine and model disagree on absorption");
+        fundingEvents += seen;
+        _expectFunding = false;
+    }
+
+    /// @dev Whether a first funding of the current cycle can collect MIN_FUNDING.
+    function _startable() private view returns (bool) {
+        uint256 available = carry + unallocated;
+        if (lastFundedCycle != 0 && !_model[lastFundedCycle].settled) {
+            if (!_model[lastFundedCycle].gameClosed) return false;
+            (, uint256 residue) = _settlementAmounts(lastFundedCycle);
+            available += residue;
+        }
+        return available >= market.MIN_FUNDING();
+    }
+
+    /// @dev Independent model of `_absorb`: carry only at first funding, held
+    /// transfers always, nothing below the threshold. Capacity never binds here.
+    /// `donated` is the caller's pulled CST, already counted in `unallocated`.
+    function _modelAbsorb(uint256 donated) private returns (bool) {
+        ModelRound storage r = _model[currentCycle];
+        bool initial = !r.funded;
+        _expectFunding = false;
+        if (initial) {
+            if (!_startable()) return false;
+            if (lastFundedCycle != 0 && !_model[lastFundedCycle].settled) _modelSettle(lastFundedCycle);
+        }
+        uint256 carryUsed = initial ? carry : 0;
+        uint256 total = unallocated + carryUsed;
+        if (total < (initial ? market.MIN_FUNDING() : (donated != 0 ? 1 : MIN_AUTO_TOP_UP))) return false;
+        (_expectFunding, _expectDonated) = (true, donated);
+        (_expectTransfers, _expectCarry) = (unallocated - donated, carryUsed);
+        if (initial) {
+            if (!r.initialized) {
+                (uint16[8] memory seeds,) = market.seedPreview(currentCycle);
+                for (uint8 q; q < 8; ++q) {
+                    r.questions[q].weight = seeds[q];
+                }
+                r.initialized = true;
+            }
+            carry = 0;
+            r.funded = true;
+            lastFundedCycle = currentCycle;
+        }
         for (uint8 q; q < 8; ++q) {
             r.questions[q].cash += total / 8 + (q < total % 8 ? 1 : 0);
         }
         activeCash += total;
-        wallets[actor] -= amount;
-        r.funded = true;
-        lastFundedCycle = currentCycle;
+        unallocated = 0;
+        ++absorptions;
+        return true;
     }
 
     function buy(uint256 actor, uint8 question, bool yes, uint256 raw) external {
         uint256 a = actor % 4;
         uint8 q = question % 8;
         ModelRound storage r = _model[currentCycle];
-        if (!r.funded || r.gameClosed) return;
+        if (r.gameClosed || (!r.funded && !_startable())) return;
+        bool starting = !r.funded;
+        bool absorbed = _modelAbsorb(0);
+        if (starting) ++autoStarts;
+        else if (absorbed) ++tradeAbsorptions;
         ModelQuestion storage p = r.questions[q];
         uint256 cash = bound(raw, 1e12, 1e18);
         uint256 selected = p.cash - (yes ? p.yes : p.no);
@@ -207,9 +303,13 @@ contract IndependentMarketHandler is Test {
         uint256 weight = yes ? p.weight : 10_000 - p.weight;
         uint256 units = cash + (10_000 - weight) * cash * selected / (2 * (weight * other + 10_000 * cash));
         bytes32 untouched = _otherQuestions(currentCycle, q);
+        vm.recordLogs();
         vm.prank(actors[a]);
         market.buy(currentCycle, q, yes, cash, units, type(uint256).max);
-        assertEq(_otherQuestions(currentCycle, q), untouched, "single-question buy leaked into another question");
+        _checkFunding(actors[a]);
+        if (!absorbed) {
+            assertEq(_otherQuestions(currentCycle, q), untouched, "single-question buy leaked into another question");
+        }
         p.cash += cash;
         if (yes) {
             p.yes += units;
@@ -227,21 +327,37 @@ contract IndependentMarketHandler is Test {
         uint256 a = actor % 4;
         uint8 q = question % 8;
         ModelRound storage r = _model[currentCycle];
-        if (!r.funded || r.gameClosed) return;
+        if (r.gameClosed || (!r.funded && !_startable())) return;
         ModelQuestion storage p = r.questions[q];
         Holdings storage h = _holdings[currentCycle][a];
         uint256 owned = yes ? h.yes[q] : h.no[q];
         if (owned < 1e12) return;
+        bool starting = !r.funded; // Split-only pairs: the sell starts the cycle first.
+        bool absorbed = _modelAbsorb(0);
         uint256 units = bound(raw, 1e12, owned);
         uint256 selected = p.cash - (yes ? p.yes : p.no);
         uint256 other = p.cash - (yes ? p.no : p.yes);
         uint256 weight = yes ? p.weight : 10_000 - p.weight;
         uint256 cash = weight * units * other / (2 * (weight * other + (10_000 - weight) * selected + 10_000 * units));
-        if (cash == 0) return;
+        if (cash == 0) {
+            if (absorbed) {
+                vm.recordLogs();
+                vm.prank(actors[a]); // Same threshold as the skipped sell: keep engine and model in step.
+                market.fundRound(currentCycle, 0);
+                _checkFunding(actors[a]);
+            }
+            return;
+        }
+        if (starting) ++autoStarts;
+        else if (absorbed) ++tradeAbsorptions;
         bytes32 untouched = _otherQuestions(currentCycle, q);
+        vm.recordLogs();
         vm.prank(actors[a]);
         market.sell(currentCycle, q, yes, units, cash, type(uint256).max);
-        assertEq(_otherQuestions(currentCycle, q), untouched, "single-question sell leaked into another question");
+        _checkFunding(actors[a]);
+        if (!absorbed) {
+            assertEq(_otherQuestions(currentCycle, q), untouched, "single-question sell leaked into another question");
+        }
         p.cash -= cash;
         if (yes) {
             p.yes -= units;
@@ -420,7 +536,31 @@ contract IndependentMarketHandler is Test {
         token.transfer(target, amount);
         if (toVault) vaultDonations += amount;
         else marketDonations += amount;
+        if (!toVault) unallocated += amount;
         wallets[a] -= amount;
+    }
+
+    /// @dev Teardown step: from whatever state the campaign reached, a direct transfer
+    /// then the first buy of a fresh cycle settles the last funded cycle and starts
+    /// the pools from carry plus held CST, with no fundRound.
+    function startFreshCycleWithABuy() external {
+        if (!_model[currentCycle].gameClosed) _close(currentCycle, 0);
+        ++currentCycle;
+        vm.warp(block.timestamp + 1);
+        _open(currentCycle);
+        this.donate(0, 2e18, false); // Makes any reachable state startable.
+        uint256 before = autoStarts;
+        this.buy(1, 2, currentCycle % 2 == 0, 1e18);
+        assertEq(autoStarts, before + 1, "the first buy did not start the cycle");
+        assertEq(unallocated, 0);
+        assertEq(carry, 0);
+    }
+
+    /// @dev R1 end to end: a direct transfer of at least MIN_AUTO_TOP_UP, then the
+    /// next buy, which must absorb it (or start the cycle with it) before pricing.
+    function transferThenBuy(uint256 actor, uint256 raw, uint8 question, bool yes, uint256 rawCash) external {
+        this.donate(actor, bound(raw, MIN_AUTO_TOP_UP, 10e18), false);
+        this.buy(actor % 4 + 1, question, yes, rawCash); // Usually another actor.
     }
 
     function finish() external {
@@ -532,7 +672,7 @@ contract IndependentMarketInvariantTest is StdInvariant, Test {
         market = new IndependentOutcomeMarket(IIndependentCollateral(address(token)), source);
         handler = new IndependentMarketHandler(market, source, token);
         handler.fund(0, 800e18 + 5);
-        bytes4[] memory selectors = new bytes4[](15);
+        bytes4[] memory selectors = new bytes4[](17);
         selectors[0] = handler.fund.selector;
         selectors[1] = handler.fundFromCarry.selector;
         selectors[2] = handler.buy.selector;
@@ -548,6 +688,8 @@ contract IndependentMarketInvariantTest is StdInvariant, Test {
         selectors[12] = handler.claim.selector;
         selectors[13] = handler.donate.selector;
         selectors[14] = handler.offline.selector;
+        selectors[15] = handler.trigger.selector;
+        selectors[16] = handler.transferThenBuy.selector;
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
         targetContract(address(handler));
     }
@@ -556,7 +698,7 @@ contract IndependentMarketInvariantTest is StdInvariant, Test {
         OutcomeSettlementVault vault = market.settlementVault();
         assertEq(market.totalActiveCollateral(), handler.activeCash());
         assertEq(market.pendingCarry(), handler.carry());
-        assertEq(token.balanceOf(address(market)), handler.activeCash() + handler.carry() + handler.marketDonations());
+        assertEq(token.balanceOf(address(market)), handler.activeCash() + handler.carry() + handler.unallocated());
         assertEq(vault.totalEscrowed(), handler.vaultCash());
         assertEq(token.balanceOf(address(vault)), handler.vaultCash() + handler.vaultDonations());
         uint256 total = token.balanceOf(address(market)) + token.balanceOf(address(vault));
@@ -633,7 +775,51 @@ contract IndependentMarketInvariantTest is StdInvariant, Test {
         }
     }
 
+    function test_heldTransfersAbsorbAndCyclesAutoStartWithoutFundRound() public {
+        handler.donate(0, 5e18, false);
+        handler.buy(1, 0, true, 1e18); // Absorbs the held transfer before pricing.
+        assertEq(handler.unallocated(), 0);
+        handler.donate(1, 1e17, false);
+        handler.buy(2, 1, false, 1e18); // Below threshold: held.
+        assertEq(handler.unallocated(), 1e17);
+        handler.closeAndAdvance(0);
+        handler.donate(2, 3e18, false); // No cycle trading: waits.
+        handler.buy(0, 2, true, 1e18); // First trade settles cycle 1 and starts cycle 2.
+        assertEq(handler.autoStarts(), 1);
+        assertEq(handler.tradeAbsorptions(), 1);
+        handler.trigger(3); // Nothing held: the bare trigger moves nothing.
+        assertEq(handler.idleTriggers(), 1);
+        handler.donate(3, 2e18, false);
+        handler.trigger(3);
+        assertEq(handler.triggerAbsorptions(), 1);
+        assertEq(handler.fundingEvents(), handler.absorptions());
+        assertEq(handler.unallocated(), 0);
+        assertEq(market.pendingCarry(), 0);
+        assertTrue(market.roundState(1).settled);
+        assertTrue(market.roundState(2).funded);
+        invariant_cashAndWalletsMatchIndependentFlows();
+        invariant_questionBackingAndEscrowsMatchTheOracle();
+        afterInvariant();
+    }
+
+    /// @dev Statistics over the run, then a deterministic teardown start. A run's
+    /// own counts are logged, not asserted: a 64-call run need not reach a trade
+    /// on a startable cycle. Every absorption the model predicted was matched by
+    /// exactly one engine RoundFunded event, field by field, at the call itself.
     function afterInvariant() public {
+        emit log_named_uint("absorptions (all funding paths)", handler.absorptions());
+        emit log_named_uint("trade absorptions into trading cycles", handler.tradeAbsorptions());
+        emit log_named_uint("bare-trigger absorptions", handler.triggerAbsorptions());
+        emit log_named_uint("idle bare triggers below threshold", handler.idleTriggers());
+        emit log_named_uint("cycles auto-started by a trade", handler.autoStarts());
+        assertEq(handler.fundingEvents(), handler.absorptions(), "unmatched RoundFunded events");
+        assertLe(
+            handler.tradeAbsorptions() + handler.triggerAbsorptions() + handler.autoStarts(), handler.absorptions()
+        );
+        uint256 starts = handler.autoStarts();
+        handler.startFreshCycleWithABuy();
+        assertEq(handler.autoStarts(), starts + 1);
+        assertEq(handler.fundingEvents(), handler.absorptions());
         handler.finish();
         invariant_cashAndWalletsMatchIndependentFlows();
         invariant_questionBackingAndEscrowsMatchTheOracle();
@@ -641,6 +827,22 @@ contract IndependentMarketInvariantTest is StdInvariant, Test {
         assertEq(handler.activeCash(), 0);
         assertEq(handler.vaultCash(), 0);
         assertEq(market.settlementVault().totalEscrowed(), 0);
+    }
+
+    function test_aSellOfSplitOnlyPairsAutoStartsTheNextCycleFromCarryAndHeldCst() public {
+        handler.buy(0, 0, true, 1e18);
+        handler.closeAndAdvance(1);
+        handler.split(2, 4, 3e18); // Positions in cycle 2; splits never start a cycle.
+        handler.donate(1, 5e18, false);
+        assertFalse(market.roundState(2).funded);
+        handler.sell(2, 4, true, 1e18); // Settles cycle 1, starts cycle 2, then sells.
+        assertEq(handler.autoStarts(), 1);
+        assertTrue(market.roundState(1).settled && market.roundState(2).funded);
+        assertEq(handler.unallocated(), 0);
+        assertEq(market.pendingCarry(), 0);
+        invariant_cashAndWalletsMatchIndependentFlows();
+        invariant_questionBackingAndEscrowsMatchTheOracle();
+        afterInvariant();
     }
 
     function test_oldAndSplitOnlyCyclesDrainAfterLaterCarryFundingAndSourceFailure() public {

@@ -14,6 +14,9 @@ describe("independent contract errors", () => {
     "NonPositiveReserve",
     "InvalidCollateral",
     "InvalidProbability",
+    "InvalidParameters",
+    "InvalidSourceState",
+    "TransferFailed",
   ] as const)("decodes %s without leaking implementation jargon", (name) => {
     const error = new ContractFunctionRevertedError({
       abi: independentMarketAbi,
@@ -23,6 +26,22 @@ describe("independent contract errors", () => {
     const description = describeIndependentError(new BaseError("revert", { cause: error }));
     expect(description).not.toContain(name);
     expect(description.length).toBeGreaterThan(20);
+  });
+  it("explains errors a trade can now surface when it opens a new cycle", () => {
+    const describe_ = (name: "NotFunded" | "OutOfOrderRound" | "NotFinalized" | "TransferFailed") =>
+      describeIndependentError(
+        new BaseError("revert", {
+          cause: new ContractFunctionRevertedError({
+            abi: independentMarketAbi,
+            functionName: "buy",
+            data: encodeErrorResult({ abi: independentMarketAbi, errorName: name }),
+          }),
+        }),
+      );
+    expect(describe_("NotFunded")).toMatch(/Add CST/);
+    expect(describe_("OutOfOrderRound")).toMatch(/later cycle/);
+    expect(describe_("NotFinalized")).toMatch(/preceding cycle/);
+    expect(describe_("TransferFailed")).toMatch(/settles the preceding one/);
   });
   it("keeps legacy wallet/error fallbacks and explains textual reverts", () => {
     expect(describeIndependentError(new Error("FundingCapacity"))).toMatch(/carried funds/);

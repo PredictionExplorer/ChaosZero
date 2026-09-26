@@ -8,7 +8,13 @@ import { assertAbiSubset, readBrowserAbi } from "./browser-abi.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const require = createRequire(path.join(root, "frontend/package.json"));
-const { createPublicClient, createWalletClient, createTestClient, http } = require("viem");
+const {
+  createPublicClient,
+  createWalletClient,
+  createTestClient,
+  http,
+  parseEventLogs,
+} = require("viem");
 const { anvil } = require("viem/chains");
 const ts = require("typescript");
 const ONE = 10n ** 18n;
@@ -126,6 +132,86 @@ const trade = async (round, question, yes, buy, input) => {
       );
   return output;
 };
+// Held contributions: CST the market owns beyond its pools and carry.
+const held = async () => {
+  const [balance, active, carried] = await Promise.all([
+    read(token, tokenAbi, "balanceOf", [market]),
+    read(market, marketAbi, "totalActiveCollateral"),
+    read(market, marketAbi, "pendingCarry"),
+  ]);
+  return balance > active + carried ? balance - active - carried : 0n;
+};
+// Preview/execution parity: every absorption lands exactly as fundingPreview
+// promised, with one RoundFunded whose parts sum to the per-pool allocations.
+const expectFunding = async (receipt, preview, round, donated) => {
+  const events = parseEventLogs({ abi: marketAbi, eventName: "RoundFunded", logs: receipt.logs });
+  assert.equal(events.length, 1, "One absorption per call");
+  const { args } = events[0];
+  assert.equal(events[0].address.toLowerCase(), market.toLowerCase());
+  assert.equal(args.roundId, round);
+  assert.equal(args.caller.toLowerCase(), accounts[1].toLowerCase());
+  assert.equal(args.donated, donated);
+  assert.equal(args.carryUsed, preview.carryUsed);
+  assert.equal(args.transfersUsed, preview.totalFunding - preview.carryUsed - donated);
+  assert.deepEqual([...args.allocations], [...preview.allocations]);
+  assert.equal(await read(market, marketAbi, "pendingCarry"), preview.deferredCarry);
+  assert.equal(await held(), 0n, "Everything that fits is absorbed");
+};
+// fundRound with a gift, or with zero as the permissionless trigger.
+const fund = async (round, amount) => {
+  const preview = await read(market, marketAbi, "fundingPreview", [round, amount]);
+  assert.ok(preview.canFund, "Preview must promise the funding");
+  assert.equal(preview.unallocated, await held());
+  const before = await states(round);
+  const receipt = await send(market, marketAbi, "fundRound", [round, amount]);
+  await expectFunding(receipt, preview, round, amount);
+  const after = await states(round);
+  for (let q = 0; q < 8; q++)
+    assert.equal(after[q].activeCollateral - before[q].activeCollateral, preview.allocations[q]);
+  return preview;
+};
+// A buy that first absorbs held CST (or starts the cycle), quoted by the browser
+// solver against the effective post-absorption pool, exactly as the app does.
+const absorbingBuy = async (round, question, yes, input) => {
+  const preview = await read(market, marketAbi, "fundingPreview", [round, 0n]);
+  assert.ok(preview.canFund, "The next trade must absorb");
+  assert.equal(preview.unallocated, await held());
+  const before = await states(round);
+  const [seeds] = await read(market, marketAbi, "seedPreview", [round]);
+  const effective = {
+    ...pool(before[question]),
+    collateral: before[question].activeCollateral + preview.allocations[question],
+    initialYesBps: Number(seeds[question]),
+  };
+  const output = quoteIndependentTrade(effective, yes, true, input);
+  assert.ok(output > 0n, "Browser must find an executable quote");
+  const id = await read(market, marketAbi, "positionId", [round, question, yes]);
+  const unitsBefore = await read(market, marketAbi, "balanceOf", [accounts[1], id]);
+  const receipt = await send(market, marketAbi, "buy", [
+    round,
+    question,
+    yes,
+    input,
+    output,
+    (await client.getBlock()).timestamp + 900n,
+  ]);
+  await expectFunding(receipt, preview, round, 0n);
+  assert.equal(await read(market, marketAbi, "balanceOf", [accounts[1], id]), unitsBefore + output);
+  const after = await states(round);
+  for (let q = 0; q < 8; q++) {
+    assert.equal(
+      after[q].activeCollateral,
+      before[q].activeCollateral + preview.allocations[q] + (q === question ? input : 0n),
+      "Every pool deepens by exactly its allocation",
+    );
+    assert.equal(Number(after[q].initialYesBps), Number(seeds[q]));
+    if (q !== question) {
+      assert.equal(after[q].yesSupply, before[q].yesSupply);
+      assert.equal(after[q].noSupply, before[q].noSupply);
+    }
+  }
+  return preview;
+};
 const snapshot = await tester.snapshot();
 try {
   const round = await read(game, gameAbi, "roundNum");
@@ -198,14 +284,19 @@ try {
   await trade(round, 5, false, false, q5Units / 4n);
   await trade(round, 6, true, true, 25n * ONE);
   await trade(round, 7, true, true, 50n * ONE);
-  const beforeGift = await states(round);
-  await send(market, marketAbi, "fundRound", [round, 8n * ONE + 3n]);
-  const afterGift = await states(round);
+  // A plain transfer runs no market code: the next trade absorbs it before pricing.
+  await send(token, tokenAbi, "transfer", [market, 100n * ONE]);
+  assert.equal(await held(), 100n * ONE);
+  const absorbed = await absorbingBuy(round, 3, true, 10n * ONE);
+  for (let q = 0; q < 8; q++) assert.equal(absorbed.allocations[q], allocation(100n * ONE, q));
+  // Under MIN_AUTO_TOP_UP a trade leaves held CST alone; any explicit gift sweeps it.
+  await send(token, tokenAbi, "transfer", [market, ONE / 2n]);
+  assert.equal((await read(market, marketAbi, "fundingPreview", [round, 0n])).canFund, false);
+  await trade(round, 3, false, true, 5n * ONE);
+  assert.equal(await held(), ONE / 2n);
+  const swept = await fund(round, 8n * ONE + 3n);
   for (let q = 0; q < 8; q++)
-    assert.equal(
-      afterGift[q].activeCollateral - beforeGift[q].activeCollateral,
-      allocation(8n * ONE + 3n, q),
-    );
+    assert.equal(swept.allocations[q], allocation(8n * ONE + 3n + ONE / 2n, q));
 
   const gestures = 7n;
   for (let i = 0n; i < gestures; i++)
@@ -262,7 +353,9 @@ try {
   const carry = cash(beforeSettlement) - owedTotal;
   assert.ok(carry > 0n);
   const nextRound = await read(game, gameAbi, "roundNum");
-  await send(market, marketAbi, "fundRound", [nextRound, 8n * ONE]);
+  const opened = await fund(nextRound, 8n * ONE);
+  assert.equal(opened.needsSettlement, true);
+  assert.equal(opened.carryUsed, carry);
   const next = await states(nextRound);
   assert.equal(
     cash(await states(round)),
@@ -294,23 +387,34 @@ try {
   assert.deepEqual(await states(nextRound), next);
   await tester.setCode({ address: source, bytecode: sourceCode });
 
-  // A cycle with no trades rolls all its sponsor capital forward. No new CST
-  // payment or token approval is needed to activate the following cycle.
+  // A cycle with no trades rolls all its sponsor capital forward. A transfer made
+  // while no cycle trades waits, and the next cycle's first buy settles the empty
+  // cycle and opens the pools from carry plus that transfer: no start transaction.
   await send(game, gameAbi, "bidEth", [], await read(game, gameAbi, "getNextEthPrice"));
   await tester.setNextBlockTimestamp({
     timestamp: (await read(game, gameAbi, "mainPrizeTime")) + 1n,
   });
   await send(game, gameAbi, "closeCycle");
   const thirdRound = await read(game, gameAbi, "roundNum");
-  const walletBeforeCarry = await read(token, tokenAbi, "balanceOf", [accounts[1]]);
-  await send(market, marketAbi, "fundRound", [thirdRound, 0n]);
-  assert.equal(await read(token, tokenAbi, "balanceOf", [accounts[1]]), walletBeforeCarry);
+  await send(token, tokenAbi, "transfer", [market, 5n * ONE]);
+  assert.equal(await held(), 5n * ONE);
+  const walletBeforeStart = await read(token, tokenAbi, "balanceOf", [accounts[1]]);
+  const started = await absorbingBuy(thirdRound, 0, true, ONE);
+  assert.equal(started.needsSettlement, true);
+  assert.equal(started.carryUsed, cash(next));
+  assert.equal(started.totalFunding, cash(next) + 5n * ONE);
+  assert.equal(await read(token, tokenAbi, "balanceOf", [accounts[1]]), walletBeforeStart - ONE);
+  assert.equal((await read(market, marketAbi, "roundState", [nextRound])).settled, true);
   assert.equal(cash(await states(nextRound)), 0n);
-  assert.equal(cash(await states(thirdRound)), cash(next));
-  assert.equal(await read(token, tokenAbi, "balanceOf", [market]), cash(next));
+  assert.equal(cash(await states(thirdRound)), cash(next) + 6n * ONE);
+  assert.equal(await read(token, tokenAbi, "balanceOf", [market]), cash(next) + 6n * ONE);
   assert.equal(await read(token, tokenAbi, "balanceOf", [vault]), 0n);
+  // The permissionless zero-amount trigger distributes held CST without trading.
+  await send(token, tokenAbi, "transfer", [market, 2n * ONE]);
+  const distributed = await fund(thirdRound, 0n);
+  for (let q = 0; q < 8; q++) assert.equal(distributed.allocations[q], allocation(2n * ONE, q));
   console.log(
-    "Independent smoke passed: exact quotes, isolation, split/merge, transfers/operators, remainder funding, end-only payouts, closure-only parity, midpoint inheritance, automatic carry, source-outage late claims, and empty-cycle rollover.",
+    "Independent smoke passed: exact quotes, isolation, split/merge, transfers/operators, direct transfers absorbed before pricing, sub-threshold holds swept by gifts, preview/execution parity, remainder funding, end-only payouts, closure-only parity, midpoint inheritance, automatic carry, source-outage late claims, and a cycle opened by its first buy.",
   );
 } finally {
   await tester.revert({ id: snapshot });

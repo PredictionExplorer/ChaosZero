@@ -11,7 +11,12 @@ import { localGameAbi, localTokenAbi } from "@/shared/abi";
 import { positionId, validateRecipient } from "@/shared/positions";
 import { independentMarketAbi } from "./abi";
 import { describeIndependentError } from "./errors";
-import type { IndependentActions, IndependentRecovery, IndependentSnapshot } from "./models";
+import {
+  LOCAL_DIRECT_TRANSFER,
+  type IndependentActions,
+  type IndependentRecovery,
+  type IndependentSnapshot,
+} from "./models";
 
 const GAS = 4_000_000n;
 export function useIndependentActions(
@@ -107,12 +112,24 @@ export function useIndependentActions(
         }),
       ),
     fund: (amount) =>
-      run("Cycle funding", () =>
+      run("Cycle funding", () => {
+        const current = sourceSnapshot();
+        // A zero-amount call is the separate Distribute trigger, never a gift.
+        if (amount <= 0n) throw new Error("Enter a CST amount greater than zero.");
+        return write({
+          address: market,
+          abi: independentMarketAbi,
+          functionName: "fundRound",
+          args: [current.roundId, amount],
+        });
+      }),
+    distribute: () =>
+      run("Pool distribution", () =>
         write({
           address: market,
           abi: independentMarketAbi,
           functionName: "fundRound",
-          args: [sourceSnapshot().roundId, amount],
+          args: [sourceSnapshot().roundId, 0n],
         }),
       ),
     trade: (question, yes, buy, input, output) =>
@@ -191,7 +208,7 @@ export function useIndependentActions(
       }),
     local: (kind) =>
       run(
-        `Local ${kind === "faucet" ? "CST faucet" : kind === "close" ? "cycle closure" : `${kind.toUpperCase()} gesture`}`,
+        `Local ${kind === "faucet" ? "CST faucet" : kind === "close" ? "cycle closure" : kind === "direct" ? "direct CST transfer" : `${kind.toUpperCase()} gesture`}`,
         () => {
           const current = sourceSnapshot();
           if (!current.local) throw new Error("Local game controls are unavailable.");
@@ -222,6 +239,15 @@ export function useIndependentActions(
                 address: current.game,
                 abi: localGameAbi,
                 functionName: "closeCycle",
+              });
+            case "direct":
+              // A plain ERC-20 transfer: no market code runs until the next
+              // trade or Distribute absorbs it.
+              return write({
+                address: current.token,
+                abi: localTokenAbi,
+                functionName: "transfer",
+                args: [market, LOCAL_DIRECT_TRANSFER],
               });
           }
         },

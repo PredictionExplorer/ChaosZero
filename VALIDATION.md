@@ -101,3 +101,39 @@ heavy profile was not rerun because no financial logic changed.
 
 Environment: Node 24.2.0, Python 3.13.5, pnpm 10.32.0, Foundry 1.7.1 and Solidity
 0.8.35.
+
+## Addendum: automatic contribution distribution — 26 September 2026
+
+Every CST contribution now reaches the eight pools through one private routine,
+`_absorb`. Direct transfers and mints, previously stranded, are split equally by
+the next buy, sell or `fundRound` on the trading cycle (implicit triggers need at
+least 1 CST held), and a cycle's first trade settles the previous funded cycle
+and starts the new pools from carry. Explicit `fundRound` sponsors keep today's
+`FundingCapacity` protection. `RoundFunded` has a new signature.
+
+| Check                    | Result                                                                                                                                                                                                                                                                                                                   |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Complete repository gate | `pnpm check` passed: 338 Solidity tests across 22 suites, all fixtures reproduced, the logarithm oracle, 1,476 frontend tests across 60 files with enforced coverage, the production build, the browser lifecycle with its embedded smoke, and clean dependency audits.                                                  |
+| Extended campaigns       | Seed `0x0be8fb6ea6afea4d6954abdffada09d90e91fed33609586f2ce3202e01128533`: 338 tests passed; 63 fuzz properties × 50,000 inputs (3,150,000 cases) and 11 invariants × 512 × 256 (1,441,792 calls) with zero reverts, in 15.3 minutes. The edited auto-distribution suite was rerun afterwards with the same seed: 25/25. |
+| Browser lifecycle        | A direct transfer during trading is absorbed by the next buy with exact eight-way allocations; cycle 3 is opened by its first buy, with `seedPreview` starting prices. The smoke checks every `RoundFunded` against the preview, sub-threshold waiting, gift sweeping and preview/execution parity.                      |
+| Mutation checks          | Fifteen deliberate faults were caught, including absorb-after-pricing, off-by-one thresholds, a split that absorbs, a skipped previous-cycle settlement, swapped event fields, a missing lock, carry reported as held CST, and an unsaturated preview.                                                                   |
+| Adversarial review       | Six lenses with two skeptics per finding. No contract defect was confirmed. Two preview test gaps and two documentation inaccuracies were fixed.                                                                                                                                                                         |
+
+The invariant handler models held CST, direct transfers, bare triggers and
+trade-triggered starts, and checks each `RoundFunded` against its model. It logs
+rather than asserts per-run coverage: sampled single runs of 64 calls absorbed in
+56 of 60 runs and auto-started in 49 of 60, so a per-run assertion would be
+flaky; each run's teardown auto-start is asserted.
+
+The market runtime is **24,393 bytes** (183 below EIP-170); the helper is 12,338.
+Passing a literal instead of the `_noDonation` immutable measured 25,182 bytes.
+Gas on the local EVM: the legacy cold-buy probe rose from 181,358 to 185,093
+(one balance read). The new probe, at a new timestamp, measures 208,574 for a
+buy with nothing held, 208,608 with under 1 CST held, 530,060 for a buy that
+first absorbs 100 CST, and 1,237,344 for the first buy of a cycle, which settles
+the previous cycle and starts the pools.
+
+Residual limits are recorded in SECURITY.md: held CST under 1 CST can be
+partially captured by a pre-positioned trader who sends a 1-wei gift, and each
+transfer of at least 1 CST moves one eight-pool absorption's gas onto the next
+trader. No public-chain transaction was submitted.

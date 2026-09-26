@@ -8,6 +8,7 @@ import {
   useIndependentRecovery,
 } from "./use-independent-market";
 import { ACCOUNT, GAME, MARKET, SOURCE, TOKEN, VAULT, snapshot, zero } from "./test-fixtures";
+import { ONE } from "@/shared/math";
 
 const mocks = vi.hoisted(() => ({
   available: true,
@@ -75,19 +76,23 @@ beforeEach(() => {
       [4200, 5100, 5200, 5300, 5400, 5500, 5600, 5700],
       [true, true, true, true, true, true, true, true],
     ],
-    fundingPreview: { ...state.funding!, availableCarry: 88n },
+    fundingPreview: { ...state.funding!, availableCarry: 88n, unallocated: 5n * ONE },
     balancesOf: [state.user!.yes, zero()],
     balanceOf: 1000n,
+    marketBalance: state.poolCustody + 77n + 5n * ONE,
     allowance: 99n,
     getNextEthPrice: 100n,
     getNextCstPrice: 200n,
     mainPrizeTime: 999n,
     roundStats: state.local!.current,
   };
-  mocks.read.mockImplementation(async ({ functionName }: { functionName: string }) => {
-    if (!(functionName in data)) throw new Error(`Unexpected ${functionName}`);
-    return data[functionName];
-  });
+  mocks.read.mockImplementation(
+    async ({ functionName, args }: { functionName: string; args?: readonly unknown[] }) => {
+      if (functionName === "balanceOf" && args?.[0] === MARKET) return data.marketBalance;
+      if (!(functionName in data)) throw new Error(`Unexpected ${functionName}`);
+      return data[functionName];
+    },
+  );
 });
 afterEach(() => {
   cleanup();
@@ -198,10 +203,46 @@ describe("independent block-pinned reads", () => {
     expect(result.current.data!.user).toBeNull();
     expect(result.current.data!.local!.previous).toBeNull();
     expect(
-      mocks.read.mock.calls.some(([r]) =>
-        ["balanceOf", "balancesOf", "allowance"].includes(r.functionName),
+      mocks.read.mock.calls.some(
+        ([r]) =>
+          ["balanceOf", "balancesOf", "allowance"].includes(r.functionName) &&
+          r.args?.[0] !== MARKET,
       ),
     ).toBe(false);
+  });
+  it("derives held contributions from the market's CST balance at the same block", async () => {
+    const { result } = renderHook(() => ({ ...useIndependentMarket(MARKET, null) }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.heldContributions).toBe(5n * ONE);
+    expect(result.current.data!.funding!.unallocated).toBe(5n * ONE);
+    expect(mocks.read).toHaveBeenCalledWith(
+      expect.objectContaining({
+        address: TOKEN,
+        functionName: "balanceOf",
+        args: [MARKET],
+        blockNumber: 123n,
+      }),
+    );
+  });
+  it("keeps held contributions visible while no cycle trades and saturates a deficit", async () => {
+    data.outcomeState = [false, true, 255, 3];
+    data.marketBalance = 1n;
+    const { result } = renderHook(() => ({ ...useIndependentMarket(MARKET, null) }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.funding).toBeNull();
+    expect(result.current.data!.heldContributions).toBe(0n);
+  });
+  it("rejects a preview whose held CST disagrees with the same-block balance", async () => {
+    data.marketBalance = (data.marketBalance as bigint) + 1n;
+    const { result } = renderHook(() => ({ ...useIndependentMarket(MARKET, null) }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error?.message).toMatch(/custody is inconsistent/);
   });
   it.each([
     [true, false, 0, 1],

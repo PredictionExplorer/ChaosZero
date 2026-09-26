@@ -103,8 +103,15 @@ describe("independent transaction boundaries", () => {
       args: [MARKET, ONE],
     },
     {
-      name: "carry-only funding",
-      invoke: (a: ReturnType<typeof useIndependentActions>) => a.fund(0n),
+      name: "gift",
+      invoke: (a: ReturnType<typeof useIndependentActions>) => a.fund(ONE),
+      target: MARKET,
+      fn: "fundRound",
+      args: [1n, ONE],
+    },
+    {
+      name: "bare distribution trigger",
+      invoke: (a: ReturnType<typeof useIndependentActions>) => a.distribute(),
       target: MARKET,
       fn: "fundRound",
       args: [1n, 0n],
@@ -230,6 +237,23 @@ describe("independent transaction boundaries", () => {
       expect(await result.current.fund(ONE)).toBe(false);
     });
     expect(mocks.submit).not.toHaveBeenCalled();
+  });
+  it("never sends a zero gift; the bare trigger is a separate action", async () => {
+    const { result } = setup();
+    await act(async () => {
+      expect(await result.current.fund(0n)).toBe(false);
+    });
+    expect(mocks.simulate).not.toHaveBeenCalled();
+    expect(result.current.message).toMatch(/greater than zero/);
+  });
+  it("labels the distribution trigger and explains an empty trigger revert", async () => {
+    mocks.simulate.mockRejectedValueOnce(new Error("InvalidParameters"));
+    const { result } = setup();
+    await act(async () => {
+      expect(await result.current.distribute()).toBe(false);
+    });
+    expect(mocks.submit).not.toHaveBeenCalled();
+    expect(result.current.message).toMatch(/Nothing is waiting to enter the pools/);
   });
   it("does not submit a failed preflight and resets controls", async () => {
     mocks.simulate.mockRejectedValueOnce(new Error("ProductWouldDecrease"));
@@ -360,17 +384,40 @@ describe("independent recovery and local controls", () => {
       expect(mocks.submit).not.toHaveBeenCalled();
     },
   );
-  it.each(["faucet", "eth", "cst", "close"] as const)("preflights local %s calls", async (kind) => {
+  it.each(["faucet", "eth", "cst", "close", "direct"] as const)(
+    "preflights local %s calls",
+    async (kind) => {
+      const { result } = setup();
+      await act(async () => {
+        expect(await result.current.local(kind)).toBe(true);
+      });
+      expect(mocks.submit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          address: kind === "faucet" || kind === "direct" ? TOKEN : GAME,
+          functionName: {
+            faucet: "faucet",
+            eth: "bidEth",
+            cst: "bidCst",
+            close: "closeCycle",
+            direct: "transfer",
+          }[kind],
+        }),
+      );
+    },
+  );
+  it("sends the local direct transfer to the market with no market call", async () => {
     const { result } = setup();
     await act(async () => {
-      expect(await result.current.local(kind)).toBe(true);
+      expect(await result.current.local("direct")).toBe(true);
     });
-    expect(mocks.submit).toHaveBeenCalledWith(
+    expect(mocks.simulate).toHaveBeenCalledWith(
       expect.objectContaining({
-        address: kind === "faucet" ? TOKEN : GAME,
-        functionName: { faucet: "faucet", eth: "bidEth", cst: "bidCst", close: "closeCycle" }[kind],
+        address: TOKEN,
+        functionName: "transfer",
+        args: [MARKET, 100n * ONE],
       }),
     );
+    expect(result.current.message).toBe("Local direct CST transfer confirmed.");
   });
   it("refuses simulator writes without local snapshot data", async () => {
     const state = snapshot();

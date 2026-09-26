@@ -1,4 +1,6 @@
-[
+{
+"constants":{"MIN_AUTO_TOP_UP":"1000000000000000000"},
+"vectors":[
 {"name":"prior-1-unchanged","initialYesBps":1,"before":{"collateral":"1000000000000000000000","yes":"0","no":"0"},"after":{"collateral":"1000000000000000000000","yes":"0","no":"0"},"accepted":true,"beforeMarginalBps":1,"afterMarginalBps":1},
 {"name":"prior-1-buy-yes","initialYesBps":1,"before":{"collateral":"1000000000000000000000","yes":"0","no":"0"},"after":{"collateral":"1100000000000000000000","yes":"150000000000000000000","no":"0"},"accepted":true,"beforeMarginalBps":1,"afterMarginalBps":1},
 {"name":"prior-1-buy-no","initialYesBps":1,"before":{"collateral":"1000000000000000000000","yes":"0","no":"0"},"after":{"collateral":"1100000000000000000000","yes":"0","no":"150000000000000000000"},"accepted":false,"beforeMarginalBps":1,"afterMarginalBps":0},
@@ -130,3 +132,4 @@
 {"name":"random-62-sell-yes","initialYesBps":3089,"before":{"collateral":"281618054987969292850556760845714","yes":"81538607813610452426619820725667","no":"203992372246099585811817105421106"},"after":{"collateral":"248768842234006700040913465944219","yes":"4339510943393808118309250754551","no":"203992372246099585811817105421106"},"accepted":false,"beforeMarginalBps":1477,"afterMarginalBps":756},
 {"name":"random-63-sell-no","initialYesBps":6606,"before":{"collateral":"1159","yes":"481","no":"335"},"after":{"collateral":"1035","yes":"481","no":"307"},"accepted":false,"beforeMarginalBps":7028,"afterMarginalBps":7189}
 ]
+}

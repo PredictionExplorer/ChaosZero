@@ -1,4 +1,6 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { ONE } from "@/shared/math";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { IndependentDashboard } from "./app";
 import { ACCOUNT, MARKET, noopActions, snapshot } from "./test-fixtures";
@@ -85,5 +87,41 @@ describe("independent dashboard failure boundaries", () => {
     mocks.recovery.mockReturnValue({ data, error: null, isFetching: false, refetch: vi.fn() });
     rerender(<IndependentDashboard market={MARKET} override={null} />);
     expect(mocks.actions).toHaveBeenLastCalledWith(MARKET, undefined, data);
+  });
+});
+
+describe("independent dashboard contributions", () => {
+  it("separates carried CST from held contributions waiting to enter pools", () => {
+    const state = snapshot();
+    state.pendingCarry = 12n * ONE;
+    state.heldContributions = 3n * ONE;
+    mocks.market.mockReturnValue({ data: state, error: null, isFetching: false, refetch: vi.fn() });
+    render(<IndependentDashboard market={MARKET} override={null} />);
+    expect(screen.getByTestId("independent-waiting")).toHaveTextContent("15 CST");
+    expect(screen.getByTestId("independent-carry")).toHaveTextContent("12 CST");
+    expect(screen.getByTestId("independent-held")).toHaveTextContent("3 CST");
+    expect(screen.getByTestId("independent-held-note")).toHaveTextContent(
+      "next trade on a trading cycle or when anyone distributes them",
+    );
+  });
+  it("offers a local-only direct transfer to exercise automatic distribution", async () => {
+    const actions = { ...noopActions(), local: vi.fn().mockResolvedValue(true) };
+    mocks.actions.mockReturnValue(actions);
+    const state = snapshot();
+    mocks.market.mockReturnValue({ data: state, error: null, isFetching: false, refetch: vi.fn() });
+    const { rerender } = render(<IndependentDashboard market={MARKET} override={null} />);
+    expect(screen.queryByTestId("independent-held-note")).not.toBeInTheDocument();
+    const button = screen.getByRole("button", {
+      name: "Send 100 test CST directly to the market",
+    });
+    await userEvent.click(button);
+    expect(actions.local).toHaveBeenCalledWith("direct");
+    const poor = snapshot();
+    poor.user!.balance = 99n * ONE;
+    mocks.market.mockReturnValue({ data: poor, error: null, isFetching: false, refetch: vi.fn() });
+    rerender(<IndependentDashboard market={MARKET} override={null} />);
+    expect(
+      screen.getByRole("button", { name: "Send 100 test CST directly to the market" }),
+    ).toBeDisabled();
   });
 });

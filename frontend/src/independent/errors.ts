@@ -5,14 +5,21 @@ const messages: Record<string, string> = {
   RoundNotOpen:
     "This cycle is closed for trading, splitting and funding. Owned pairs can still be merged.",
   NotFinalized:
-    "The cycle has not closed yet. Trading continues; winnings become retrievable after full closure.",
-  OutOfOrderRound: "A later cycle has already been funded. Choose the current cycle.",
+    "The preceding cycle has not fully closed, so it cannot be settled yet. Opening the next cycle’s pools, settlement and winnings wait for full closure.",
+  OutOfOrderRound: "A later cycle has already opened its pools. Choose the current cycle.",
   FundingCapacity:
-    "This funding does not fit after carried funds are included. Refresh the funding preview and reduce new CST.",
+    "This gift does not fit after carried funds are included. Refresh the funding preview and reduce the amount.",
   NotInitialized: "No pool funding or split positions exist for this cycle yet.",
-  NotFunded: "Start the eight pools with carried funds or a new gift before trading.",
+  NotFunded:
+    "This cycle’s pools have not opened and nothing waiting can open them yet. Add CST to all eight pools to open them.",
+  InvalidParameters:
+    "Nothing is waiting to enter the pools, or the amount is outside the supported range. Refresh the market.",
   InvalidTimestamp:
-    "The game’s canonical cycle timestamps could not be verified. Settlement is unavailable until valid data returns.",
+    "The game’s canonical cycle timestamps could not be verified. Settlement, and opening the next cycle’s pools, are unavailable until valid data returns.",
+  InvalidSourceState:
+    "The outcome source returned inconsistent answers. Trading, settlement and opening pools are unavailable until valid source data is restored.",
+  TransferFailed:
+    "A CST transfer failed. Check your CST balance and approval. A trade that opens a new cycle also settles the preceding one, which can fail here; try again later.",
   NonPositiveReserve:
     "This question has no remaining trading reserve. Use a smaller amount or fund its cycle.",
   InvalidCollateral: "The amount is outside this question’s supported collateral range.",

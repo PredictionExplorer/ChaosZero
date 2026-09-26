@@ -48,6 +48,7 @@ export function snapshot(): IndependentSnapshot {
     claimEscrow: 0n,
     pendingCarry: 0n,
     availableCarry: 0n,
+    heldContributions: 0n,
     funding: {
       availableCarry: 0n,
       carryUsed: 0n,
@@ -57,6 +58,7 @@ export function snapshot(): IndependentSnapshot {
       allocations: zero(),
       needsSettlement: false,
       canFund: false,
+      unallocated: 0n,
     },
     user: {
       owner: ACCOUNT,
@@ -81,6 +83,7 @@ export function noopActions(): IndependentActions {
     message: null,
     approve: done,
     fund: done,
+    distribute: done,
     trade: done,
     settle: done,
     claim: done,

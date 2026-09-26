@@ -10,25 +10,35 @@ Implemented:
 - Winning positions pay exactly 1 CST after full cycle closure.
 - Settlement reserves every outstanding winning claim in a separate vault,
   empties the old active pools, and credits only surplus to future funding.
-- The next first funding transaction includes the previous funded cycle's carry
-  before trading starts. Late claims cannot affect new pools. Skipped game
+- The first buy, sell or funding transaction of a new cycle settles the previous
+  funded cycle and starts the new pools from its carry and held contributions
+  before anything is priced. Late claims cannot affect new pools. Skipped game
   cycles require no catch-up loop; sufficient carry can start a market with no
   new CST.
+- CST sent or minted directly to the market is split equally across the eight
+  pools of the trading cycle by the next buy, sell or `fundRound`, before
+  pricing. Buys, sells and the permissionless `fundRound(cycle, 0)` trigger
+  (which distributes without trading) absorb it once at least 1 CST is held;
+  any `fundRound` gift also sweeps smaller amounts. With no cycle trading, it
+  joins the next cycle's start. `RoundFunded` has a new signature that separates the caller's own CST,
+  swept transfers and carry.
 - Starting odds use the preceding cycle's time-weighted recorded prices over
   40–60% of its canonical duration, with explicit missing-history fallback.
 - The browser separates active pool collateral, unpaid claims and carry, and
   supports recovery of old positions when the result source is unavailable.
 
 No winning-holder bonus or sponsor withdrawal rights. Matching YES/NO pairs
-return their original CST without capturing a share of the surplus. Voluntary
-additional gifts can move prices; automatic carry is applied only at startup.
-Numerical capacity limits retain exceptional excess carry for later cycles.
+return their original CST without capturing a share of the surplus. Gifts and
+absorbed transfers can move prices; carry is applied only at startup. Direct
+transfers are irrevocable. Numerical capacity limits retain exceptional excess
+carry and held contributions for later cycles.
 
 The complete repository gate, both production configurations and the integrated
-local browser lifecycle passed. Extended campaigns passed 2,800,000 fuzz cases
-and 1,441,792 stateful actions without failures. Results and reproduction
-commands are recorded in [VALIDATION.md](VALIDATION.md). The prior shared engine
-and its tests remain as regression coverage.
+local browser lifecycle passed for the original release. Its extended campaigns
+passed 2,800,000 fuzz cases and 1,441,792 stateful actions without failures.
+Results and reproduction commands are recorded in [VALIDATION.md](VALIDATION.md),
+with later changes as dated addenda. The prior shared engine and its tests
+remain as regression coverage.
 
 The live game's eight-question result adapter is still future work. Local
 validation does not authorize using the simulator with real CST.

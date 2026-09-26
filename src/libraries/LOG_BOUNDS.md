@@ -156,7 +156,11 @@ all logarithms, and the weights sum to 10,000. The weighted sums fit below
 Integer floor division gives the displayed basis-point quote. Exact trade
 quantities continue to use the enclosing invariant check, not a rounded display
 price. Initial weights stay in 1..9999 and never change after initialization.
-Additional voluntary gifts can move prices toward those fixed initial odds.
+Additional gifts can move prices toward those fixed initial odds. An absorbed
+contribution is such a gift: its allocation `g` raises `C`, and so both `rY` and
+`rN`, by `g`. A buy or sell absorbs before its product check, so the trade is
+verified against the post-absorption reserves; its exact submitted amounts
+either pass that check or revert.
 
 ## Settlement and rollover conservation
 
@@ -176,23 +180,45 @@ winning supply and escrow equally, without touching carry. Transfers alter only
 the claim owner. Claim order and multiple wallets cannot gain extra rollover.
 
 Before a new funded cycle starts, the latest previously funded cycle must be
-settled. All eligible carry is included before first trading, divided into eight
-equal allocations with at most one base-unit difference for the remainder. Old
-split-only cycles have no sponsor reserve, so settling them later adds no carry.
-Unfunded game-cycle gaps need no unbounded catch-up loop. Extreme carry above the
-initial funding headroom cap remains explicitly pending for later cycles; it is
-never silently injected into an already-funded pool.
+settled. First funding can happen inside the new cycle's first buy or sell: that
+call settles the previous cycle, places carry and held contributions, and only
+then verifies its own trade. All eligible carry is included before first trading,
+divided into eight equal allocations with at most one base-unit difference for
+the remainder. Old split-only cycles have no sponsor reserve, so settling them
+later adds no carry. Unfunded game-cycle gaps need no unbounded catch-up loop.
+Extreme carry above the initial funding headroom cap remains explicitly pending
+for later cycles; it is never silently injected into an already-funded pool.
 
 The custody invariants are:
 
 ```text
-market CST = active question collateral + pending carry + unsolicited transfers
+market CST = active question collateral + pending carry + held contributions
 vault CST  = outstanding winning claims + unsolicited vault transfers.
 ```
 
-Direct CST transfers are excluded from funding; all authorized transfers must
-match exact sent and received amounts. The same transaction guard covers
-funding, trades, split/merge, settlement and claims.
+Held contributions `H = market CST - active - pendingCarry` are CST that arrived
+without accounting: direct transfers, mints, and a sponsor's pull just verified
+inside `fundRound`. One routine, run by `buy`, `sell` and `fundRound` on an open
+cycle, credits them. With carry `K` offered only at first funding and `cap` the
+cycle's remaining capacity, let `P = min(H + K, cap)`. If `P` reaches the
+threshold (`MIN_FUNDING` at first funding; on a funded cycle 1 CST for trades
+and bare triggers, 1 wei for a gift), it places `P` in eight equal allocations
+and sets
+
+```text
+active' = active + P
+pendingCarry' = pendingCarry + H - P
+```
+
+so `H` returns to zero and the identity holds. Carry ranks first, then the
+sponsor's own pulled CST, which must fit or revert, then unsolicited CST; only
+carry and unsolicited CST can be deferred. Settlement lowers market CST and
+active collateral by the escrow and moves the surplus from active to pending
+carry, leaving `H` unchanged. Vault transfers are never credited. `H` saturates
+at zero after unsupported external destruction, so later inflows first restore
+the missing backing. All authorized transfers must match exact sent and received
+amounts. The same transaction guard covers funding, trades, split/merge,
+settlement and claims.
 
 ## Middle-window history
 
