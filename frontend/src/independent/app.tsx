@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { appConfig, resolveRoundOverride } from "@/lib/config";
 import { formatCst, shortAddress } from "@/lib/format";
+import { formatDuration } from "@/shared/question-metrics";
 import { QUESTIONS, type QuestionId } from "@/shared/questions";
 import { independentMarketAddress } from "./config";
 import {
@@ -18,7 +19,6 @@ import {
   IndependentQuestionCard,
   IndependentSetsPanel,
   IndependentTradePanel,
-  duration,
 } from "./components";
 import { useIndependentActions } from "./use-independent-actions";
 import { useIndependentMarket, useIndependentRecovery } from "./use-independent-market";
@@ -326,7 +326,7 @@ export function IndependentDashboard({
                   ? "The current game cycle starts with an ETH gesture."
                   : snapshot.timestamp >= snapshot.local.deadline
                     ? "The countdown has elapsed. The last participant can close now; others wait for the timeout."
-                    : `${duration(snapshot.local.deadline - snapshot.timestamp)} until this game cycle can close.`}
+                    : `${formatDuration(snapshot.local.deadline - snapshot.timestamp)} until this game cycle can close.`}
               </p>
             </Card>
           )}

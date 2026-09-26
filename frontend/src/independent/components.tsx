@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { ArrowDownLeft, ArrowUpRight, Layers3, Wallet } from "lucide-react";
-import { formatEther } from "viem";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConnectButton } from "@/components/wallet/connect-button";
@@ -12,8 +11,8 @@ import { useIndependentFundingPreview } from "./use-independent-market";
 import { quoteIndependentTrade, independentYesProbabilityBps } from "@/shared/independent-math";
 import { MAX_COLLATERAL } from "@/shared/math";
 import { matchedSets } from "@/shared/positions";
+import { formatQuestionMetric } from "@/shared/question-metrics";
 import { answerYes, QUESTIONS, type QuestionId } from "@/shared/questions";
-import type { CycleStats } from "@/shared/use-shared-market";
 import {
   exactCst,
   independentPortfolioValue,
@@ -33,37 +32,6 @@ export const percent = (value: bigint | number | null, final = false) => {
   if (!final && value === 10_000n) return ">99.99%";
   return `${(Number(value) / 100).toLocaleString("en-US", { maximumFractionDigits: 2 })}%`;
 };
-export const duration = (value: bigint) =>
-  value >= 3600n
-    ? `${value / 3600n}h ${(value % 3600n) / 60n}m`
-    : value >= 60n
-      ? `${value / 60n}m ${value % 60n}s`
-      : `${value}s`;
-export function metric(stats: CycleStats | null | undefined, question: number): string {
-  if (!stats) return "—";
-  switch (question) {
-    case 0:
-      return stats.gestureCount.toLocaleString();
-    case 1:
-      return duration(stats.enduranceDuration);
-    case 2:
-      return duration(stats.chronoDuration);
-    case 3:
-      return `${Number(formatEther(stats.ethSpent)).toLocaleString("en-US", { maximumFractionDigits: 6 })} ETH`;
-    case 4:
-      return `${formatCst(stats.cstBurned)} CST`;
-    case 5:
-      return `${stats.cstGestureCount} CST / ${stats.ethGestureCount} ETH`;
-    case 6:
-      return stats.gestureCount === 0n
-        ? "No gestures yet"
-        : `#${stats.enduranceGesture} / #${stats.chronoGesture}`;
-    case 7:
-      return `${formatCst(stats.highestCstPaid)} CST`;
-    default:
-      return "—";
-  }
-}
 
 export function IndependentQuestionCard({
   question,
@@ -123,23 +91,15 @@ export function IndependentQuestionCard({
       <p className="mt-2 min-h-10 text-xs leading-5 text-ink-dim">{item.question}</p>
       <div className="my-4 grid grid-cols-2 gap-3 border-y border-line py-3 text-xs">
         <div>
-          <p className="mb-1 text-ink-faint">
-            {question === 6 ? "Endurance / Chrono" : "This cycle"}
-          </p>
+          <p className="mb-1 text-ink-faint">{item.currentLabel ?? "This cycle"}</p>
           <p className="font-mono" data-testid={`current-${question}`}>
-            {metric(snapshot.local?.current, question)}
+            {formatQuestionMetric(snapshot.local?.current, question)}
           </p>
         </div>
         <div>
-          <p className="mb-1 text-ink-faint">
-            {question === 5 || question === 6 ? "Condition" : "Previous cycle"}
-          </p>
+          <p className="mb-1 text-ink-faint">{item.condition ? "Condition" : "Previous cycle"}</p>
           <p className="font-mono">
-            {question === 5
-              ? "CST > ETH"
-              : question === 6
-                ? "Same gesture"
-                : metric(snapshot.local?.previous, question)}
+            {item.condition ?? formatQuestionMetric(snapshot.local?.previous, question)}
           </p>
         </div>
       </div>

@@ -8,8 +8,6 @@ pragma solidity 0.8.35;
 library CycleMetrics {
     struct Metrics {
         uint256 gestureCount;
-        uint256 ethGestureCount;
-        uint256 cstGestureCount;
         uint256 ethSpent;
         uint256 cstBurned;
         uint256 highestCstPaid;
@@ -41,11 +39,9 @@ library CycleMetrics {
         ++next.gestureCount;
         next.lastGestureTime = timestamp;
         if (withCst) {
-            ++next.cstGestureCount;
             next.cstBurned += paid;
             if (paid > next.highestCstPaid) next.highestCstPaid = paid;
         } else {
-            ++next.ethGestureCount;
             next.ethSpent += paid;
         }
         _store(stored, next);
@@ -94,8 +90,6 @@ library CycleMetrics {
 
     function _store(Metrics storage target, Metrics memory value) private {
         target.gestureCount = value.gestureCount;
-        target.ethGestureCount = value.ethGestureCount;
-        target.cstGestureCount = value.cstGestureCount;
         target.ethSpent = value.ethSpent;
         target.cstBurned = value.cstBurned;
         target.highestCstPaid = value.highestCstPaid;

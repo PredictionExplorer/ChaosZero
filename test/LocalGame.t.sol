@@ -54,8 +54,6 @@ contract LocalGameTest is Test {
     function test_baselineWasReplayedAndIsFinal() public view {
         CycleMetrics.Metrics memory m = game.roundStats(0);
         assertEq(m.gestureCount, 6);
-        assertEq(m.ethGestureCount, 3);
-        assertEq(m.cstGestureCount, 3);
         assertEq(m.ethSpent, 0.045 ether);
         assertEq(m.cstBurned, 600 ether);
         assertEq(m.highestCstPaid, 300 ether);
@@ -177,26 +175,56 @@ contract LocalGameTest is Test {
         vm.prank(alice);
         game.bidCst(0);
         CycleMetrics.Metrics memory m = game.roundStats(1);
-        assertEq(m.cstGestureCount, 1);
+        assertEq(m.gestureCount, 2);
         assertEq(m.cstBurned, 0);
         assertEq(game.cstOpeningPrice(), 200 ether);
         assertGt(cst.balanceOf(alice), 10_000 ether);
     }
 
-    function test_strictCountTiesRemainUnknownUntilClosureAndThenNo() public {
+    function test_evenGestureTotalIsUnknownWhileOpenAndThenNo() public {
         _eth();
         vm.prank(alice);
         game.bidCst(type(uint256).max);
-        (,, uint8 known,) = source.outcomeState(1);
-        assertEq(known & 32, 0);
-        vm.warp(game.mainPrizeTime());
+        _assertParityUnknown();
+        assertEq(_closeCycle() & 32, 0);
+    }
+
+    function test_oddGestureTotalIsUnknownWhileOpenAndThenYes() public {
+        _eth();
+        _assertParityUnknown();
         vm.prank(alice);
-        game.closeCycle();
-        (bool open, bool final_, uint8 finalMask, uint8 values) = source.outcomeState(1);
-        assertFalse(open);
-        assertTrue(final_);
-        assertEq(finalMask, 255);
-        assertEq(values & 32, 0);
+        game.bidCst(type(uint256).max);
+        _assertParityUnknown();
+        _eth();
+        _assertParityUnknown();
+        assertEq(_closeCycle() & 32, 32);
+    }
+
+    function test_freeCstGestureFlipsParity() public {
+        _eth();
+        vm.warp(vm.getBlockTimestamp() + game.cstDuration());
+        assertEq(game.getNextCstPrice(), 0);
+        uint256 beforeFreeGesture = vm.snapshotState();
+        assertEq(_closeCycle() & 32, 32);
+        vm.revertToState(beforeFreeGesture);
+        vm.prank(alice);
+        game.bidCst(0);
+        assertEq(game.roundStats(1).cstBurned, 0);
+        _assertParityUnknown();
+        assertEq(_closeCycle() & 32, 0);
+    }
+
+    function test_fuzz_parityIsUnknownUntilClosureAndThenMatchesGestureCount(
+        uint256 count,
+        uint256 choices,
+        uint32[40] memory gaps
+    ) public {
+        _exerciseParity(bound(count, 1, gaps.length), choices, gaps);
+    }
+
+    function test_immediateCstGesturesRemainCoveredByTheParityHarness() public {
+        uint32[40] memory gaps;
+        _exerciseParity(gaps.length, type(uint256).max, gaps);
     }
 
     function test_clockAloneCanMakeTimingThresholdsCertain() public {
@@ -286,10 +314,50 @@ contract LocalGameTest is Test {
         assertEq(result & previousKnown, previousValues & previousKnown);
     }
 
+    function _exerciseParity(uint256 gestures, uint256 choices, uint32[40] memory gaps) private {
+        // Each CST gesture at most doubles the next opening price, so this funds
+        // every mix, including back-to-back CST gestures at full price.
+        deal(address(cst), alice, game.cstOpeningPrice() << gestures, true);
+        for (uint256 i; i < gestures; ++i) {
+            vm.warp(vm.getBlockTimestamp() + bound(gaps[i], 0, 300));
+            if (i != 0 && (choices >> i) & 1 != 0) {
+                vm.prank(alice);
+                game.bidCst(type(uint256).max);
+            } else {
+                _eth();
+            }
+            assertEq(game.roundStats(1).gestureCount, i + 1);
+            _assertParityUnknown();
+        }
+        assertEq((_closeCycle() >> 5) & 1, gestures % 2);
+    }
+
     function _eth() private {
         uint256 price = game.getNextEthPrice();
         vm.prank(alice);
         game.bidEth{value: price}();
+    }
+
+    function _assertParityUnknown() private view {
+        (bool open,, uint8 known, uint8 values) = source.outcomeState(1);
+        assertTrue(open);
+        assertEq(known & 32, 0);
+        assertEq(values & 32, 0);
+    }
+
+    /// @dev Closes cycle 1 as its last gesturer and returns the finalized answers.
+    function _closeCycle() private returns (uint8 values) {
+        uint256 prizeTime = game.mainPrizeTime();
+        if (prizeTime > vm.getBlockTimestamp()) vm.warp(prizeTime);
+        vm.prank(alice);
+        game.closeCycle();
+        bool open;
+        bool final_;
+        uint8 mask;
+        (open, final_, mask, values) = source.outcomeState(1);
+        assertFalse(open);
+        assertTrue(final_);
+        assertEq(mask, 255);
     }
 }
 

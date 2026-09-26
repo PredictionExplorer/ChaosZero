@@ -3,7 +3,11 @@ import { execFileSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import path from "node:path";
-import { independentMarketAbi, settlementVaultAbi } from "../frontend/src/independent/abi";
+import {
+  independentMarketAbi,
+  independentSourceAbi,
+  settlementVaultAbi,
+} from "../frontend/src/independent/abi";
 import { localGameAbi } from "../frontend/src/shared/abi";
 import { quoteIndependentTrade } from "../frontend/src/shared/independent-math";
 const requireFrontend = createRequire(path.resolve("frontend/package.json"));
@@ -165,8 +169,19 @@ test("independent pools: isolated prices, full closure, protected late claims, h
   for (let i = 0; i < 7; i++) {
     await page.getByRole("button", { name: /^ETH gesture/ }).click();
     await expect(page.getByTestId("current-0")).toHaveText(String(i + 1));
+    await expect(page.getByTestId("current-5")).toHaveText(
+      `${i + 1} · ${i % 2 === 0 ? "odd" : "even"}`,
+    );
   }
   await expect(page.getByTestId("question-0")).toContainText("Trading");
+  // Parity flips with every gesture, so question 5 stays unknown until closure.
+  const [, , knownMask] = await client.readContract({
+    address: d.sourceAddress,
+    abi: independentSourceAbi,
+    functionName: "outcomeState",
+    args: [1n],
+  });
+  expect(knownMask & (1 << 5)).toBe(0);
   await expect(page.getByRole("button", { name: "Retrieve winnings", exact: true })).toBeDisabled();
   await trade.getByLabel(/CST to spend/).fill("1");
   await trade.getByRole("button", { name: "Approve CST to trade" }).click();
@@ -254,6 +269,9 @@ test("independent pools: isolated prices, full closure, protected late claims, h
   // A much later old claim, with source offline, cannot consume the new pools.
   await page.getByRole("link", { name: "Previous cycle" }).click();
   await expect(page.getByTestId("independent-cycle")).toHaveText("Cycle 1");
+  // Seven gestures closed cycle 1 on an odd total.
+  await expect(page.getByTestId("current-5")).toHaveText("7 · odd");
+  await expect(page.getByTestId("question-5")).toContainText("Resolved YES");
   const unchangedSecond = await qs(2n);
   const token = await client.readContract({
     address: market,

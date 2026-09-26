@@ -28,7 +28,9 @@ The launcher refuses occupied ports instead of attaching to an unrelated process
 ## The eight fixed questions
 
 Questions 0–4 and 7 compare against the preceding finalized cycle. Questions 5
-and 6 compare facts within the current cycle. Strict-comparison ties resolve NO.
+and 6 use only the current cycle: 5 is the parity of its total gesture count, 6
+a same-gesture fact. Both are decided only at closure. Strict-comparison ties
+resolve NO.
 
 | ID  | Question                                         | Result                                                                                                   |
 | --- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
@@ -37,11 +39,11 @@ and 6 compare facts within the current cycle. Strict-comparison ties resolve NO.
 | 2   | Longer Chrono Warrior time?                      | Maximum tenure of an Endurance record is greater.                                                        |
 | 3   | More ETH spent on gestures?                      | Actual ETH gesture payments are greater; separate contributions are excluded.                            |
 | 4   | More CST burned through gestures?                | CST gesture payments are greater; unrelated token burns are excluded.                                    |
-| 5   | More CST gestures than ETH gestures?             | CST count strictly exceeds ETH count within this cycle.                                                  |
+| 5   | Odd number of gestures?                          | The final total of ETH and CST gestures is odd; an even total resolves NO.                               |
 | 6   | Does the same gesture earn Endurance and Chrono? | The two winning record episodes originate from the same gesture. Matching wallets alone is insufficient. |
 | 7   | Higher maximum CST payment?                      | The largest CST amount actually paid for one gesture is greater.                                         |
 
-Questions 0–4 and 7 can become permanently YES before closure. The independent market keeps trading open until the game actually closes the cycle; all eight payouts settle together. A known or highly predictable question can consume only its own funding. The source still validates monotonic facts, and the UI distinguishes those facts from final settlement.
+Questions 0–4 and 7 can become permanently YES before closure. The independent market keeps trading open until the game actually closes the cycle; all eight payouts settle together. A known or highly predictable question can consume only its own funding. Anyone can flip question 5 with one more gesture, even a zero-price CST gesture, and every gesture extends the countdown, so its price reflects a contest over the final gesture rather than a forecast. The source still validates monotonic facts, and the UI distinguishes those facts from final settlement.
 
 ## Funding, settlement and rollover
 

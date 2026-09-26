@@ -55,7 +55,7 @@ export const outcomeSourceAbi = parseAbi([
 
 export const localGameAbi = parseAbi([
   "function roundNum() view returns (uint256)",
-  "function roundStats(uint256 roundId) view returns ((uint256 gestureCount,uint256 ethGestureCount,uint256 cstGestureCount,uint256 ethSpent,uint256 cstBurned,uint256 highestCstPaid,uint256 enduranceDuration,uint256 chronoDuration,uint256 enduranceGesture,uint256 chronoGesture,uint256 enduranceStart,uint256 previousEnduranceDuration,uint256 firstGestureTime,uint256 lastGestureTime,bool chronoInitialized,bool finalized) metrics)",
+  "function roundStats(uint256 roundId) view returns ((uint256 gestureCount,uint256 ethSpent,uint256 cstBurned,uint256 highestCstPaid,uint256 enduranceDuration,uint256 chronoDuration,uint256 enduranceGesture,uint256 chronoGesture,uint256 enduranceStart,uint256 previousEnduranceDuration,uint256 firstGestureTime,uint256 lastGestureTime,bool chronoInitialized,bool finalized) metrics)",
   "function mainPrizeTime() view returns (uint256)",
   "function getNextEthPrice() view returns (uint256)",
   "function getNextCstPrice() view returns (uint256)",

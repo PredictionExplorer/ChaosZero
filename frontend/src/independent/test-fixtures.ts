@@ -11,8 +11,6 @@ export const zero = () => fixedAmounts(Array<bigint>(8).fill(0n));
 export function snapshot(): IndependentSnapshot {
   const metrics = {
     gestureCount: 7n,
-    ethGestureCount: 4n,
-    cstGestureCount: 3n,
     ethSpent: ONE,
     cstBurned: 20n * ONE,
     highestCstPaid: 10n * ONE,

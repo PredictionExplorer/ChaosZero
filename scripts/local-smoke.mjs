@@ -207,13 +207,15 @@ try {
       allocation(8n * ONE + 3n, q),
     );
 
-  for (let i = 0; i < 7; i++)
+  const gestures = 7n;
+  for (let i = 0n; i < gestures; i++)
     await send(game, gameAbi, "bidEth", [], await read(game, gameAbi, "getNextEthPrice"));
   const [startedAt] = await read(source, sourceAbi, "cycleTimes", [round]);
   const closeAt = (await read(game, gameAbi, "mainPrizeTime")) + 1n;
   const [, finalized, known] = await read(source, sourceAbi, "outcomeState", [round]);
   assert.equal(finalized, false);
   assert.ok((known & 1) !== 0, "The gesture-count answer is mathematically known");
+  assert.equal(known & (1 << 5), 0, "Gesture parity must stay unknown until closure");
   await trade(round, 0, true, true, 20n * ONE);
   await assert.rejects(
     client.simulateContract({
@@ -246,6 +248,13 @@ try {
   const beforeSettlement = await states(round);
   const [, final, , answers] = await read(source, sourceAbi, "outcomeState", [round]);
   assert.equal(final, true);
+  const { gestureCount } = await read(game, gameAbi, "roundStats", [round]);
+  assert.equal(gestureCount, gestures);
+  assert.equal(
+    (answers >> 5) & 1,
+    Number(gestureCount % 2n),
+    "Question 5 resolves on the final gesture count's parity",
+  );
   const owed = beforeSettlement.map((q, i) =>
     (answers & (1 << i)) !== 0 ? q.yesSupply : q.noSupply,
   );
@@ -301,7 +310,7 @@ try {
   assert.equal(await read(token, tokenAbi, "balanceOf", [market]), cash(next));
   assert.equal(await read(token, tokenAbi, "balanceOf", [vault]), 0n);
   console.log(
-    "Independent smoke passed: exact quotes, isolation, split/merge, transfers/operators, remainder funding, end-only payouts, midpoint inheritance, automatic carry, source-outage late claims, and empty-cycle rollover.",
+    "Independent smoke passed: exact quotes, isolation, split/merge, transfers/operators, remainder funding, end-only payouts, closure-only parity, midpoint inheritance, automatic carry, source-outage late claims, and empty-cycle rollover.",
   );
 } finally {
   await tester.revert({ id: snapshot });

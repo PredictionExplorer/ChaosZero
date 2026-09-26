@@ -34,6 +34,46 @@ describe("independent question interface", () => {
     expect(screen.getByRole("button", { name: "Buy YES: More gestures?" })).toBeEnabled();
     expect(screen.queryByText("Resolved YES")).not.toBeInTheDocument();
   });
+  it("shows the live gesture parity against its fixed condition", () => {
+    render(
+      <IndependentQuestionCard
+        question={5}
+        snapshot={snapshot()}
+        selected={false}
+        onSelect={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "Odd gesture count?" })).toBeInTheDocument();
+    expect(screen.getByText("This cycle")).toBeInTheDocument();
+    expect(screen.getByTestId("current-5")).toHaveTextContent("7 · odd");
+    expect(screen.getByText("Condition")).toBeInTheDocument();
+    expect(screen.getByText("Odd total")).toBeInTheDocument();
+    expect(screen.queryByText("Previous cycle")).not.toBeInTheDocument();
+  });
+  it("labels each card's live value and its comparison", () => {
+    const { unmount } = render(
+      <IndependentQuestionCard
+        question={0}
+        snapshot={snapshot()}
+        selected={false}
+        onSelect={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId("current-0")).toHaveTextContent("7");
+    expect(screen.getByText("Previous cycle").nextElementSibling).toHaveTextContent("6");
+    unmount();
+    render(
+      <IndependentQuestionCard
+        question={6}
+        snapshot={snapshot()}
+        selected={false}
+        onSelect={vi.fn()}
+      />,
+    );
+    expect(screen.getByText("Endurance / Chrono")).toBeInTheDocument();
+    expect(screen.getByTestId("current-6")).toHaveTextContent("#2 / #3");
+    expect(screen.getByText("Condition").nextElementSibling).toHaveTextContent("Same gesture");
+  });
   it("never rounds an unresolved tiny price into apparent certainty", () => {
     const state = snapshot();
     state.questions[0].pool = {

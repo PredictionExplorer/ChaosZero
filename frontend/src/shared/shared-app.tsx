@@ -28,13 +28,9 @@ import { PositionRecoveryPanel } from "./position-recovery-panel";
 import { collateralBreakdown, portfolioValue } from "./positions";
 import { usePositionRecovery } from "./use-position-recovery";
 import { claimable, MAX_COLLATERAL, MIN_FUNDING, quoteTrade, yesProbabilityBps } from "./math";
+import { formatDuration, formatQuestionMetric } from "./question-metrics";
 import { answerYes, questionKnown, QUESTIONS, type QuestionId } from "./questions";
-import {
-  useSharedActions,
-  useSharedMarket,
-  type CycleStats,
-  type SharedSnapshot,
-} from "./use-shared-market";
+import { useSharedActions, useSharedMarket, type SharedSnapshot } from "./use-shared-market";
 
 const inputClass =
   "h-12 w-full rounded-xl border border-line-strong bg-void/70 px-4 font-mono text-lg text-ink outline-none focus:border-signal focus:ring-1 focus:ring-signal disabled:opacity-50";
@@ -43,41 +39,6 @@ const percent = (bps: bigint | null) =>
   bps === null
     ? "—"
     : `${(Number(bps) / 100).toLocaleString("en-US", { maximumFractionDigits: 1 })}%`;
-export const duration = (seconds: bigint) => {
-  const hours = seconds / 3600n;
-  const minutes = (seconds % 3600n) / 60n;
-  return hours > 0n
-    ? `${hours}h ${minutes}m`
-    : minutes > 0n
-      ? `${minutes}m ${seconds % 60n}s`
-      : `${seconds}s`;
-};
-
-function metricValue(stats: CycleStats | null | undefined, question: number): string {
-  if (!stats) return "—";
-  switch (question) {
-    case 0:
-      return stats.gestureCount.toLocaleString();
-    case 1:
-      return duration(stats.enduranceDuration);
-    case 2:
-      return duration(stats.chronoDuration);
-    case 3:
-      return `${Number(formatEther(stats.ethSpent)).toLocaleString("en-US", { maximumFractionDigits: 6 })} ETH`;
-    case 4:
-      return `${formatCst(stats.cstBurned)} CST`;
-    case 5:
-      return `${stats.cstGestureCount} CST / ${stats.ethGestureCount} ETH`;
-    case 6:
-      return stats.gestureCount === 0n
-        ? "No gestures yet"
-        : `#${stats.enduranceGesture} / #${stats.chronoGesture}`;
-    case 7:
-      return `${formatCst(stats.highestCstPaid)} CST`;
-    default:
-      return "—";
-  }
-}
 
 export function SharedGate() {
   const params = useSearchParams();
@@ -150,23 +111,15 @@ export function QuestionCard({
       <p className="mt-2 min-h-10 text-xs leading-5 text-ink-dim">{item.question}</p>
       <div className="my-4 grid grid-cols-2 gap-3 border-y border-line py-3 text-xs">
         <div>
-          <p className="mb-1 text-ink-faint">
-            {question === 6 ? "Endurance / Chrono" : "This cycle"}
-          </p>
+          <p className="mb-1 text-ink-faint">{item.currentLabel ?? "This cycle"}</p>
           <p className="font-mono text-ink" data-testid={`current-${question}`}>
-            {metricValue(snapshot.local?.current, question)}
+            {formatQuestionMetric(snapshot.local?.current, question)}
           </p>
         </div>
         <div>
-          <p className="mb-1 text-ink-faint">
-            {question === 5 ? "Condition" : question === 6 ? "Condition" : "Previous cycle"}
-          </p>
+          <p className="mb-1 text-ink-faint">{item.condition ? "Condition" : "Previous cycle"}</p>
           <p className="font-mono text-ink">
-            {question === 5
-              ? "CST > ETH"
-              : question === 6
-                ? "Same gesture"
-                : metricValue(snapshot.local?.previous, question)}
+            {item.condition ?? formatQuestionMetric(snapshot.local?.previous, question)}
           </p>
         </div>
       </div>
@@ -935,7 +888,7 @@ export function SharedDashboard({
                   ? "The current cycle begins with an ETH gesture."
                   : snapshot.timestamp >= snapshot.local.deadline
                     ? "The timer has expired. The last participant can close now; other wallets must wait for the timeout."
-                    : `${duration(snapshot.local.deadline - snapshot.timestamp)} until the current cycle can close.`}
+                    : `${formatDuration(snapshot.local.deadline - snapshot.timestamp)} until the current cycle can close.`}
               </p>
             </Card>
           )}

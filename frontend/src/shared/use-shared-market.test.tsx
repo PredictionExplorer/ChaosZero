@@ -66,8 +66,6 @@ const ONE = 10n ** 18n;
 const zeros = () => Array<bigint>(8).fill(0n);
 const stats = (gestureCount: bigint): CycleStats => ({
   gestureCount,
-  ethGestureCount: 3n,
-  cstGestureCount: 4n,
   ethSpent: ONE / 10n,
   cstBurned: 500n * ONE,
   highestCstPaid: 200n * ONE,

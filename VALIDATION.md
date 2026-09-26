@@ -82,3 +82,22 @@ remain in its vault, and surplus remains accounted as carry or new-cycle
 funding. This does not mean every contract's CST balance is zero. Passing tests
 establish the covered accounting/execution properties, not accurate next-cycle
 probabilities or resistance to economic influence over the underlying game.
+
+## Addendum: gesture-parity question — 26 September 2026
+
+Question 5 changed from "more CST gestures than ETH gestures" to "odd total
+gesture count at closure". Only the local outcome source, the simulator's
+statistics record (two unused gesture-type counters removed), the frontend and
+the documentation changed. Market, vault and library code is untouched; the
+independent market runtime is still **24,467 bytes**.
+
+`pnpm check` passed on the change: 310 Solidity tests across 21 suites (new
+parity unit and fuzz properties included), byte-identical regeneration of all
+three fixture sets, the 631-interval logarithm oracle, 1,447 frontend tests
+across 60 files with enforced coverage, the production build, the browser
+lifecycle with its embedded local smoke (parity unknown before closure, then
+equal to the final gesture count's parity), and clean dependency audits. The
+heavy profile was not rerun because no financial logic changed.
+
+Environment: Node 24.2.0, Python 3.13.5, pnpm 10.32.0, Foundry 1.7.1 and Solidity
+0.8.35.

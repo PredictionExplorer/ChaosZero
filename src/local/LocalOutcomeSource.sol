@@ -38,11 +38,12 @@ contract LocalOutcomeSource is IIndependentOutcomeSource {
         if (now_.chronoDuration > previous.chronoDuration) values |= 4;
         if (now_.ethSpent > previous.ethSpent) values |= 8;
         if (now_.cstBurned > previous.cstBurned) values |= 16;
-        if (now_.cstGestureCount > now_.ethGestureCount) values |= 32;
+        if (now_.gestureCount % 2 == 1) values |= 32;
         if (now_.enduranceGesture != 0 && now_.enduranceGesture == now_.chronoGesture) values |= 64;
         if (now_.highestCstPaid > previous.highestCstPaid) values |= 128;
         if (finalized) return (false, true, type(uint8).max, values);
-        // Questions 5 and 6 can change either way before closure. The other six only grow.
+        // Question 5 flips with every gesture and question 6 can change either way, so both are
+        // known only at closure. The other six only grow.
         knownMask = values & 0x9f;
         values &= knownMask;
     }

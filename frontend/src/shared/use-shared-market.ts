@@ -21,8 +21,6 @@ const LOCAL_GAS_LIMIT = 2_000_000n;
 
 export interface CycleStats {
   gestureCount: bigint;
-  ethGestureCount: bigint;
-  cstGestureCount: bigint;
   ethSpent: bigint;
   cstBurned: bigint;
   highestCstPaid: bigint;

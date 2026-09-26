@@ -1,4 +1,26 @@
-export const QUESTIONS = [
+/** Cycle statistic a question card displays; `formatQuestionMetric` renders each one. */
+export type QuestionMetric =
+  | "gestures"
+  | "endurance"
+  | "chrono"
+  | "ethSpent"
+  | "cstBurned"
+  | "parity"
+  | "sameGesture"
+  | "maxCstPaid";
+
+export interface QuestionDefinition {
+  readonly title: string;
+  readonly question: string;
+  readonly detail: string;
+  readonly metric: QuestionMetric;
+  /** Label for the live value when it is not a plain "This cycle" statistic. */
+  readonly currentLabel?: string;
+  /** Fixed resolution rule shown instead of the previous cycle's value. */
+  readonly condition?: string;
+}
+
+export const QUESTIONS: readonly QuestionDefinition[] = [
   {
     title: "More gestures?",
     question: "Will this cycle have more gestures than the previous cycle?",
@@ -33,10 +55,12 @@ export const QUESTIONS = [
     metric: "cstBurned",
   },
   {
-    title: "CST ahead of ETH?",
-    question: "Will CST gestures outnumber ETH gestures?",
-    detail: "Compares payment counts within this cycle. Equal counts resolve NO.",
-    metric: "paymentMix",
+    title: "Odd gesture count?",
+    question: "Will this cycle end with an odd number of gestures?",
+    detail:
+      "Counts every ETH and CST gesture, including free CST gestures, when the cycle closes. An odd total resolves YES; an even total resolves NO. Each new gesture flips the answer, so it is decided only at closure.",
+    metric: "parity",
+    condition: "Odd total",
   },
   {
     title: "One gesture, both titles?",
@@ -44,6 +68,8 @@ export const QUESTIONS = [
     detail:
       "The exact same gesture must earn both titles. Two different gestures from the same wallet resolve NO.",
     metric: "sameGesture",
+    currentLabel: "Endurance / Chrono",
+    condition: "Same gesture",
   },
   {
     title: "Higher CST peak?",
@@ -52,7 +78,7 @@ export const QUESTIONS = [
       "Compares the largest CST amount actually paid for one gesture. An equal peak resolves NO.",
     metric: "maxCstPaid",
   },
-] as const;
+];
 
 export const QUESTION_COUNT = QUESTIONS.length;
 export type QuestionId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;

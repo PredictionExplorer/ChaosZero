@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ONE } from "./math";
 import { FundingPanel, Portfolio, QuestionCard, SharedGate, TradePanel } from "./shared-app";
-import type { SharedSnapshot } from "./use-shared-market";
+import type { CycleStats, SharedSnapshot } from "./use-shared-market";
 
 vi.mock("@/components/wallet/connect-button", () => ({
   ConnectButton: () => <button>Connect wallet</button>,
@@ -42,6 +42,31 @@ function snapshot(): SharedSnapshot {
     local: null,
   };
 }
+const stats = (gestureCount: bigint): CycleStats => ({
+  gestureCount,
+  ethSpent: ONE / 10n,
+  cstBurned: 500n * ONE,
+  highestCstPaid: 200n * ONE,
+  enduranceDuration: 600n,
+  chronoDuration: 800n,
+  enduranceGesture: 2n,
+  chronoGesture: 3n,
+  firstGestureTime: 20n,
+  lastGestureTime: 90n,
+  finalized: false,
+});
+function withStats(): SharedSnapshot {
+  return {
+    ...snapshot(),
+    local: {
+      ethPrice: ONE / 100n,
+      cstPrice: 400n * ONE,
+      deadline: 1_000n,
+      current: stats(8n),
+      previous: stats(6n),
+    },
+  };
+}
 
 describe("shared market controls", () => {
   it("refuses the shared prototype on a public chain without attempting market reads", () => {
@@ -65,6 +90,35 @@ describe("shared market controls", () => {
     expect(
       screen.getByText(/Two different gestures from the same wallet resolve NO/),
     ).toBeInTheDocument();
+  });
+
+  it("shows the live gesture parity and stays open until closure", async () => {
+    render(
+      <QuestionCard question={5} snapshot={withStats()} selected={false} onSelect={vi.fn()} />,
+    );
+    expect(screen.getByRole("heading", { name: "Odd gesture count?" })).toBeInTheDocument();
+    expect(screen.getByTestId("current-5")).toHaveTextContent("8 · even");
+    expect(screen.getByText("Condition")).toBeInTheDocument();
+    expect(screen.getByText("Odd total")).toBeInTheDocument();
+    expect(screen.queryByText("Previous cycle")).not.toBeInTheDocument();
+    expect(screen.getByText("Open")).toBeInTheDocument();
+    await userEvent.click(screen.getByText("Settlement rule"));
+    expect(screen.getByText(/Each new gesture flips the answer/)).toBeInTheDocument();
+  });
+
+  it("labels each card's live value and its comparison", () => {
+    const { unmount } = render(
+      <QuestionCard question={0} snapshot={withStats()} selected={false} onSelect={vi.fn()} />,
+    );
+    expect(screen.getByTestId("current-0")).toHaveTextContent("8");
+    expect(screen.getByText("Previous cycle").nextElementSibling).toHaveTextContent("6");
+    unmount();
+    render(
+      <QuestionCard question={6} snapshot={withStats()} selected={false} onSelect={vi.fn()} />,
+    );
+    expect(screen.getByText("Endurance / Chrono")).toBeInTheDocument();
+    expect(screen.getByTestId("current-6")).toHaveTextContent("#2 / #3");
+    expect(screen.getByText("Condition").nextElementSibling).toHaveTextContent("Same gesture");
   });
 
   it("shows a resolved NO and disables its trade buttons", () => {
