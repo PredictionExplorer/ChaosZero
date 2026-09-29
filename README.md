@@ -1,5 +1,9 @@
 # Chaos Zero
 
+[![CI](https://github.com/PredictionExplorer/ChaosZero/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/PredictionExplorer/ChaosZero/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/PredictionExplorer/ChaosZero/actions/workflows/codeql.yml/badge.svg?branch=main)](https://github.com/PredictionExplorer/ChaosZero/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/PredictionExplorer/ChaosZero/badge)](https://scorecard.dev/viewer/?uri=github.com/PredictionExplorer/ChaosZero)
+
 **Chaos** is what you bet on; **zero** is what you have to trust. A perpetual
 series of binary prediction markets on one question, asked fresh every
 [Cosmic Signature](https://cosmicsignature.com) round:
@@ -157,19 +161,27 @@ Arbitrum One addresses:
 
 ## Development and testing
 
-Requires [Foundry](https://getfoundry.sh).
-
 ```bash
-forge build
-forge test                                   # full suite: unit + fuzz + invariant + attacks
-FOUNDRY_PROFILE=heavy forge test             # long fuzzing campaign (50k fuzz runs,
-                                             # 512x256 invariant campaigns)
-ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc \
-  forge test --match-contract ForkTest -vv   # optional: validate against the live game
+git clone --recurse-submodules https://github.com/PredictionExplorer/ChaosZero
+cd ChaosZero
+make setup    # submodules, frontend deps, git hooks, then a toolchain check
+make check    # every offline CI gate: format, lint, build, tests, coverage,
+              # differential vectors, gas snapshot
+make help     # everything else: test-fork, test-e2e, test-heavy, analyze, ...
 ```
 
-The test suite is organized in four layers plus a differential bridge to the
-frontend:
+Needs git, Node 22 with pnpm (`corepack enable pnpm`) and
+[Foundry](https://getfoundry.sh) at the version pinned in
+[`tools/versions.env`](tools/versions.env) (`make foundry` installs it);
+`make doctor` checks all of it. A dev container with everything preinstalled
+lives in [`.devcontainer/`](.devcontainer/devcontainer.json).
+[CONTRIBUTING.md](CONTRIBUTING.md) covers the rest: the git hooks, every test
+layer, CI, gas snapshots and vectors, pinned tool versions, and the rule that
+`src/` is deployed and never changes without a redeploy.
+
+The core contract suites, plus the differential bridge to the frontend
+(CONTRIBUTING.md lists every layer, including gas benchmarks, deployment
+integrity, symbolic, mutation and end-to-end tests):
 
 - [`test/GestureSeriesMarket.t.sol`](test/GestureSeriesMarket.t.sol) — unit
   tests for every function: lazy initialization, tie semantics, early
@@ -213,8 +225,11 @@ frontend:
   `frontend/src/test/fixtures/contract-vectors.json`; the frontend's math
   library must match **bit-for-bit** (CI regenerates and fails on drift).
 
-Fuzzing intensity is configured per profile in [`foundry.toml`](foundry.toml);
-crank the `heavy` numbers up arbitrarily for overnight runs.
+Fuzzing intensity is configured per profile in [`foundry.toml`](foundry.toml):
+`make test-heavy` runs the `heavy` campaign (50k fuzz runs, 512x256 invariant
+campaigns); crank its numbers up arbitrarily for overnight runs. Fork tests
+validate against the live game:
+`ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc make test-fork`.
 
 ## Deployment
 
