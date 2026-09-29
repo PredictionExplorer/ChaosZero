@@ -1,0 +1,15 @@
+{
+  "recommendations": [
+    "NomicFoundation.hardhat-solidity",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "EditorConfig.EditorConfig",
+    "bradlc.vscode-tailwindcss",
+    "vitest.explorer",
+    "ms-playwright.playwright",
+    "tamasfe.even-better-toml",
+    "redhat.vscode-yaml",
+    "github.vscode-github-actions"
+  ],
+  "unwantedRecommendations": ["juanblanco.solidity"]
+}

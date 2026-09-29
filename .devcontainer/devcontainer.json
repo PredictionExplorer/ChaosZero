@@ -1,0 +1,49 @@
+// A ready-to-work ChaosZero environment (VS Code Dev Containers, GitHub
+// Codespaces): Node 22 with pnpm through corepack, the pinned Foundry and solc,
+// the optional scanners, frontend dependencies and git hooks. Everything is
+// pinned in tools/versions.env, .nvmrc and frontend/package.json, and
+// post-create.sh installs it with the same script contributors run locally.
+{
+  "name": "ChaosZero",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:5.2.1-22-trixie@sha256:7168390386e56b74bf966aaf076f13b67e5b7290133489d18e0d0a818633dab7",
+  "features": {
+    // The image's Python plus uv, which tools/setup.sh extras uses to install
+    // the pinned Python scanners (slither, halmos, zizmor, typos).
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "os-provided",
+      "installTools": true,
+      "toolsToInstall": "uv"
+    }
+  },
+  "containerEnv": {
+    // Set to "false" to skip slither, halmos and the other optional scanners.
+    "CHAOSZERO_INSTALL_EXTRAS": "true",
+    "COREPACK_ENABLE_DOWNLOAD_PROMPT": "0"
+  },
+  "remoteEnv": {
+    "PATH": "/home/node/.foundry/bin:/home/node/.local/bin:${containerEnv:PATH}"
+  },
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "forwardPorts": [3000, 8545],
+  "portsAttributes": {
+    "3000": { "label": "frontend (pnpm dev)", "onAutoForward": "notify" },
+    "8545": { "label": "anvil", "onAutoForward": "silent" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "NomicFoundation.hardhat-solidity",
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "EditorConfig.EditorConfig",
+        "bradlc.vscode-tailwindcss",
+        "vitest.explorer",
+        "ms-playwright.playwright",
+        "tamasfe.even-better-toml",
+        "redhat.vscode-yaml",
+        "github.vscode-github-actions"
+      ]
+    }
+  },
+  "remoteUser": "node"
+}

@@ -155,7 +155,10 @@ describe("Tooltip — portal and stacking", () => {
 });
 
 describe("Tooltip — live geometry", () => {
-  function stubTriggerRect(el: Element, rect: { top: number; bottom: number; left: number; right: number }) {
+  function stubTriggerRect(
+    el: Element,
+    rect: { top: number; bottom: number; left: number; right: number },
+  ) {
     vi.spyOn(el, "getBoundingClientRect").mockReturnValue({
       ...rect,
       width: rect.right - rect.left,
@@ -252,8 +255,20 @@ describe("computeBubblePosition", () => {
 
   it("aligns to the trigger's start and end edges", () => {
     const t = trigger({ top: 400, bottom: 420, left: 450, right: 550 });
-    const start = computeBubblePosition({ trigger: t, side: "top", align: "start", ...BUBBLE, ...VIEWPORT });
-    const end = computeBubblePosition({ trigger: t, side: "top", align: "end", ...BUBBLE, ...VIEWPORT });
+    const start = computeBubblePosition({
+      trigger: t,
+      side: "top",
+      align: "start",
+      ...BUBBLE,
+      ...VIEWPORT,
+    });
+    const end = computeBubblePosition({
+      trigger: t,
+      side: "top",
+      align: "end",
+      ...BUBBLE,
+      ...VIEWPORT,
+    });
     expect(start.left).toBe(450);
     expect(end.left).toBe(550 - 200);
   });
@@ -300,8 +315,20 @@ describe("computeBubblePosition", () => {
 
   it("keeps the preferred side when both sides fit", () => {
     const t = trigger({ top: 400, bottom: 420, left: 450, right: 550 });
-    const top = computeBubblePosition({ trigger: t, side: "top", align: "center", ...BUBBLE, ...VIEWPORT });
-    const bottom = computeBubblePosition({ trigger: t, side: "bottom", align: "center", ...BUBBLE, ...VIEWPORT });
+    const top = computeBubblePosition({
+      trigger: t,
+      side: "top",
+      align: "center",
+      ...BUBBLE,
+      ...VIEWPORT,
+    });
+    const bottom = computeBubblePosition({
+      trigger: t,
+      side: "bottom",
+      align: "center",
+      ...BUBBLE,
+      ...VIEWPORT,
+    });
     expect(top.top).toBe(400 - 6 - 40);
     expect(bottom.top).toBe(420 + 6);
   });
@@ -309,8 +336,20 @@ describe("computeBubblePosition", () => {
   it("falls back to the preferred side when neither side fits", () => {
     const tiny = { viewportWidth: 1000, viewportHeight: 50 } as const;
     const t = trigger({ top: 20, bottom: 30, left: 450, right: 550 });
-    const top = computeBubblePosition({ trigger: t, side: "top", align: "center", ...BUBBLE, ...tiny });
-    const bottom = computeBubblePosition({ trigger: t, side: "bottom", align: "center", ...BUBBLE, ...tiny });
+    const top = computeBubblePosition({
+      trigger: t,
+      side: "top",
+      align: "center",
+      ...BUBBLE,
+      ...tiny,
+    });
+    const bottom = computeBubblePosition({
+      trigger: t,
+      side: "bottom",
+      align: "center",
+      ...BUBBLE,
+      ...tiny,
+    });
     expect(top.top).toBe(20 - 6 - 40);
     expect(bottom.top).toBe(30 + 6);
   });
@@ -333,7 +372,13 @@ describe("computeBubblePosition", () => {
         (t, bubbleWidth, bubbleHeight, side, align) => {
           const viewportWidth = 1024;
           const viewportHeight = 768;
-          const rect = { top: t.top, bottom: t.top + t.height, left: t.left, right: t.left + t.width, width: t.width };
+          const rect = {
+            top: t.top,
+            bottom: t.top + t.height,
+            left: t.left,
+            right: t.left + t.width,
+            width: t.width,
+          };
           const pos = computeBubblePosition({
             trigger: rect,
             bubbleWidth,

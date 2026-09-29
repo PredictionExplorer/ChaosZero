@@ -1,0 +1,82 @@
+[
+  {
+    "id": "137ad8e9ad2c2bef054bf1f152e14ec35f6c25a07b2ebde1b2c9fd506554a932",
+    "check": "pragma",
+    "impact": "Informational",
+    "confidence": "High",
+    "location": "src/GestureSeriesMarket.sol#L2",
+    "verdict": "false-positive",
+    "rationale": "The contract pins `0.8.35` for a reproducible, verified deployment; the interface uses `^0.8.35` so integrators can import it with newer compilers. Both resolve to the pinned solc 0.8.35 here, and changing either file would change the deployed metadata hash.",
+    "description": "2 different versions of Solidity are used:\n\t- Version constraint 0.8.35 is used by:\n\t\t-0.8.35 (src/GestureSeriesMarket.sol#2)\n\t- Version constraint ^0.8.35 is used by:\n\t\t-^0.8.35 (src/ICosmicSignatureGame.sol#2)\n"
+  },
+  {
+    "id": "569547008cf8455d4de1ddd685ca9976c7732ea6c9c96a9d6794c6bf42be2f6b",
+    "check": "reentrancy-no-eth",
+    "impact": "Medium",
+    "confidence": "Medium",
+    "location": "src/GestureSeriesMarket.sol#L230-L263",
+    "verdict": "false-positive",
+    "rationale": "The flagged call is `cst.transferFrom` pulling the caller's own CST before crediting them (pull-then-credit, the safe order). State written after it cannot be abused because every state-mutating entry point shares one contract-wide `nonReentrant` lock, so a token callback cannot re-enter anything that writes `_rounds`; this holds even for a hostile token (in production the token is the immutable CST address read from the game at construction). The cross-function list contains only `view` functions, and before the pull the only writes are the idempotent round initialization and threshold lock, so a read-only reentrant observer sees a consistent pre-deposit snapshot. The lock is exercised by the ReenteringCst attack tests in GestureSeriesMarketHardening.t.sol.",
+    "description": "Reentrancy in GestureSeriesMarket.addLiquidity(uint256,uint256,uint16,uint256,uint256,uint256) (src/GestureSeriesMarket.sol#230-263):\n\tExternal calls:\n\t- _pullCst(msg.sender,cstIn) (src/GestureSeriesMarket.sol#254)\n\t\t- ! cst.transferFrom(from,address(this),amount) (src/GestureSeriesMarket.sol#744)\n\tState variables written after the call(s):\n\t- sharesOut = _openPool(rm,p,roundId,cstIn,declaredFeeBps,initialYesProbBps) (src/GestureSeriesMarket.sol#258)\n\t\t- rm.yesBalance[msg.sender] += cstIn - rY (src/GestureSeriesMarket.sol#604)\n\t\t- rm.noBalance[msg.sender] += cstIn - rN (src/GestureSeriesMarket.sol#605)\n\tGestureSeriesMarket._rounds (src/GestureSeriesMarket.sol#151) can be used in cross function reentrancies:\n\t- GestureSeriesMarket.balancesOf(uint256,address) (src/GestureSeriesMarket.sol#510-513)\n\t- GestureSeriesMarket.currentFeeBps(uint256) (src/GestureSeriesMarket.sol#505-507)\n\t- GestureSeriesMarket.lpPositionOf(uint256,address) (src/GestureSeriesMarket.sol#517-524)\n\t- GestureSeriesMarket.pool(uint256) (src/GestureSeriesMarket.sol#486-501)\n\t- GestureSeriesMarket.quoteBetNo(uint256,uint256) (src/GestureSeriesMarket.sol#533-535)\n\t- GestureSeriesMarket.quoteBetYes(uint256,uint256) (src/GestureSeriesMarket.sol#528-530)\n\t- GestureSeriesMarket.roundState(uint256) (src/GestureSeriesMarket.sol#459-483)\n"
+  },
+  {
+    "id": "a192f1a62907a73e5fde5311d12d7885012e251559a3a72eb827794027cd1b06",
+    "check": "reentrancy-no-eth",
+    "impact": "Medium",
+    "confidence": "Medium",
+    "location": "src/GestureSeriesMarket.sol#L230-L263",
+    "verdict": "false-positive",
+    "rationale": "The flagged call is `cst.transferFrom` pulling the caller's own CST before crediting them (pull-then-credit, the safe order). State written after it cannot be abused because every state-mutating entry point shares one contract-wide `nonReentrant` lock, so a token callback cannot re-enter anything that writes `_rounds`; this holds even for a hostile token (in production the token is the immutable CST address read from the game at construction). The cross-function list contains only `view` functions, and before the pull the only writes are the idempotent round initialization and threshold lock, so a read-only reentrant observer sees a consistent pre-deposit snapshot. The lock is exercised by the ReenteringCst attack tests in GestureSeriesMarketHardening.t.sol. On this path (`_joinPool`) the second external call, the pending-fee payout, is the function's last action, after every write.",
+    "description": "Reentrancy in GestureSeriesMarket.addLiquidity(uint256,uint256,uint16,uint256,uint256,uint256) (src/GestureSeriesMarket.sol#230-263):\n\tExternal calls:\n\t- _pullCst(msg.sender,cstIn) (src/GestureSeriesMarket.sol#254)\n\t\t- ! cst.transferFrom(from,address(this),amount) (src/GestureSeriesMarket.sol#744)\n\t- sharesOut = _joinPool(rm,p,roundId,cstIn,declaredFeeBps) (src/GestureSeriesMarket.sol#260)\n\t\t- ! cst.transfer(to,amount) (src/GestureSeriesMarket.sol#748)\n\tState variables written after the call(s):\n\t- sharesOut = _joinPool(rm,p,roundId,cstIn,declaredFeeBps) (src/GestureSeriesMarket.sol#260)\n\t\t- rm.yesBalance[msg.sender] += cstIn - dY (src/GestureSeriesMarket.sol#643)\n\t\t- rm.noBalance[msg.sender] += cstIn - dN (src/GestureSeriesMarket.sol#644)\n\tGestureSeriesMarket._rounds (src/GestureSeriesMarket.sol#151) can be used in cross function reentrancies:\n\t- GestureSeriesMarket.balancesOf(uint256,address) (src/GestureSeriesMarket.sol#510-513)\n\t- GestureSeriesMarket.currentFeeBps(uint256) (src/GestureSeriesMarket.sol#505-507)\n\t- GestureSeriesMarket.lpPositionOf(uint256,address) (src/GestureSeriesMarket.sol#517-524)\n\t- GestureSeriesMarket.pool(uint256) (src/GestureSeriesMarket.sol#486-501)\n\t- GestureSeriesMarket.quoteBetNo(uint256,uint256) (src/GestureSeriesMarket.sol#533-535)\n\t- GestureSeriesMarket.quoteBetYes(uint256,uint256) (src/GestureSeriesMarket.sol#528-530)\n\t- GestureSeriesMarket.roundState(uint256) (src/GestureSeriesMarket.sol#459-483)\n"
+  },
+  {
+    "id": "e7b7780754093a4a3099f1e416205f57618e7eba3b42214b4209d7aff1302216",
+    "check": "reentrancy-no-eth",
+    "impact": "Medium",
+    "confidence": "Medium",
+    "location": "src/GestureSeriesMarket.sol#L336-L346",
+    "verdict": "false-positive",
+    "rationale": "The flagged call is `cst.transferFrom` pulling the caller's own CST before crediting them (pull-then-credit, the safe order). State written after it cannot be abused because every state-mutating entry point shares one contract-wide `nonReentrant` lock, so a token callback cannot re-enter anything that writes `_rounds`; this holds even for a hostile token (in production the token is the immutable CST address read from the game at construction). The cross-function list contains only `view` functions, and before the pull the only writes are the idempotent round initialization and threshold lock, so a read-only reentrant observer sees a consistent pre-deposit snapshot. The lock is exercised by the ReenteringCst attack tests in GestureSeriesMarketHardening.t.sol.",
+    "description": "Reentrancy in GestureSeriesMarket.mintSets(uint256,uint256) (src/GestureSeriesMarket.sol#336-346):\n\tExternal calls:\n\t- _pullCst(msg.sender,amount) (src/GestureSeriesMarket.sol#342)\n\t\t- ! cst.transferFrom(from,address(this),amount) (src/GestureSeriesMarket.sol#744)\n\tState variables written after the call(s):\n\t- rm.yesBalance[msg.sender] += amount (src/GestureSeriesMarket.sol#343)\n\tGestureSeriesMarket._rounds (src/GestureSeriesMarket.sol#151) can be used in cross function reentrancies:\n\t- GestureSeriesMarket.balancesOf(uint256,address) (src/GestureSeriesMarket.sol#510-513)\n\t- GestureSeriesMarket.currentFeeBps(uint256) (src/GestureSeriesMarket.sol#505-507)\n\t- GestureSeriesMarket.lpPositionOf(uint256,address) (src/GestureSeriesMarket.sol#517-524)\n\t- GestureSeriesMarket.pool(uint256) (src/GestureSeriesMarket.sol#486-501)\n\t- GestureSeriesMarket.quoteBetNo(uint256,uint256) (src/GestureSeriesMarket.sol#533-535)\n\t- GestureSeriesMarket.quoteBetYes(uint256,uint256) (src/GestureSeriesMarket.sol#528-530)\n\t- GestureSeriesMarket.roundState(uint256) (src/GestureSeriesMarket.sol#459-483)\n\t- rm.noBalance[msg.sender] += amount (src/GestureSeriesMarket.sol#344)\n\tGestureSeriesMarket._rounds (src/GestureSeriesMarket.sol#151) can be used in cross function reentrancies:\n\t- GestureSeriesMarket.balancesOf(uint256,address) (src/GestureSeriesMarket.sol#510-513)\n\t- GestureSeriesMarket.currentFeeBps(uint256) (src/GestureSeriesMarket.sol#505-507)\n\t- GestureSeriesMarket.lpPositionOf(uint256,address) (src/GestureSeriesMarket.sol#517-524)\n\t- GestureSeriesMarket.pool(uint256) (src/GestureSeriesMarket.sol#486-501)\n\t- GestureSeriesMarket.quoteBetNo(uint256,uint256) (src/GestureSeriesMarket.sol#533-535)\n\t- GestureSeriesMarket.quoteBetYes(uint256,uint256) (src/GestureSeriesMarket.sol#528-530)\n\t- GestureSeriesMarket.roundState(uint256) (src/GestureSeriesMarket.sol#459-483)\n"
+  },
+  {
+    "id": "02cd8f2d005727315a6d3bc3231eb12fb8b3a939cc0aa760fabedc56c94fb544",
+    "check": "uninitialized-local",
+    "impact": "Medium",
+    "confidence": "Medium",
+    "location": "src/GestureSeriesMarket.sol#L418",
+    "verdict": "false-positive",
+    "rationale": "`yesWon_` is assigned on both non-reverting branches of `resolve` (round over: count > threshold; live round: true) and the only other branch reverts with `NotResolvable()`, so it is never read unassigned. The detector does not treat the custom-error `revert` as ending that path.",
+    "description": "GestureSeriesMarket.resolve(uint256).yesWon_ (src/GestureSeriesMarket.sol#418) is a local variable never initialized\n"
+  },
+  {
+    "id": "ab194ac345dcec25676358d79bb6cf2a8c656f233ab2af0e0c920c310746b3f1",
+    "check": "divide-before-multiply",
+    "impact": "Medium",
+    "confidence": "Medium",
+    "location": "src/GestureSeriesMarket.sol#L661-L689",
+    "verdict": "false-positive",
+    "rationale": "Intentional two-step rounding. `fee` is the integer CST amount actually retained in `feeReserve`, so `accFeePerShare` must distribute exactly that floored amount. Fusing the expressions (cstIn * feeBps * ONE / (BPS * totalShares)) would credit LPs with fees the pool never retained and break `sum(pendingFees) <= feeReserve`. Both floors favor the contract; the per-bet dust stays in feeReserve. Pinned by invariant_shareAndFeeAccountingCoherent and invariant_exactCollateralization.",
+    "description": "GestureSeriesMarket._bet(GestureSeriesMarket.RoundMarket,uint256,bool,uint256,uint256) (src/GestureSeriesMarket.sol#661-689) performs a multiplication on the result of a division:\n\t- fee = cstIn * _poolFeeBps(p) / BPS (src/GestureSeriesMarket.sol#670)\n\t- p.accFeePerShare += fee * ONE / p.totalShares (src/GestureSeriesMarket.sol#673)\n"
+  },
+  {
+    "id": "2b0868e029bef692e824372d2b220d669c70c9b38e7b16e3430ce89481238049",
+    "check": "timestamp",
+    "impact": "Low",
+    "confidence": "Medium",
+    "location": "src/GestureSeriesMarket.sol#L734-L737",
+    "verdict": "accepted",
+    "rationale": "Intended use: the user-signed `deadline` guard (Uniswap pattern). Sequencer timestamp drift can only move the expiry edge of a transaction by the drift the chain allows; no value depends on the timestamp and every trade is also bounded by explicit slippage minimums, which are the economic protection.",
+    "description": "GestureSeriesMarket._checkDeadline(uint256) (src/GestureSeriesMarket.sol#734-737) uses timestamp for comparisons\n\tDangerous comparisons:\n\t- block.timestamp > deadline (src/GestureSeriesMarket.sol#736)\n"
+  },
+  {
+    "id": "a19b41528013ecac3d485c7fcd1c1472c3b8fabec9326695b557fe1769f4f20d",
+    "check": "shadowing-local",
+    "impact": "Low",
+    "confidence": "High",
+    "location": "src/ICosmicSignatureGame.sol#L16",
+    "verdict": "false-positive",
+    "rationale": "Parameter name in a body-less interface declaration: `bidderAddresses(uint256 roundNum)` mirrors the upstream CosmicSignatureGame getter and has no scope in which the shadowed `roundNum()` could be referenced. Renaming it would change the deployed metadata hash.",
+    "description": "ICosmicSignatureGame.bidderAddresses(uint256).roundNum (src/ICosmicSignatureGame.sol#16) shadows:\n\t- ICosmicSignatureGame.roundNum() (src/ICosmicSignatureGame.sol#10) (function)\n"
+  }
+]

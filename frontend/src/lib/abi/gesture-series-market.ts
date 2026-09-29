@@ -4,927 +4,927 @@
  */
 export const gestureSeriesMarketAbi = [
   {
-    "type": "constructor",
-    "inputs": [
+    type: "constructor",
+    inputs: [
       {
-        "name": "game_",
-        "type": "address",
-        "internalType": "contract ICosmicSignatureGame"
-      }
+        name: "game_",
+        type: "address",
+        internalType: "contract ICosmicSignatureGame",
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "addLiquidity",
-    "inputs": [
+    type: "function",
+    name: "addLiquidity",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "cstIn",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "cstIn",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "declaredFeeBps",
-        "type": "uint16",
-        "internalType": "uint16"
+        name: "declaredFeeBps",
+        type: "uint16",
+        internalType: "uint16",
       },
       {
-        "name": "initialYesProbBps",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "initialYesProbBps",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "minSharesOut",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "minSharesOut",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "deadline",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "deadline",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "sharesOut",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "sharesOut",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "balancesOf",
-    "inputs": [
+    type: "function",
+    name: "balancesOf",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: "user",
+        type: "address",
+        internalType: "address",
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "yes",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "yes",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "no",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "no",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "betNo",
-    "inputs": [
+    type: "function",
+    name: "betNo",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "cstIn",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "cstIn",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "minTokensOut",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "minTokensOut",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "deadline",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "deadline",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "tokensOut",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "tokensOut",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "betYes",
-    "inputs": [
+    type: "function",
+    name: "betYes",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "cstIn",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "cstIn",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "minTokensOut",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "minTokensOut",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "deadline",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "deadline",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "tokensOut",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "tokensOut",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "claim",
-    "inputs": [
+    type: "function",
+    name: "claim",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "cstOut",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "cstOut",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "claimFees",
-    "inputs": [
+    type: "function",
+    name: "claimFees",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "feesOut",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "feesOut",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "cst",
-    "inputs": [],
-    "outputs": [
+    type: "function",
+    name: "cst",
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IERC20"
-      }
+        name: "",
+        type: "address",
+        internalType: "contract IERC20",
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "currentFeeBps",
-    "inputs": [
+    type: "function",
+    name: "currentFeeBps",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "game",
-    "inputs": [],
-    "outputs": [
+    type: "function",
+    name: "game",
+    inputs: [],
+    outputs: [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "contract ICosmicSignatureGame"
-      }
+        name: "",
+        type: "address",
+        internalType: "contract ICosmicSignatureGame",
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "lpPositionOf",
-    "inputs": [
+    type: "function",
+    name: "lpPositionOf",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "user",
-        "type": "address",
-        "internalType": "address"
-      }
+        name: "user",
+        type: "address",
+        internalType: "address",
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "shares",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "shares",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "pendingFees",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "pendingFees",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "declaredFeeBps",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
+        name: "declaredFeeBps",
+        type: "uint16",
+        internalType: "uint16",
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "mintSets",
-    "inputs": [
+    type: "function",
+    name: "mintSets",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "pool",
-    "inputs": [
+    type: "function",
+    name: "pool",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "reserveYes",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "reserveYes",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "reserveNo",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "reserveNo",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "totalShares",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "totalShares",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "accFeePerShare",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "accFeePerShare",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "feeReserve",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "feeReserve",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "feeWeight",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "feeWeight",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "feeBps",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "feeBps",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "quoteBetNo",
-    "inputs": [
+    type: "function",
+    name: "quoteBetNo",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "cstIn",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "cstIn",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "quoteBetYes",
-    "inputs": [
+    type: "function",
+    name: "quoteBetYes",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "cstIn",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "cstIn",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "redeemSets",
-    "inputs": [
+    type: "function",
+    name: "redeemSets",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "amount",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "removeLiquidity",
-    "inputs": [
+    type: "function",
+    name: "removeLiquidity",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "shares",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "shares",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "minYesOut",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "minYesOut",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "minNoOut",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "minNoOut",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "deadline",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "deadline",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "yesOut",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "yesOut",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "noOut",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "noOut",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "feesOut",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "feesOut",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "stateMutability": "nonpayable"
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "resolve",
-    "inputs": [
+    type: "function",
+    name: "resolve",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "function",
-    "name": "roundState",
-    "inputs": [
+    type: "function",
+    name: "roundState",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
+      },
     ],
-    "outputs": [
+    outputs: [
       {
-        "name": "initialized",
-        "type": "bool",
-        "internalType": "bool"
+        name: "initialized",
+        type: "bool",
+        internalType: "bool",
       },
       {
-        "name": "thresholdKnown",
-        "type": "bool",
-        "internalType": "bool"
+        name: "thresholdKnown",
+        type: "bool",
+        internalType: "bool",
       },
       {
-        "name": "resolved",
-        "type": "bool",
-        "internalType": "bool"
+        name: "resolved",
+        type: "bool",
+        internalType: "bool",
       },
       {
-        "name": "yesWon",
-        "type": "bool",
-        "internalType": "bool"
+        name: "yesWon",
+        type: "bool",
+        internalType: "bool",
       },
       {
-        "name": "threshold",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "threshold",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "currentCount",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "currentCount",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "roundActive",
-        "type": "bool",
-        "internalType": "bool"
+        name: "roundActive",
+        type: "bool",
+        internalType: "bool",
       },
       {
-        "name": "outcomeDecided",
-        "type": "bool",
-        "internalType": "bool"
-      }
+        name: "outcomeDecided",
+        type: "bool",
+        internalType: "bool",
+      },
     ],
-    "stateMutability": "view"
+    stateMutability: "view",
   },
   {
-    "type": "function",
-    "name": "updateFeeDeclaration",
-    "inputs": [
+    type: "function",
+    name: "updateFeeDeclaration",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        internalType: "uint256",
       },
       {
-        "name": "newFeeBps",
-        "type": "uint16",
-        "internalType": "uint16"
-      }
+        name: "newFeeBps",
+        type: "uint16",
+        internalType: "uint16",
+      },
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    outputs: [],
+    stateMutability: "nonpayable",
   },
   {
-    "type": "event",
-    "name": "Bet",
-    "inputs": [
+    type: "event",
+    name: "Bet",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
       },
       {
-        "name": "user",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "user",
+        type: "address",
+        indexed: true,
+        internalType: "address",
       },
       {
-        "name": "yes",
-        "type": "bool",
-        "indexed": false,
-        "internalType": "bool"
+        name: "yes",
+        type: "bool",
+        indexed: false,
+        internalType: "bool",
       },
       {
-        "name": "cstIn",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: "cstIn",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
       },
       {
-        "name": "netIn",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: "netIn",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
       },
       {
-        "name": "tokensOut",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: "tokensOut",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "Claimed",
-    "inputs": [
+    type: "event",
+    name: "Claimed",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
       },
       {
-        "name": "user",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "user",
+        type: "address",
+        indexed: true,
+        internalType: "address",
       },
       {
-        "name": "cstOut",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: "cstOut",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "FeeDeclarationUpdated",
-    "inputs": [
+    type: "event",
+    name: "FeeDeclarationUpdated",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
       },
       {
-        "name": "provider",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "provider",
+        type: "address",
+        indexed: true,
+        internalType: "address",
       },
       {
-        "name": "oldFeeBps",
-        "type": "uint16",
-        "indexed": false,
-        "internalType": "uint16"
+        name: "oldFeeBps",
+        type: "uint16",
+        indexed: false,
+        internalType: "uint16",
       },
       {
-        "name": "newFeeBps",
-        "type": "uint16",
-        "indexed": false,
-        "internalType": "uint16"
-      }
+        name: "newFeeBps",
+        type: "uint16",
+        indexed: false,
+        internalType: "uint16",
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "FeesClaimed",
-    "inputs": [
+    type: "event",
+    name: "FeesClaimed",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
       },
       {
-        "name": "user",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "user",
+        type: "address",
+        indexed: true,
+        internalType: "address",
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: "amount",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "LiquidityAdded",
-    "inputs": [
+    type: "event",
+    name: "LiquidityAdded",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
       },
       {
-        "name": "provider",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "provider",
+        type: "address",
+        indexed: true,
+        internalType: "address",
       },
       {
-        "name": "cstIn",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: "cstIn",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
       },
       {
-        "name": "declaredFeeBps",
-        "type": "uint16",
-        "indexed": false,
-        "internalType": "uint16"
+        name: "declaredFeeBps",
+        type: "uint16",
+        indexed: false,
+        internalType: "uint16",
       },
       {
-        "name": "sharesOut",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: "sharesOut",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
       },
       {
-        "name": "yesToPool",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: "yesToPool",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
       },
       {
-        "name": "noToPool",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: "noToPool",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "LiquidityRemoved",
-    "inputs": [
+    type: "event",
+    name: "LiquidityRemoved",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
       },
       {
-        "name": "provider",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "provider",
+        type: "address",
+        indexed: true,
+        internalType: "address",
       },
       {
-        "name": "sharesIn",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: "sharesIn",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
       },
       {
-        "name": "yesOut",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: "yesOut",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
       },
       {
-        "name": "noOut",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: "noOut",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
       },
       {
-        "name": "feesOut",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: "feesOut",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "Resolved",
-    "inputs": [
+    type: "event",
+    name: "Resolved",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
       },
       {
-        "name": "finalCount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
+        name: "finalCount",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
       },
       {
-        "name": "yesWon",
-        "type": "bool",
-        "indexed": false,
-        "internalType": "bool"
-      }
+        name: "yesWon",
+        type: "bool",
+        indexed: false,
+        internalType: "bool",
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "RoundInitialized",
-    "inputs": [
+    type: "event",
+    name: "RoundInitialized",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      }
+        name: "roundId",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "ThresholdLocked",
-    "inputs": [
+    type: "event",
+    name: "ThresholdLocked",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
       },
       {
-        "name": "threshold",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: "threshold",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "SetsMinted",
-    "inputs": [
+    type: "event",
+    name: "SetsMinted",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
       },
       {
-        "name": "user",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "user",
+        type: "address",
+        indexed: true,
+        internalType: "address",
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: "amount",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "event",
-    "name": "SetsRedeemed",
-    "inputs": [
+    type: "event",
+    name: "SetsRedeemed",
+    inputs: [
       {
-        "name": "roundId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        name: "roundId",
+        type: "uint256",
+        indexed: true,
+        internalType: "uint256",
       },
       {
-        "name": "user",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
+        name: "user",
+        type: "address",
+        indexed: true,
+        internalType: "address",
       },
       {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
+        name: "amount",
+        type: "uint256",
+        indexed: false,
+        internalType: "uint256",
+      },
     ],
-    "anonymous": false
+    anonymous: false,
   },
   {
-    "type": "error",
-    "name": "AlreadyResolved",
-    "inputs": []
+    type: "error",
+    name: "AlreadyResolved",
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "DeadlineExpired",
-    "inputs": []
+    type: "error",
+    name: "DeadlineExpired",
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "InsufficientLiquidity",
-    "inputs": []
+    type: "error",
+    name: "InsufficientLiquidity",
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "InsufficientShares",
-    "inputs": []
+    type: "error",
+    name: "InsufficientShares",
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "InvalidParams",
-    "inputs": []
+    type: "error",
+    name: "InvalidParams",
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "NotResolvable",
-    "inputs": []
+    type: "error",
+    name: "NotResolvable",
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "NotResolved",
-    "inputs": []
+    type: "error",
+    name: "NotResolved",
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "OutcomeDecided",
-    "inputs": []
+    type: "error",
+    name: "OutcomeDecided",
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "ReentrantCall",
-    "inputs": []
+    type: "error",
+    name: "ReentrantCall",
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "RoundNotActive",
-    "inputs": []
+    type: "error",
+    name: "RoundNotActive",
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "RoundNotInitialized",
-    "inputs": []
+    type: "error",
+    name: "RoundNotInitialized",
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "Slippage",
-    "inputs": []
+    type: "error",
+    name: "Slippage",
+    inputs: [],
   },
   {
-    "type": "error",
-    "name": "TransferFailed",
-    "inputs": []
-  }
+    type: "error",
+    name: "TransferFailed",
+    inputs: [],
+  },
 ] as const;

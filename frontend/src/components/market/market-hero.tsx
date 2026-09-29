@@ -76,10 +76,15 @@ function ThresholdCopy({ snapshot }: { snapshot: RoundSnapshot }) {
   const prevRound = snapshot.roundId - 1n;
   if (snapshot.roundId === snapshot.gameRoundNum + 1n) {
     return (
-      <p className="flex items-center gap-1 text-xs text-ink-faint" data-testid="hero-threshold-forming">
+      <p
+        className="flex items-center gap-1 text-xs text-ink-faint"
+        data-testid="hero-threshold-forming"
+      >
         Threshold forming:{" "}
-        <span className="font-mono font-semibold text-ended">{formatCount(snapshot.prevRoundCount)}</span> gestures in
-        round {prevRound.toString()} so far, still climbing
+        <span className="font-mono font-semibold text-ended">
+          {formatCount(snapshot.prevRoundCount)}
+        </span>{" "}
+        gestures in round {prevRound.toString()} so far, still climbing
         <InfoTip
           label="About the forming threshold"
           align="end"
@@ -89,7 +94,10 @@ function ThresholdCopy({ snapshot }: { snapshot: RoundSnapshot }) {
     );
   }
   return (
-    <p className="flex items-center gap-1 text-xs text-ink-faint" data-testid="hero-threshold-unknown">
+    <p
+      className="flex items-center gap-1 text-xs text-ink-faint"
+      data-testid="hero-threshold-unknown"
+    >
       Threshold locks when round {prevRound.toString()} ends
       <InfoTip
         label="About the unknown threshold"
@@ -111,7 +119,12 @@ export function MarketHero({ snapshot, history }: MarketHeroProps) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Tooltip content={badge.tip} side="bottom" align="start">
-            <Badge tone={badge.tone} pulse={badge.pulse} className="cursor-help" data-testid="phase-badge">
+            <Badge
+              tone={badge.tone}
+              pulse={badge.pulse}
+              className="cursor-help"
+              data-testid="phase-badge"
+            >
               {badge.label}
             </Badge>
           </Tooltip>
@@ -141,10 +154,15 @@ export function MarketHero({ snapshot, history }: MarketHeroProps) {
               —
             </span>
           ) : (
-            <span className={phase === "resolved" ? "text-ended" : "text-glow-signal text-ink"} data-testid="hero-probability">
+            <span
+              className={phase === "resolved" ? "text-ended" : "text-glow-signal text-ink"}
+              data-testid="hero-probability"
+            >
               <AnimatedNumber
                 value={probability * 100}
-                format={(v) => `${v.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`}
+                format={(v) =>
+                  `${v.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
+                }
               />
             </span>
           )}

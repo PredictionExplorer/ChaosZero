@@ -8,5 +8,10 @@ import { serializeJsonLd } from "@/lib/structured-data";
  */
 export function JsonLd({ data }: { data: JsonLdData }) {
   // dangerouslySetInnerHTML is safe here: serializeJsonLd escapes every "<".
-  return <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(data) }} />;
+  return (
+    <script
+      type="application/ld+json"
+      dangerouslySetInnerHTML={{ __html: serializeJsonLd(data) }}
+    />
+  );
 }

@@ -31,7 +31,12 @@ export interface LiquidityPanelProps {
   pendingAction: "approve" | "addLiquidity" | "removeLiquidity" | "updateFee" | "claimFees" | null;
   onConnect: () => void;
   onApprove: (amount: bigint) => Promise<boolean>;
-  onAdd: (cstIn: bigint, declaredFeeBps: number, initialYesProbBps: bigint, minSharesOut: bigint) => Promise<boolean>;
+  onAdd: (
+    cstIn: bigint,
+    declaredFeeBps: number,
+    initialYesProbBps: bigint,
+    minSharesOut: bigint,
+  ) => Promise<boolean>;
   onRemove: (shares: bigint, minYesOut: bigint, minNoOut: bigint) => Promise<boolean>;
   onUpdateFee: (newFeeBps: number) => Promise<boolean>;
   onClaimFees: () => Promise<boolean>;
@@ -81,7 +86,8 @@ export function LiquidityPanel({
   const addPreview = useMemo(() => {
     if (amount === null) return null;
     if (!poolOpen) {
-      if (amount < MIN_INITIAL_LIQUIDITY) return { error: "Below the minimum first deposit (0.001 CST)" } as const;
+      if (amount < MIN_INITIAL_LIQUIDITY)
+        return { error: "Below the minimum first deposit (0.001 CST)" } as const;
       const result = openPool(amount, BigInt(probPct * 100), BigInt(feeVoteBps));
       return {
         shares: result.sharesOut,
@@ -168,7 +174,11 @@ export function LiquidityPanel({
           <Droplets className="size-4 text-signal-bright" aria-hidden />
           Provide liquidity
         </h2>
-        <div className="flex rounded-lg border border-line p-0.5 text-xs" role="tablist" aria-label="Liquidity mode">
+        <div
+          className="flex rounded-lg border border-line p-0.5 text-xs"
+          role="tablist"
+          aria-label="Liquidity mode"
+        >
           {(["add", "remove"] as const).map((m) => (
             <button
               key={m}
@@ -196,7 +206,10 @@ export function LiquidityPanel({
             content="Every bet pays this fee to the pool's liquidity providers. It isn't fixed: each LP declares the fee they want, and the pool charges the share-weighted average of all declarations — so it drifts as LPs join, leave, or re-vote."
           />
         </span>
-        <span className="font-mono text-sm font-semibold text-signal-bright" data-testid="lp-pool-fee">
+        <span
+          className="font-mono text-sm font-semibold text-signal-bright"
+          data-testid="lp-pool-fee"
+        >
           {poolOpen ? formatBps(poolFee) : "—"}
         </span>
       </div>
@@ -234,7 +247,10 @@ export function LiquidityPanel({
                 {formatBps(BigInt(lpDeclaredFeeBps))}
               </button>
             </Tooltip>{" "}
-            · <span className="font-mono text-higher" data-testid="lp-pending-fees">{formatCst(lpPendingFees)}</span>{" "}
+            ·{" "}
+            <span className="font-mono text-higher" data-testid="lp-pending-fees">
+              {formatCst(lpPendingFees)}
+            </span>{" "}
             <Tooltip
               content="Trading fees your shares have earned so far, in CST. Claim them anytime — they sit in escrow and don't compound into the pool."
               className="align-baseline"
@@ -260,7 +276,10 @@ export function LiquidityPanel({
 
       {/* Re-vote without moving funds */}
       {showRevote && lpShares > 0n && (
-        <div className="mt-3 rounded-xl border border-signal/30 bg-signal/8 p-3" data-testid="lp-revote">
+        <div
+          className="mt-3 rounded-xl border border-signal/30 bg-signal/8 p-3"
+          data-testid="lp-revote"
+        >
           <div className="flex items-baseline justify-between text-xs">
             <span className="flex items-center gap-1.5 text-ink-dim">
               <Vote className="size-3.5" aria-hidden /> Change your fee vote
@@ -282,7 +301,11 @@ export function LiquidityPanel({
           />
           <div className="mt-2 flex items-center justify-between">
             <p className="text-[11px] text-ink-faint" data-testid="lp-revote-preview">
-              {revotePreview !== null && <>Pool fee: {formatBps(poolFee)} → {formatBps(revotePreview)}</>}
+              {revotePreview !== null && (
+                <>
+                  Pool fee: {formatBps(poolFee)} → {formatBps(revotePreview)}
+                </>
+              )}
             </p>
             <Button
               variant="outline"
@@ -303,8 +326,8 @@ export function LiquidityPanel({
             className="mt-4 rounded-xl border border-dashed border-line p-4 text-center text-xs text-ink-faint"
             data-testid="lp-add-closed"
           >
-            Adding liquidity is closed for this round (it&apos;s decided, ended, or resolved). You can still remove,
-            re-vote, and claim fees at any time.
+            Adding liquidity is closed for this round (it&apos;s decided, ended, or resolved). You
+            can still remove, re-vote, and claim fees at any time.
           </p>
         ) : (
           <>
@@ -340,7 +363,10 @@ export function LiquidityPanel({
             </div>
 
             {/* Your fee vote (applies to your WHOLE position). */}
-            <div className="mt-3 rounded-xl border border-line bg-surface-2/40 p-3" data-testid="lp-fee-vote">
+            <div
+              className="mt-3 rounded-xl border border-line bg-surface-2/40 p-3"
+              data-testid="lp-fee-vote"
+            >
               <div className="flex items-baseline justify-between text-xs">
                 <span className="flex items-center gap-1 text-ink-faint">
                   Your fee vote — what bettors should pay
@@ -365,14 +391,17 @@ export function LiquidityPanel({
                 data-testid="lp-fee-vote-slider"
               />
               <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
-                The pool charges the share-weighted average of all votes; earnings split by shares. Depositing
-                re-votes your whole position at this value.
+                The pool charges the share-weighted average of all votes; earnings split by shares.
+                Depositing re-votes your whole position at this value.
               </p>
             </div>
 
             {/* First LP sets the opening odds. */}
             {!poolOpen && (
-              <div className="mt-3 rounded-xl border border-line bg-surface-2/40 p-3" data-testid="lp-odds">
+              <div
+                className="mt-3 rounded-xl border border-line bg-surface-2/40 p-3"
+                data-testid="lp-odds"
+              >
                 <div className="flex items-baseline justify-between text-xs">
                   <span className="flex items-center gap-1 text-ink-faint">
                     Opening odds — chance of YES
@@ -396,8 +425,8 @@ export function LiquidityPanel({
                   data-testid="lp-odds-slider"
                 />
                 <p className="mt-1.5 text-[11px] leading-relaxed text-ink-faint">
-                  You&apos;re the first LP: pick where the odds open. Misjudged odds are free money for arbitrageurs,
-                  so open near your honest estimate.
+                  You&apos;re the first LP: pick where the odds open. Misjudged odds are free money
+                  for arbitrageurs, so open near your honest estimate.
                 </p>
               </div>
             )}
@@ -432,10 +461,11 @@ export function LiquidityPanel({
                         label='About "Returned to you"'
                         content={
                           <>
-                            Your CST first mints equal YES + NO tokens, but the pool only keeps them at its current
-                            odds ratio. The leftover side comes straight back to your wallet as outcome tokens.
-                            Nothing is lost — hold them as a position, or pair them with the other side later
-                            (1 YES + 1 NO always redeems for 1 CST).
+                            Your CST first mints equal YES + NO tokens, but the pool only keeps them
+                            at its current odds ratio. The leftover side comes straight back to your
+                            wallet as outcome tokens. Nothing is lost — hold them as a position, or
+                            pair them with the other side later (1 YES + 1 NO always redeems for 1
+                            CST).
                           </>
                         }
                       />
@@ -467,7 +497,10 @@ export function LiquidityPanel({
               className="mt-4 w-full"
               size="lg"
               variant="signal"
-              disabled={connected && (amount === null || insufficient || !!parsed.error || addPreview?.error != null)}
+              disabled={
+                connected &&
+                (amount === null || insufficient || !!parsed.error || addPreview?.error != null)
+              }
               loading={pendingAction === "approve" || pendingAction === "addLiquidity"}
               onClick={() => void submitAdd()}
               data-testid="lp-add-submit"
@@ -476,8 +509,8 @@ export function LiquidityPanel({
             </Button>
 
             <p className="mt-3 text-center text-[11px] leading-relaxed text-ink-faint">
-              LP risk: the gesture count is public, so late traders are informed — fees are your compensation. Size
-              accordingly and withdraw when the round stops being uncertain.
+              LP risk: the gesture count is public, so late traders are informed — fees are your
+              compensation. Size accordingly and withdraw when the round stops being uncertain.
             </p>
           </>
         )
@@ -492,7 +525,10 @@ export function LiquidityPanel({
             </p>
           ) : (
             <>
-              <div className="mt-4 rounded-xl border border-line bg-surface-2/40 p-3" data-testid="lp-remove-box">
+              <div
+                className="mt-4 rounded-xl border border-line bg-surface-2/40 p-3"
+                data-testid="lp-remove-box"
+              >
                 <div className="flex items-baseline justify-between text-xs">
                   <span className="text-ink-faint">Remove</span>
                   <span className="font-mono font-semibold text-ink" data-testid="lp-remove-pct">
@@ -547,8 +583,9 @@ export function LiquidityPanel({
                 Remove liquidity
               </Button>
               <p className="mt-3 text-center text-[11px] leading-relaxed text-ink-faint">
-                Withdrawals work at ANY time — even mid-round or after resolution. Paired YES+NO tokens redeem 1:1
-                for CST; the unpaired rest is your market exposure. Removed shares stop voting on the fee.
+                Withdrawals work at ANY time — even mid-round or after resolution. Paired YES+NO
+                tokens redeem 1:1 for CST; the unpaired rest is your market exposure. Removed shares
+                stop voting on the fee.
               </p>
             </>
           )}

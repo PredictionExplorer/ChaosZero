@@ -1,0 +1,95 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/evilmartians/lefthook/v2.1.14/schema.json
+#
+# Git hooks for ChaosZero, managed by lefthook (https://lefthook.dev).
+#
+# Installed by `make setup` (or `make hooks`), and by `pnpm install` in
+# frontend/ through its "prepare" script, which is a no-op on CI and Vercel.
+# lefthook itself is pinned in frontend/package.json.
+#
+# Every job mirrors a CI check, so the hooks only move feedback earlier:
+#   pre-commit  seconds, staged files only: format and re-stage (forge fmt,
+#               prettier), lint (eslint), then check exactly what is being
+#               committed (conflict markers, big files, .env files, secrets,
+#               typos)
+#   pre-push    what CI would catch, scoped to what the pushed commits touch
+#   commit-msg  deliberately absent: commit messages are free-form prose
+#
+# Skip every hook once:   LEFTHOOK=0 git commit ...  (or: git commit --no-verify)
+# Skip some jobs:         LEFTHOOK_EXCLUDE=eslint,typos git commit ...
+# Run a hook by hand:     frontend/node_modules/.bin/lefthook run pre-push --force
+# Personal overrides:     lefthook-local.yml next to this file (gitignored),
+#                         e.g. `pre-push: {skip: true}`
+# CI enforces all of it regardless, so skipping only defers the feedback.
+
+min_version: 2.1.14
+
+# Sourced by every hook before lefthook starts: puts Node, pnpm and Foundry on
+# PATH for GUI git clients that do not load the shell profile.
+rc: tools/hooks/env.sh
+
+# Standard globbing: `*` stops at `/`, `**` spans directories.
+glob_matcher: doublestar
+
+pre-commit:
+  # Fix first, then check the result: the checks read the index after the
+  # formatters have re-staged their fixes, and nothing reads a file while a
+  # formatter is rewriting it.
+  piped: true
+  jobs:
+    - name: fix
+      group:
+        parallel: true
+        jobs:
+          - name: forge-fmt
+            glob: "**/*.sol"
+            run: forge fmt {staged_files}
+            stage_fixed: true
+            fail_text: "forge fmt failed. No forge? Install the pinned Foundry with: make foundry"
+
+          - name: frontend
+            root: frontend/
+            group:
+              piped: true
+              jobs:
+                - name: prettier
+                  glob: "**/*.{cjs,css,js,json,jsx,md,mjs,mts,cts,ts,tsx,yaml,yml}"
+                  run: node_modules/.bin/prettier --write --ignore-unknown --log-level=warn {staged_files}
+                  stage_fixed: true
+                  fail_text: "prettier failed. 'node: not found' means your git client cannot see Node (CONTRIBUTING.md, Git hooks); in a fresh clone or worktree, run make setup first"
+
+                - name: eslint
+                  glob: "**/*.{cjs,js,jsx,mjs,mts,cts,ts,tsx}"
+                  run: node_modules/.bin/eslint --max-warnings=0 --no-warn-ignored {staged_files}
+                  fail_text: "ESLint failed: fix the problems above (warnings count too)"
+
+    - name: check
+      group:
+        parallel: true
+        jobs:
+          - name: staged-files
+            run: tools/hooks/check-staged.sh
+
+          - name: gitleaks
+            run: tools/hooks/optional.sh gitleaks gitleaks git --pre-commit --staged --redact --no-banner --verbose
+
+          - name: typos
+            run: tools/hooks/optional.sh typos typos --force-exclude {staged_files}
+
+pre-push:
+  # Sequential on purpose: forge and vitest each use every core. Each job runs
+  # its checks only when the pushed commits touch its area, as decided by
+  # tools/hooks/pre-push.sh (the contract job also watches the deployment
+  # record and frontend/.env.production, which the deployment integrity test
+  # reads). The pushed files come from that script too, not from lefthook's
+  # own lookup, which needs a local main branch. The checks run on the
+  # working tree, so commit or stash unrelated edits before pushing.
+  jobs:
+    - name: contracts
+      files: tools/hooks/pre-push.sh --changed
+      run: tools/hooks/pre-push.sh contracts {files}
+      fail_text: "Contract checks failed. Skip once with LEFTHOOK_EXCLUDE=contracts git push"
+
+    - name: frontend
+      files: tools/hooks/pre-push.sh --changed
+      run: tools/hooks/pre-push.sh frontend {files}
+      fail_text: "Frontend checks failed. Skip once with LEFTHOOK_EXCLUDE=frontend git push"

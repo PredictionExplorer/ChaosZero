@@ -1,0 +1,23 @@
+# typos (https://github.com/crate-ci/typos): the spell checker behind the CI
+# hygiene job and the pre-commit hook. Run it with `typos` from the repository
+# root; `typos --write-changes` applies its suggestions.
+#
+# Accept a word here only when it is correct and typos cannot know that, with
+# a comment saying why. Never add a real misspelling: fix it instead (except
+# in src/, which is the deployed contract and must not change).
+
+[files]
+# Dotfiles and .github/ are skipped by default; check them too.
+ignore-hidden = false
+extend-exclude = [
+  # A file, not a directory, in git worktrees.
+  ".git",
+  # Vendored third-party code (git submodules): not ours to fix.
+  "lib/",
+  # Generated: third-party package names and hashes.
+  "frontend/pnpm-lock.yaml",
+]
+
+[default.extend-identifiers]
+# The plural of PNG; typos splits it into "PN" + "Gs" and flags "PN".
+PNGs = "PNGs"

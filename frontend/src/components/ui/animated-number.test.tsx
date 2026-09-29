@@ -30,7 +30,9 @@ describe("AnimatedNumber", () => {
   it("passes through intermediate values while tweening", async () => {
     vi.useFakeTimers();
     try {
-      const { rerender } = render(<AnimatedNumber value={0} durationS={1} format={(v) => v.toFixed(2)} />);
+      const { rerender } = render(
+        <AnimatedNumber value={0} durationS={1} format={(v) => v.toFixed(2)} />,
+      );
       rerender(<AnimatedNumber value={100} durationS={1} format={(v) => v.toFixed(2)} />);
       await act(async () => {
         await vi.advanceTimersByTimeAsync(100);

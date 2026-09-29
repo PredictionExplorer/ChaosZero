@@ -186,7 +186,9 @@ export const FAQ_CATEGORIES: readonly FaqCategory[] = [
       {
         id: "tie",
         question: "What happens on an exact tie?",
-        answer: ["NO wins. YES pays out only when the count is strictly greater than the threshold."],
+        answer: [
+          "NO wins. YES pays out only when the count is strictly greater than the threshold.",
+        ],
       },
       {
         id: "far-future",

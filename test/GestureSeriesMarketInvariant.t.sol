@@ -481,6 +481,27 @@ contract GestureSeriesMarketInvariantTest is SeriesTestBase {
         }
     }
 
+    /// Once opened, a pool is permanent: the DEAD_SHARES locked at address(0)
+    /// never move (nobody can sign for address(0)), so the share supply never
+    /// drops below them, and neither reserve can ever reach zero — removals
+    /// round down while dead shares remain, and a bet always leaves at least
+    /// 1 wei on the side it buys. Stronger than the check above (it also
+    /// covers pools every real LP has left), and the reason the zero-reserve
+    /// guard in `_joinPool` and the zero-liquidity guard in `_bet` can never
+    /// fire on-chain.
+    function invariant_openedPoolsNeverClose() public view {
+        uint256 n = handler.roundsTouchedCount();
+        for (uint256 i = 0; i < n; i++) {
+            uint256 roundId = handler.roundsTouched(i);
+            (uint256 rY, uint256 rN, uint256 totalShares,,,,) = market.pool(roundId);
+            (uint256 deadShares,,) = market.lpPositionOf(roundId, address(0));
+            assertEq(deadShares, DEAD_SHARES, "dead shares moved");
+            assertGe(totalShares, DEAD_SHARES, "share supply fell below the dead shares");
+            assertGe(rY, 1, "YES reserve emptied");
+            assertGe(rN, 1, "NO reserve emptied");
+        }
+    }
+
     /// After every fuzz campaign: force-finish every round and prove everyone
     /// can exit in full. Afterwards the contract retains EXACTLY the CST
     /// backing dead-share reserves and fee-rounding dust — nothing else.

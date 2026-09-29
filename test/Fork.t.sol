@@ -1,26 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.35;
 
-import {Test} from "forge-std/Test.sol";
 import {GestureSeriesMarket, IERC20} from "../src/GestureSeriesMarket.sol";
 import {ICosmicSignatureGame} from "../src/ICosmicSignatureGame.sol";
+import {ArbitrumForkTest, ArbitrumOne} from "./utils/ArbitrumOne.sol";
 
 /// @notice Validates our minimal interface against the live Cosmic Signature
-/// proxy on Arbitrum One and runs a full LP + bet flow against the series
-/// market deployed on a fork. Skipped unless ARBITRUM_RPC_URL is set:
+/// proxy on Arbitrum One and runs a full LP + bet flow against a fresh series
+/// market deployed on a fork. Reported as SKIPPED unless ARBITRUM_RPC_URL is set:
 ///
-///   ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc forge test --match-contract ForkTest -vv
-contract ForkTest is Test {
-    address constant GAME = 0x6a714Ae7B5b6eA520F6BCA23d2E609C4Fd5863F2;
-    address constant CST = 0xAD91843e6A58Ba560F577E676986AFb1dba6FBA0;
+///   ARBITRUM_RPC_URL=https://arb1.arbitrum.io/rpc forge test --match-contract Fork -vv
+contract ForkTest is ArbitrumForkTest {
+    address constant GAME = ArbitrumOne.GAME;
+    address constant CST = ArbitrumOne.CST;
 
     function test_fork_liveGameInterfaceAndMarketFlow() external {
-        string memory rpcUrl = vm.envOr("ARBITRUM_RPC_URL", string(""));
-        if (bytes(rpcUrl).length == 0) {
-            emit log("Skipping fork test: ARBITRUM_RPC_URL not set");
-            return;
-        }
-        vm.createSelectFork(rpcUrl);
+        _forkArbitrumOneOrSkip();
 
         ICosmicSignatureGame game = ICosmicSignatureGame(GAME);
         assertEq(game.token(), CST, "token() getter");
@@ -28,10 +23,8 @@ contract ForkTest is Test {
         emit log_named_uint("live roundNum", round);
         emit log_named_uint("threshold (previous round's count)", round > 0 ? game.bidderAddresses(round - 1) : 0);
         emit log_named_uint("gestures so far this round", game.bidderAddresses(round));
-        if (round == 0) {
-            emit log("Game still in round 0: series markets start at round 1; skipping flow");
-            return;
-        }
+        // Series markets start at round 1 (round 0 has no previous round).
+        vm.skip(round == 0, "live game still in round 0");
 
         GestureSeriesMarket market = new GestureSeriesMarket(game);
 

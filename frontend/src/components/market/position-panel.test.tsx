@@ -120,6 +120,51 @@ describe("PositionPanel", () => {
     await u.click(screen.getByTestId("redeem-button"));
     expect(props.onRedeemSets).toHaveBeenCalledWith(40n * ONE);
   });
+
+  it("redeems as many sets as the smaller side, whichever side that is", async () => {
+    const u = userEvent.setup();
+    const { props } = renderPanel({ user: user({ yesBalance: 15n * ONE, noBalance: 60n * ONE }) });
+
+    await u.click(screen.getByTestId("redeem-button"));
+    expect(props.onRedeemSets).toHaveBeenCalledWith(15n * ONE);
+  });
+
+  it("offers no redemption for a one-sided position", () => {
+    renderPanel({ user: user({ noBalance: 0n }) });
+    expect(screen.queryByTestId("redeem-button")).not.toBeInTheDocument();
+  });
+
+  it("admits there is no market price while the pool is unfunded", async () => {
+    const u = userEvent.setup();
+    renderPanel({
+      snapshot: snapshot({
+        pool: {
+          reserveYes: 0n,
+          reserveNo: 0n,
+          totalShares: 0n,
+          accFeePerShare: 0n,
+          feeReserve: 0n,
+          feeWeight: 0n,
+        },
+      }),
+    });
+
+    await u.hover(screen.getByText("no market price yet"));
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/no liquidity yet/i);
+  });
+
+  it("names the winning side once settled", () => {
+    renderPanel({ snapshot: snapshot({ resolved: true, yesWon: false }) });
+    expect(screen.getByText("settled — NO won")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["claim", { resolved: true, yesWon: true }, "claim-button"],
+    ["redeem", {}, "redeem-button"],
+  ] as const)("spins the %s button while it is in flight", (pendingAction, overrides, testId) => {
+    renderPanel({ snapshot: snapshot(overrides), pendingAction });
+    expect(screen.getByTestId(testId)).toBeDisabled();
+  });
 });
 
 describe("PositionPanel — tooltips", () => {
@@ -146,7 +191,9 @@ describe("PositionPanel — tooltips", () => {
     renderPanel();
 
     await u.hover(screen.getByRole("button", { name: "About YES tokens" }));
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/pays exactly 1 CST if this round beats/i);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      /pays exactly 1 CST if this round beats/i,
+    );
     await u.unhover(screen.getByRole("button", { name: "About YES tokens" }));
 
     await u.hover(screen.getByRole("button", { name: "About NO tokens" }));
@@ -158,7 +205,9 @@ describe("PositionPanel — tooltips", () => {
     renderPanel();
 
     await u.hover(screen.getByText("complete sets"));
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/worth exactly 1 CST no matter how the round ends/i);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      /worth exactly 1 CST no matter how the round ends/i,
+    );
   });
 
   it("explains the mark price in the header caption", async () => {

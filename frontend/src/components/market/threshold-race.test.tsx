@@ -48,7 +48,9 @@ describe("ThresholdRace", () => {
   });
 
   it("shows the pending strip instead of a race while the threshold is unknown", () => {
-    render(<ThresholdRace currentCount={0} threshold={0} thresholdKnown={false} prevRoundId={6n} />);
+    render(
+      <ThresholdRace currentCount={0} threshold={0} thresholdKnown={false} prevRoundId={6n} />,
+    );
     expect(screen.getByTestId("race-pending")).toHaveTextContent(/locks when round 6 ends/i);
     expect(screen.getByTestId("race-target")).toHaveTextContent(/beat \?/i);
     expect(screen.queryByTestId("race-marker")).not.toBeInTheDocument();
@@ -56,7 +58,9 @@ describe("ThresholdRace", () => {
   });
 
   it("never treats an unknown threshold of 0 as a crossing", () => {
-    render(<ThresholdRace currentCount={5} threshold={0} thresholdKnown={false} prevRoundId={null} />);
+    render(
+      <ThresholdRace currentCount={5} threshold={0} thresholdKnown={false} prevRoundId={null} />,
+    );
     expect(screen.getByTestId("threshold-race")).not.toHaveTextContent(/crossed/i);
     expect(screen.getByTestId("threshold-race")).toHaveTextContent(/threshold pending/i);
   });
@@ -77,9 +81,13 @@ describe("ThresholdRace", () => {
 
   it("explains the pending finish line while the threshold is unknown", async () => {
     const user = userEvent.setup();
-    render(<ThresholdRace currentCount={0} threshold={0} thresholdKnown={false} prevRoundId={6n} />);
+    render(
+      <ThresholdRace currentCount={0} threshold={0} thresholdKnown={false} prevRoundId={6n} />,
+    );
 
     await user.hover(screen.getByTestId("race-target"));
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/unknown until the previous round finishes/i);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      /unknown until the previous round finishes/i,
+    );
   });
 });

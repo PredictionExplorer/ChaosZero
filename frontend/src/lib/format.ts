@@ -10,7 +10,14 @@ export const CST_DECIMALS = 18;
 export function formatCst(amount: bigint, opts?: { decimals?: number }): string {
   const value = Number(formatUnits(amount, CST_DECIMALS));
   const decimals =
-    opts?.decimals ?? (Math.abs(value) >= 1000 ? 0 : Math.abs(value) >= 10 ? 1 : Math.abs(value) >= 0.01 || value === 0 ? 2 : 4);
+    opts?.decimals ??
+    (Math.abs(value) >= 1000
+      ? 0
+      : Math.abs(value) >= 10
+        ? 1
+        : Math.abs(value) >= 0.01 || value === 0
+          ? 2
+          : 4);
   return value.toLocaleString("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: decimals,

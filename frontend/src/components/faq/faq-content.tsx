@@ -28,7 +28,9 @@ function CategoryLinks({ orientation }: { orientation: "rail" | "chips" }) {
             <category.icon className="size-4 text-signal-bright" aria-hidden />
             <span className="font-medium">{category.title}</span>
             {orientation === "rail" && (
-              <span className="ml-auto font-mono text-[11px] text-ink-faint">{category.items.length}</span>
+              <span className="ml-auto font-mono text-[11px] text-ink-faint">
+                {category.items.length}
+              </span>
             )}
           </a>
         </li>
@@ -43,13 +45,15 @@ export function FaqContent() {
     <div data-testid="faq-content">
       {/* Hero */}
       <div className="mx-auto max-w-2xl py-10 text-center sm:py-14">
-        <p className="font-mono text-xs uppercase tracking-[0.35em] text-signal-bright">Help center</p>
+        <p className="font-mono text-xs uppercase tracking-[0.35em] text-signal-bright">
+          Help center
+        </p>
         <h1 className="mt-4 font-display text-4xl font-bold tracking-tight sm:text-5xl">
           Frequently asked <span className="text-signal-bright">questions</span>
         </h1>
         <p className="mt-4 text-sm leading-relaxed text-ink-dim sm:text-base">
-          Everything about betting on gestures — how prices form, how rounds resolve, what the risks are, and why
-          your funds stay yours. All of it enforced by one immutable contract.
+          Everything about betting on gestures — how prices form, how rounds resolve, what the risks
+          are, and why your funds stay yours. All of it enforced by one immutable contract.
         </p>
       </div>
 
@@ -61,7 +65,9 @@ export function FaqContent() {
       <div className="grid items-start gap-10 lg:grid-cols-[240px_1fr]">
         {/* Desktop jump-nav rail */}
         <nav aria-label="FAQ categories" className="sticky top-24 hidden self-start lg:block">
-          <p className="px-3 pb-2 font-mono text-[11px] uppercase tracking-wider text-ink-faint">On this page</p>
+          <p className="px-3 pb-2 font-mono text-[11px] uppercase tracking-wider text-ink-faint">
+            On this page
+          </p>
           <CategoryLinks orientation="rail" />
         </nav>
 
@@ -80,7 +86,10 @@ export function FaqContent() {
                   <category.icon className="size-4.5" aria-hidden />
                 </span>
                 <div>
-                  <h2 id={`faq-section-${category.id}`} className="font-display text-xl font-semibold">
+                  <h2
+                    id={`faq-section-${category.id}`}
+                    className="font-display text-xl font-semibold"
+                  >
                     {category.title}
                   </h2>
                   <p className="text-xs text-ink-faint">{category.description}</p>
@@ -96,7 +105,8 @@ export function FaqContent() {
           <Card accent="signal" className="p-8 text-center" data-testid="faq-outro">
             <h2 className="font-display text-xl font-semibold">Still curious?</h2>
             <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-ink-dim">
-              The market is a single open contract — read it, verify it, or head back and watch the odds move live.
+              The market is a single open contract — read it, verify it, or head back and watch the
+              odds move live.
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
               <Link

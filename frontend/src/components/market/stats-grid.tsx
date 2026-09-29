@@ -79,7 +79,9 @@ export function StatsGrid({ snapshot, volume }: StatsGridProps) {
           </div>
           <p className="mt-1.5 font-mono text-sm font-semibold text-ink">
             {stat.value}
-            {stat.unit && <span className="ml-1 text-[10px] font-normal text-ink-faint">{stat.unit}</span>}
+            {stat.unit && (
+              <span className="ml-1 text-[10px] font-normal text-ink-faint">{stat.unit}</span>
+            )}
           </p>
         </Card>
       ))}

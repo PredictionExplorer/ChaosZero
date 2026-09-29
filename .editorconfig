@@ -1,0 +1,40 @@
+# https://editorconfig.org — shared editor defaults. The formatters (forge fmt,
+# Prettier) have the final word; these settings keep editors from fighting them.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# forge fmt: 4-space indent, 120 columns
+[*.sol]
+indent_size = 4
+max_line_length = 120
+
+[*.{ts,tsx,js,jsx,mjs,cjs,mts,cts,json,css}]
+max_line_length = 100
+
+[Makefile]
+indent_style = tab
+
+# Trailing double spaces are hard line breaks in Markdown.
+[*.md]
+trim_trailing_whitespace = false
+
+# Generated files keep their generator's formatting.
+[{frontend/pnpm-lock.yaml,frontend/src/test/fixtures/contract-vectors.json,broadcast/**,snapshots/**}]
+indent_size = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+[lib/**]
+charset = unset
+end_of_line = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+indent_style = unset
+indent_size = unset

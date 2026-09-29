@@ -43,7 +43,22 @@ describe("MarketHero", () => {
   });
 
   it("shows a dash and guidance when nothing is funded yet", () => {
-    render(<MarketHero snapshot={snapshot({ pool: { reserveYes: 0n, reserveNo: 0n, totalShares: 0n, accFeePerShare: 0n, feeReserve: 0n, feeWeight: 0n }, initialized: false })} history={[]} />);
+    render(
+      <MarketHero
+        snapshot={snapshot({
+          pool: {
+            reserveYes: 0n,
+            reserveNo: 0n,
+            totalShares: 0n,
+            accFeePerShare: 0n,
+            feeReserve: 0n,
+            feeWeight: 0n,
+          },
+          initialized: false,
+        })}
+        history={[]}
+      />,
+    );
     expect(screen.getByTestId("hero-no-liquidity")).toBeInTheDocument();
     expect(screen.getByTestId("phase-badge")).toHaveTextContent(/awaiting first liquidity/i);
   });
@@ -55,14 +70,24 @@ describe("MarketHero", () => {
   });
 
   it("renders the resolved outcome with the final count", () => {
-    render(<MarketHero snapshot={snapshot({ resolved: true, yesWon: true, currentCount: 950n })} history={[]} />);
+    render(
+      <MarketHero
+        snapshot={snapshot({ resolved: true, yesWon: true, currentCount: 950n })}
+        history={[]}
+      />,
+    );
     expect(screen.getByTestId("phase-badge")).toHaveTextContent(/resolved/i);
     expect(screen.getByTestId("hero-final-count")).toHaveTextContent("950");
     expect(screen.getByText(/Resolved: YES/i)).toBeInTheDocument();
   });
 
   it("labels a NO resolution honestly", () => {
-    render(<MarketHero snapshot={snapshot({ resolved: true, yesWon: false, gameRoundNum: 6n })} history={[]} />);
+    render(
+      <MarketHero
+        snapshot={snapshot({ resolved: true, yesWon: false, gameRoundNum: 6n })}
+        history={[]}
+      />,
+    );
     expect(screen.getByTestId("hero-probability")).toHaveTextContent("0.0%");
     expect(screen.getByText(/Resolved: NO/i)).toBeInTheDocument();
   });
@@ -104,8 +129,21 @@ describe("MarketHero", () => {
         history={[]}
       />,
     );
-    expect(screen.getByTestId("hero-threshold-unknown")).toHaveTextContent(/locks when round 8 ends/i);
+    expect(screen.getByTestId("hero-threshold-unknown")).toHaveTextContent(
+      /locks when round 8 ends/i,
+    );
     expect(screen.queryByTestId("hero-threshold")).not.toBeInTheDocument();
+  });
+
+  it("never refers to a round before round 0", () => {
+    render(
+      <MarketHero
+        snapshot={snapshot({ roundId: 0n, gameRoundNum: 0n, thresholdKnown: false, threshold: 0n })}
+        history={[]}
+      />,
+    );
+    expect(screen.getByTestId("race-pending")).toHaveTextContent(/when the previous round ends/i);
+    expect(screen.getByTestId("race-pending")).not.toHaveTextContent(/round -1/);
   });
 });
 
@@ -141,7 +179,9 @@ describe("MarketHero — tooltips", () => {
     render(<MarketHero snapshot={snapshot()} history={[]} />);
 
     await user.hover(screen.getByRole("button", { name: "About this probability" }));
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/NO reserve ÷ \(YES reserve \+ NO reserve\)/i);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      /NO reserve ÷ \(YES reserve \+ NO reserve\)/i,
+    );
   });
 
   it("explains which game round the market tracks", async () => {

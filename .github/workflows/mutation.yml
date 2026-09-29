@@ -1,0 +1,69 @@
+# Weekly mutation testing: Foundry mutates the market contract and runs the
+# test suite against every mutant. A surviving mutant is a change no test
+# notices, so the report is a to-do list for the tests rather than a gate
+# (tools/analysis/README.md explains how to read it). The campaign takes up
+# to about two hours on the 4-core runners public repositories get.
+name: Mutation testing
+
+on:
+  schedule:
+    - cron: "37 1 * * 6"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  mutation:
+    name: Mutation campaign
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    permissions:
+      contents: read # check out the repository
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Load pinned tool versions
+        env:
+          REQUIRED: FOUNDRY_VERSION
+        run: |
+          # Strict KEY=value lines only: nothing else may reach $GITHUB_ENV.
+          if grep -nEv '^(#.*|[A-Z][A-Z0-9_]*=[A-Za-z0-9._+-]*)?$' tools/versions.env; then
+            echo "::error file=tools/versions.env::only KEY=value lines and # comments are allowed (see above)"
+            exit 1
+          fi
+          for key in $REQUIRED; do
+            grep -Eq "^${key}=.+" tools/versions.env || { echo "::error file=tools/versions.env::${key} is not set"; exit 1; }
+          done
+          grep -E '^[A-Z][A-Z0-9_]*=' tools/versions.env >> "$GITHUB_ENV"
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: ${{ env.FOUNDRY_VERSION }}
+          cache: false
+
+      - name: Run the mutation campaign
+        # Writes the report to .analysis/mutation/ and the job summary.
+        run: tools/analysis/mutation.sh
+
+      - name: Upload the mutation report
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutation-report
+          path: .analysis/mutation/
+          include-hidden-files: true
+          if-no-files-found: warn
+          retention-days: 90

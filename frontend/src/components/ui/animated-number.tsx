@@ -13,7 +13,10 @@ interface AnimatedNumberProps {
 const easeOutCubic = (t: number) => 1 - Math.pow(1 - t, 3);
 
 function prefersReducedMotion(): boolean {
-  return typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return (
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-reduced-motion: reduce)").matches
+  );
 }
 
 /**

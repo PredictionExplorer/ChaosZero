@@ -10,7 +10,12 @@ interface AddressLinkProps {
 }
 
 /** Short hash that links out to the chain explorer when one exists. */
-export function AddressLink({ address, kind = "address", label, className = "" }: AddressLinkProps) {
+export function AddressLink({
+  address,
+  kind = "address",
+  label,
+  className = "",
+}: AddressLinkProps) {
   const explorer = appConfig.chain.blockExplorers?.default?.url;
   const text = label ?? shortAddress(address);
   const baseClass = `inline-flex items-center gap-1 font-mono text-xs ${className}`;

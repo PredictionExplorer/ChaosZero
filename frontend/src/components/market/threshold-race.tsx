@@ -50,15 +50,22 @@ export function ThresholdRace({
           className="flex h-10 items-center justify-center rounded-full border border-dashed border-line bg-surface-2/40 px-4 text-xs text-ink-faint"
         >
           The finish line isn&apos;t set yet — the threshold locks
-          {prevRoundId !== null ? ` when round ${prevRoundId.toString()} ends` : " when the previous round ends"}
+          {prevRoundId !== null
+            ? ` when round ${prevRoundId.toString()} ends`
+            : " when the previous round ends"}
         </div>
         <div className="mt-1 flex items-baseline justify-between font-mono text-xs text-ink-faint">
-          <Tooltip content="Gestures (bids) placed in this round so far. The count only ever goes up." align="start">
+          <Tooltip
+            content="Gestures (bids) placed in this round so far. The count only ever goes up."
+            align="start"
+          >
             <span data-testid="race-current" className="cursor-help">
               {formatCount(currentCount)} <span className="text-[10px] uppercase">so far</span>
             </span>
           </Tooltip>
-          <span className="text-[10px] uppercase tracking-widest text-ink-faint/80">threshold pending</span>
+          <span className="text-[10px] uppercase tracking-widest text-ink-faint">
+            threshold pending
+          </span>
           <Tooltip
             content="The number to beat is unknown until the previous round finishes — it locks at that round's final gesture count."
             align="end"
@@ -116,12 +123,15 @@ export function ThresholdRace({
       </div>
 
       <div className="mt-1 flex items-baseline justify-between font-mono text-xs text-ink-faint">
-        <Tooltip content="Gestures (bids) placed in this round so far. The count only ever goes up." align="start">
+        <Tooltip
+          content="Gestures (bids) placed in this round so far. The count only ever goes up."
+          align="start"
+        >
           <span data-testid="race-current" className="cursor-help">
             {formatCount(currentCount)} <span className="text-[10px] uppercase">so far</span>
           </span>
         </Tooltip>
-        <span className="text-[10px] uppercase tracking-widest text-ink-faint/80">
+        <span className="text-[10px] uppercase tracking-widest text-ink-faint">
           {crossed ? "threshold crossed — YES wins" : "gestures vs last round"}
         </span>
         <Tooltip

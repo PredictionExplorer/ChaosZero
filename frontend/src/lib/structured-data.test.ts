@@ -57,7 +57,10 @@ describe("webApplicationJsonLd", () => {
     expect(data["@type"]).toBe("WebApplication");
     expect(data.applicationCategory).toBe("FinanceApplication");
     expect(data.offers).toMatchObject({ "@type": "Offer", price: "0" });
-    expect(data.about).toMatchObject({ name: "Cosmic Signature", url: "https://cosmicsignature.com" });
+    expect(data.about).toMatchObject({
+      name: "Cosmic Signature",
+      url: "https://cosmicsignature.com",
+    });
   });
 
   it("carries an absolute image and the publisher link", () => {

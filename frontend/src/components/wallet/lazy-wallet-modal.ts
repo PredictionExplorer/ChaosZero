@@ -7,6 +7,9 @@ import dynamic from "next/dynamic";
  * is not part of the first-load JavaScript. Consumers must only render it
  * once the user first asks to connect.
  */
-export const LazyWalletModal = dynamic(() => import("./wallet-modal").then((mod) => mod.WalletModal), {
-  ssr: false,
-});
+export const LazyWalletModal = dynamic(
+  () => import("./wallet-modal").then((mod) => mod.WalletModal),
+  {
+    ssr: false,
+  },
+);

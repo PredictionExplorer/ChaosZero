@@ -1,6 +1,19 @@
 "use client";
 
-import { Check, CheckCheck, Droplets, Flag, HandCoins, Layers, Lock, Sparkles, Undo2, Vote, Waves, X } from "lucide-react";
+import {
+  Check,
+  CheckCheck,
+  Droplets,
+  Flag,
+  HandCoins,
+  Layers,
+  Lock,
+  Sparkles,
+  Undo2,
+  Vote,
+  Waves,
+  X,
+} from "lucide-react";
 import type { ReactNode } from "react";
 import type { ActivityEvent } from "@/hooks/use-market-events";
 import { formatBps, formatCount, formatCst, timeAgo } from "@/lib/format";
@@ -21,7 +34,11 @@ function iconBubble(tone: "higher" | "lower" | "signal" | "ended", child: ReactN
     signal: "bg-signal/12 text-signal-bright",
     ended: "bg-ended/12 text-ended",
   }[tone];
-  return <span className={`flex size-7 items-center justify-center rounded-full ${classes}`}>{child}</span>;
+  return (
+    <span className={`flex size-7 items-center justify-center rounded-full ${classes}`}>
+      {child}
+    </span>
+  );
 }
 
 function describe(event: ActivityEvent): { icon: ReactNode; text: ReactNode } {
@@ -29,11 +46,18 @@ function describe(event: ActivityEvent): { icon: ReactNode; text: ReactNode } {
     case "bet": {
       const yes = event.side === "yes";
       return {
-        icon: iconBubble(yes ? "higher" : "lower", yes ? <Check className="size-3.5" aria-hidden /> : <X className="size-3.5" aria-hidden />),
+        icon: iconBubble(
+          yes ? "higher" : "lower",
+          yes ? <Check className="size-3.5" aria-hidden /> : <X className="size-3.5" aria-hidden />,
+        ),
         text: (
           <>
-            bet <span className="font-mono font-semibold text-ink">{formatCst(event.amount)} CST</span> on{" "}
-            <span className={yes ? "font-semibold text-higher" : "font-semibold text-lower"}>{yes ? "YES" : "NO"}</span>
+            bet{" "}
+            <span className="font-mono font-semibold text-ink">{formatCst(event.amount)} CST</span>{" "}
+            on{" "}
+            <span className={yes ? "font-semibold text-higher" : "font-semibold text-lower"}>
+              {yes ? "YES" : "NO"}
+            </span>
           </>
         ),
       };
@@ -43,7 +67,9 @@ function describe(event: ActivityEvent): { icon: ReactNode; text: ReactNode } {
         icon: iconBubble("signal", <Droplets className="size-3.5" aria-hidden />),
         text: (
           <>
-            added <span className="font-mono font-semibold text-ink">{formatCst(event.amount)} CST</span> of liquidity
+            added{" "}
+            <span className="font-mono font-semibold text-ink">{formatCst(event.amount)} CST</span>{" "}
+            of liquidity
             {event.feeBps !== null && (
               <span className="text-ink-faint"> · voting {formatBps(BigInt(event.feeBps))}</span>
             )}
@@ -72,7 +98,9 @@ function describe(event: ActivityEvent): { icon: ReactNode; text: ReactNode } {
         icon: iconBubble("higher", <HandCoins className="size-3.5" aria-hidden />),
         text: (
           <>
-            claimed <span className="font-mono font-semibold text-ink">{formatCst(event.amount)} CST</span> in LP fees
+            claimed{" "}
+            <span className="font-mono font-semibold text-ink">{formatCst(event.amount)} CST</span>{" "}
+            in LP fees
           </>
         ),
       };
@@ -81,7 +109,8 @@ function describe(event: ActivityEvent): { icon: ReactNode; text: ReactNode } {
         icon: iconBubble("signal", <Layers className="size-3.5" aria-hidden />),
         text: (
           <>
-            minted <span className="font-mono font-semibold text-ink">{formatCst(event.amount)}</span> sets
+            minted{" "}
+            <span className="font-mono font-semibold text-ink">{formatCst(event.amount)}</span> sets
           </>
         ),
       };
@@ -90,7 +119,9 @@ function describe(event: ActivityEvent): { icon: ReactNode; text: ReactNode } {
         icon: iconBubble("signal", <Undo2 className="size-3.5" aria-hidden />),
         text: (
           <>
-            redeemed <span className="font-mono font-semibold text-ink">{formatCst(event.amount)}</span> sets for CST
+            redeemed{" "}
+            <span className="font-mono font-semibold text-ink">{formatCst(event.amount)}</span> sets
+            for CST
           </>
         ),
       };
@@ -100,10 +131,15 @@ function describe(event: ActivityEvent): { icon: ReactNode; text: ReactNode } {
         text: (
           <>
             round resolved{" "}
-            <span className={event.yesWon ? "font-semibold text-higher" : "font-semibold text-lower"}>
+            <span
+              className={event.yesWon ? "font-semibold text-higher" : "font-semibold text-lower"}
+            >
               {event.yesWon ? "YES" : "NO"}
             </span>{" "}
-            at <span className="font-mono font-semibold text-ended">{formatCount(event.secondary)} gestures</span>
+            at{" "}
+            <span className="font-mono font-semibold text-ended">
+              {formatCount(event.secondary)} gestures
+            </span>
           </>
         ),
       };
@@ -112,7 +148,8 @@ function describe(event: ActivityEvent): { icon: ReactNode; text: ReactNode } {
         icon: iconBubble("higher", <CheckCheck className="size-3.5" aria-hidden />),
         text: (
           <>
-            claimed <span className="font-mono font-semibold text-ink">{formatCst(event.amount)} CST</span>
+            claimed{" "}
+            <span className="font-mono font-semibold text-ink">{formatCst(event.amount)} CST</span>
           </>
         ),
       };
@@ -127,7 +164,9 @@ function describe(event: ActivityEvent): { icon: ReactNode; text: ReactNode } {
         text: (
           <>
             threshold locked at{" "}
-            <span className="font-mono font-semibold text-ended">{formatCount(event.secondary)} gestures</span>
+            <span className="font-mono font-semibold text-ended">
+              {formatCount(event.secondary)} gestures
+            </span>
           </>
         ),
       };
@@ -163,7 +202,9 @@ export function ActivityFeed({ events, isLoading, maxItems = 40 }: ActivityFeedP
               >
                 {icon}
                 <div className="min-w-0 flex-1 text-sm text-ink-dim">
-                  {event.user ? <AddressLink address={event.user} className="mr-1.5 align-baseline" /> : null}
+                  {event.user ? (
+                    <AddressLink address={event.user} className="mr-1.5 align-baseline" />
+                  ) : null}
                   {text}
                 </div>
                 <div className="shrink-0 text-right">

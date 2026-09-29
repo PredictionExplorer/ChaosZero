@@ -71,14 +71,18 @@ export function parseAppConfig(raw: RawEnv): AppConfig {
   const chain = SUPPORTED_CHAINS.find((c) => c.id === chainId);
   if (!chain || !Number.isInteger(chainId)) {
     const supported = SUPPORTED_CHAINS.map((c) => `${c.id} (${c.name})`).join(", ");
-    throw new Error(`NEXT_PUBLIC_CHAIN_ID "${chainIdStr}" is not supported. Use one of: ${supported}`);
+    throw new Error(
+      `NEXT_PUBLIC_CHAIN_ID "${chainIdStr}" is not supported. Use one of: ${supported}`,
+    );
   }
 
   const deployBlockStr = clean(raw.deployBlock);
   let deployBlock: bigint | null = null;
   if (deployBlockStr !== null) {
     if (!/^\d+$/.test(deployBlockStr)) {
-      throw new Error(`NEXT_PUBLIC_DEPLOY_BLOCK must be a non-negative integer, got "${deployBlockStr}"`);
+      throw new Error(
+        `NEXT_PUBLIC_DEPLOY_BLOCK must be a non-negative integer, got "${deployBlockStr}"`,
+      );
     }
     deployBlock = BigInt(deployBlockStr);
   }

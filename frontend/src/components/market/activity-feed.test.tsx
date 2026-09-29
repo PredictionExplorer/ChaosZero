@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ActivityEvent } from "@/hooks/use-market-events";
 import { ONE } from "@/lib/math";
 import { ActivityFeed } from "./activity-feed";
@@ -21,6 +21,10 @@ function event(overrides: Partial<ActivityEvent>): ActivityEvent {
     ...overrides,
   };
 }
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe("ActivityFeed", () => {
   it("shows an empty state without events", () => {
@@ -66,5 +70,47 @@ describe("ActivityFeed", () => {
     );
     render(<ActivityFeed events={events} isLoading={false} maxItems={3} />);
     expect(screen.getByTestId("activity-feed").querySelectorAll("li")).toHaveLength(3);
+  });
+
+  it("shows placeholders, not the empty state, while history loads", () => {
+    render(<ActivityFeed events={[]} isLoading />);
+    expect(screen.queryByTestId("activity-empty")).not.toBeInTheDocument();
+    expect(screen.getByTestId("activity-feed").querySelectorAll("li")).toHaveLength(0);
+  });
+
+  it("announces a NO resolution with its final count", () => {
+    render(
+      <ActivityFeed
+        events={[event({ kind: "resolved", user: null, secondary: 640n, yesWon: false })]}
+        isLoading={false}
+      />,
+    );
+    expect(screen.getByTestId("activity-feed")).toHaveTextContent(
+      /round resolved NO at 640 gestures/,
+    );
+  });
+
+  it("links each event's transaction, labelled by age once the block time is known", () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-06-01T12:00:00Z"));
+    const now = Math.floor(Date.now() / 1000);
+    render(
+      <ActivityFeed
+        events={[
+          event({ timestamp: null, transactionHash: "0xaaa" }),
+          event({ timestamp: now - 120, transactionHash: "0xbbb" }),
+        ]}
+        isLoading={false}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: /view tx/i })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/\/tx\/0xaaa$/),
+    );
+    expect(screen.getByRole("link", { name: /2m ago/i })).toHaveAttribute(
+      "href",
+      expect.stringMatching(/\/tx\/0xbbb$/),
+    );
   });
 });

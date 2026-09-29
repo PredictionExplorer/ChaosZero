@@ -25,7 +25,10 @@ export function IntroHero() {
             <p className="font-mono text-[11px] uppercase tracking-[0.3em] text-signal-bright">
               Chaos Zero · Prediction market · Arbitrum One
             </p>
-            <h1 id="intro-hero-title" className="mt-2 font-display text-2xl font-bold tracking-tight sm:text-3xl">
+            <h1
+              id="intro-hero-title"
+              className="mt-2 font-display text-2xl font-bold tracking-tight sm:text-3xl"
+            >
               Bet on <span className="text-signal-bright">Cosmic Signature</span> gestures
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-relaxed text-ink-dim">
@@ -38,14 +41,17 @@ export function IntroHero() {
               >
                 Cosmic Signature
               </a>{" "}
-              — an on-chain NFT game where every bid is a &ldquo;gesture&rdquo; — ends with a final gesture
-              count. This market asks one question, every round:{" "}
+              — an on-chain NFT game where every bid is a &ldquo;gesture&rdquo; — ends with a final
+              gesture count. This market asks one question, every round:{" "}
               <strong className="font-semibold text-ink">
                 will this round end with more gestures than the last one?
               </strong>
             </p>
             <p className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-ink-faint">
-              <a href="#how-it-works" className="flex items-center gap-1 font-medium text-ink-dim transition-colors hover:text-signal-bright">
+              <a
+                href="#how-it-works"
+                className="flex items-center gap-1 font-medium text-ink-dim transition-colors hover:text-signal-bright"
+              >
                 How it works
                 <ArrowDown className="size-3" aria-hidden />
               </a>
@@ -60,7 +66,10 @@ export function IntroHero() {
             </p>
           </div>
 
-          <ol className="flex shrink-0 flex-row flex-wrap gap-2 lg:flex-col" aria-label="How betting works, in three steps">
+          <ol
+            className="flex shrink-0 flex-row flex-wrap gap-2 lg:flex-col"
+            aria-label="How betting works, in three steps"
+          >
             {STEPS.map((step, i) => (
               <li
                 key={step.label}

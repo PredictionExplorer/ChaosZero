@@ -81,7 +81,10 @@ export function SidePanelTabs({ lpIndicator, bet, liquidity }: SidePanelTabsProp
                     className="absolute inline-flex h-full w-full animate-ping rounded-full bg-signal-bright opacity-60"
                     aria-hidden
                   />
-                  <span className="relative inline-flex size-1.5 rounded-full bg-signal-bright" aria-hidden />
+                  <span
+                    className="relative inline-flex size-1.5 rounded-full bg-signal-bright"
+                    aria-hidden
+                  />
                   <span className="sr-only">(you have a liquidity position)</span>
                 </span>
               )}

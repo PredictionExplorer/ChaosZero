@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { BaseError, ContractFunctionRevertedError, UserRejectedRequestError } from "viem";
+import {
+  BaseError,
+  ContractFunctionRevertedError,
+  UserRejectedRequestError,
+  encodeErrorResult,
+} from "viem";
 import { gestureSeriesMarketAbi } from "./abi/gesture-series-market";
 import { describeTxError } from "./errors";
 
@@ -56,9 +61,54 @@ describe("describeTxError", () => {
     expect(describeTxError(err)).toMatch(/ETH to pay for gas/);
   });
 
+  it("explains every custom error the contract ABI declares, decoded from real revert data", () => {
+    const errorNames = gestureSeriesMarketAbi
+      .filter((item) => item.type === "error")
+      .map((item) => item.name);
+    expect(errorNames.length).toBeGreaterThan(0);
+    for (const errorName of errorNames) {
+      const data = encodeErrorResult({ abi: gestureSeriesMarketAbi, errorName });
+      const err = new BaseError("execution reverted", {
+        cause: new ContractFunctionRevertedError({
+          abi: gestureSeriesMarketAbi,
+          functionName: "betYes",
+          data,
+        }),
+      });
+      const message = describeTxError(err);
+      // A dedicated explanation, never the raw fallback.
+      expect(message, errorName).not.toMatch(/^Transaction reverted:/);
+      expect(message, errorName).not.toBe("execution reverted");
+    }
+  });
+
+  it("names an undecodable revert by its selector", () => {
+    const err = new BaseError("execution reverted", {
+      cause: new ContractFunctionRevertedError({
+        abi: gestureSeriesMarketAbi,
+        functionName: "betYes",
+        data: "0xdeadbeef",
+      }),
+    });
+    expect(describeTxError(err)).toBe("Transaction reverted: 0xdeadbeef");
+  });
+
+  it("falls back to the node's short message for a bare revert", () => {
+    const err = new BaseError("execution reverted", {
+      cause: new ContractFunctionRevertedError({
+        abi: gestureSeriesMarketAbi,
+        functionName: "betYes",
+        message: "",
+      }),
+    });
+    expect(describeTxError(err)).toBe("execution reverted");
+  });
+
   it("handles plain Errors and non-errors", () => {
     expect(describeTxError(new Error("boom"))).toBe("boom");
-    expect(describeTxError(new Error("User rejected the request."))).toBe("Transaction cancelled in your wallet.");
+    expect(describeTxError(new Error("User rejected the request."))).toBe(
+      "Transaction cancelled in your wallet.",
+    );
     expect(describeTxError("weird")).toMatch(/something went wrong/i);
     expect(describeTxError(undefined)).toMatch(/something went wrong/i);
   });

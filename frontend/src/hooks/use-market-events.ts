@@ -158,10 +158,22 @@ export function decodeScan(logs: Log[], roundId: bigint): EventScan {
         }
         break;
       case "SetsMinted":
-        activity.push({ ...base, kind: "mint", user: log.args.user, amount: log.args.amount, secondary: 0n });
+        activity.push({
+          ...base,
+          kind: "mint",
+          user: log.args.user,
+          amount: log.args.amount,
+          secondary: 0n,
+        });
         break;
       case "SetsRedeemed":
-        activity.push({ ...base, kind: "redeem", user: log.args.user, amount: log.args.amount, secondary: 0n });
+        activity.push({
+          ...base,
+          kind: "redeem",
+          user: log.args.user,
+          amount: log.args.amount,
+          secondary: 0n,
+        });
         break;
       case "Resolved":
         activity.push({
@@ -175,7 +187,13 @@ export function decodeScan(logs: Log[], roundId: bigint): EventScan {
         break;
       case "Claimed":
         if (log.args.cstOut > 0n) {
-          activity.push({ ...base, kind: "claimed", user: log.args.user, amount: log.args.cstOut, secondary: 0n });
+          activity.push({
+            ...base,
+            kind: "claimed",
+            user: log.args.user,
+            amount: log.args.cstOut,
+            secondary: 0n,
+          });
         }
         break;
       case "RoundInitialized":
@@ -195,7 +213,11 @@ export function decodeScan(logs: Log[], roundId: bigint): EventScan {
   return { activity, poolEvents };
 }
 
-async function scanEvents(client: PublicClient, series: Address, roundId: bigint): Promise<EventScan> {
+async function scanEvents(
+  client: PublicClient,
+  series: Address,
+  roundId: bigint,
+): Promise<EventScan> {
   const fromBlock = appConfig.deployBlock ?? "earliest";
   const logs = await client.getLogs({
     address: series,
@@ -206,7 +228,9 @@ async function scanEvents(client: PublicClient, series: Address, roundId: bigint
 
   // Timestamp only the newest blocks — enough for a human activity feed,
   // cheap enough for public RPCs.
-  const uniqueBlocks = [...new Set(activity.map((e) => e.blockNumber))].sort((a, b) => (a < b ? 1 : -1));
+  const uniqueBlocks = [...new Set(activity.map((e) => e.blockNumber))].sort((a, b) =>
+    a < b ? 1 : -1,
+  );
   const stamped = new Map<bigint, number>();
   await Promise.all(
     uniqueBlocks.slice(0, TIMESTAMPED_BLOCKS).map(async (bn) => {
@@ -240,7 +264,10 @@ async function scanEvents(client: PublicClient, series: Address, roundId: bigint
 export function useMarketEvents(series: Address | null, roundId: bigint | null) {
   const client = usePublicClient();
   const queryClient = useQueryClient();
-  const queryKey = useMemo(() => ["series-events", series, roundId?.toString()] as const, [series, roundId]);
+  const queryKey = useMemo(
+    () => ["series-events", series, roundId?.toString()] as const,
+    [series, roundId],
+  );
 
   const query = useQuery({
     queryKey,

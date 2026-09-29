@@ -32,7 +32,12 @@ export interface MarketActions {
   readonly pending: ActionKind | null;
   approve(cst: Address, amount: bigint): Promise<boolean>;
   bet(side: BetSide, cstIn: bigint, minTokensOut: bigint): Promise<boolean>;
-  addLiquidity(cstIn: bigint, declaredFeeBps: number, initialYesProbBps: bigint, minSharesOut: bigint): Promise<boolean>;
+  addLiquidity(
+    cstIn: bigint,
+    declaredFeeBps: number,
+    initialYesProbBps: bigint,
+    minSharesOut: bigint,
+  ): Promise<boolean>;
   removeLiquidity(shares: bigint, minYesOut: bigint, minNoOut: bigint): Promise<boolean>;
   updateFeeDeclaration(newFeeBps: number): Promise<boolean>;
   claimFees(): Promise<boolean>;
@@ -129,7 +134,14 @@ export function useMarketActions(series: Address | null, roundId: bigint | null)
           address: series as Address,
           abi: gestureSeriesMarketAbi,
           functionName: "addLiquidity",
-          args: [roundId as bigint, cstIn, declaredFeeBps, initialYesProbBps, minSharesOut, txDeadline()],
+          args: [
+            roundId as bigint,
+            cstIn,
+            declaredFeeBps,
+            initialYesProbBps,
+            minSharesOut,
+            txDeadline(),
+          ],
         }),
       ),
     [run, writeContractAsync, series, roundId],

@@ -36,7 +36,11 @@ export function RoundNav({ roundId, currentRound }: RoundNavProps) {
   const isFuture = currentRound !== null && roundId > currentRound;
 
   return (
-    <nav className="flex items-center justify-between" aria-label="Round navigation" data-testid="round-nav">
+    <nav
+      className="flex items-center justify-between"
+      aria-label="Round navigation"
+      data-testid="round-nav"
+    >
       <button
         onClick={() => navigate(roundId - 1n)}
         disabled={roundId <= 1n}
@@ -66,7 +70,11 @@ export function RoundNav({ roundId, currentRound }: RoundNavProps) {
           </Tooltip>
         )}
         {!onLive && (
-          <Tooltip side="bottom" content="Back to the round the game is playing right now." tabIndex={-1}>
+          <Tooltip
+            side="bottom"
+            content="Back to the round the game is playing right now."
+            tabIndex={-1}
+          >
             <button
               onClick={() => navigate(null)}
               data-testid="round-live"

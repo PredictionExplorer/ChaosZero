@@ -5,13 +5,7 @@
  * and answer machine-readably even before any JavaScript runs.
  */
 
-import {
-  COSMIC_SIGNATURE_URL,
-  SITE_DESCRIPTION,
-  SITE_NAME,
-  SITE_URL,
-  absoluteUrl,
-} from "./site";
+import { COSMIC_SIGNATURE_URL, SITE_DESCRIPTION, SITE_NAME, SITE_URL, absoluteUrl } from "./site";
 
 export type JsonLd = Record<string, unknown>;
 

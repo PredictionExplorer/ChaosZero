@@ -36,7 +36,9 @@ export function buildChartGeometry(
     return pad + (1 - f) * usableH;
   };
   const coords = points.map((p, i) => [x(i), y(p.probability)] as const);
-  const linePath = coords.map(([cx, cy], i) => `${i === 0 ? "M" : "L"}${cx.toFixed(2)},${cy.toFixed(2)}`).join(" ");
+  const linePath = coords
+    .map(([cx, cy], i) => `${i === 0 ? "M" : "L"}${cx.toFixed(2)},${cy.toFixed(2)}`)
+    .join(" ");
   const [lastX, lastY] = coords[coords.length - 1];
   const areaPath = `${linePath} L${lastX.toFixed(2)},${(height - pad).toFixed(2)} L${coords[0][0].toFixed(2)},${(height - pad).toFixed(2)} Z`;
   return { linePath, areaPath, lastX, lastY };

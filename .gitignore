@@ -18,3 +18,22 @@ docs/
 .env
 .env.*
 !.env.example
+
+# Coverage (forge coverage, tools/coverage.sh)
+lcov*.info
+coverage/
+
+# Analysis output: Slither, Halmos and mutation testing (tools/analysis/)
+.analysis/
+*.sarif
+crytic-export/
+
+# Personal git hook overrides (see lefthook.yml)
+lefthook-local.yml
+
+# Personal Claude Code settings and its worktrees
+.claude/settings.local.json
+.claude/worktrees/
+
+# macOS
+.DS_Store

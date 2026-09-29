@@ -47,7 +47,8 @@ export function describeTxError(error: unknown): string {
     return short;
   }
   if (error instanceof Error) {
-    if (/user rejected|user denied/i.test(error.message)) return "Transaction cancelled in your wallet.";
+    if (/user rejected|user denied/i.test(error.message))
+      return "Transaction cancelled in your wallet.";
     return error.message;
   }
   return "Something went wrong. Please try again.";

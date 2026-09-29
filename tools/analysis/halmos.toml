@@ -1,0 +1,10 @@
+# Halmos settings for tools/analysis/halmos.sh (Halmos 0.3.3).
+[global]
+# Only the symbolic suites in test/halmos/, only their check_ functions.
+match-contract = "SymbolicTest$"
+function = "check_"
+# The hardest fee-vote query takes 30-45 s on a shared 4-CPU machine, so the
+# 60 s default would leave CI one slow runner away from a spurious TIMEOUT.
+# A timeout is a failure, never a silent pass, so headroom costs nothing
+# when every query is easy.
+solver-timeout-assertion = "300s"

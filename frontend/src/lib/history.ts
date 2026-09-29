@@ -64,7 +64,9 @@ export interface ProbabilityPoint {
 }
 
 /** Chain order: by block, then by log index within the block. */
-export function sortEvents<T extends { blockNumber: bigint; logIndex: number }>(events: readonly T[]): T[] {
+export function sortEvents<T extends { blockNumber: bigint; logIndex: number }>(
+  events: readonly T[],
+): T[] {
   return [...events].sort((a, b) => {
     if (a.blockNumber !== b.blockNumber) return a.blockNumber < b.blockNumber ? -1 : 1;
     return a.logIndex - b.logIndex;
@@ -75,8 +77,11 @@ export function sortEvents<T extends { blockNumber: bigint; logIndex: number }>(
  * Applies one event to the pool, mirroring the contract exactly.
  *
  * Note on `feeWeight`: the events don't carry the removed voter's declaration,
- * so replay tracks reserves/shares/escrow exactly and leaves the vote ledger
- * out (the UI reads the live fee from the chain, not from history).
+ * so replay tracks reserves and shares exactly and leaves the vote ledger out
+ * (the UI reads the live fee from the chain, not from history). The fee escrow
+ * is approximate: `FeesClaimed` is not replayed, and a top-up that pays out
+ * pending fees emits only `LiquidityAdded`; the UI reads `feeReserve` from the
+ * chain too.
  */
 export function applyPoolEvent(pool: PoolState, event: PoolEvent): PoolState {
   switch (event.kind) {
@@ -115,9 +120,9 @@ export interface ReplayResult {
 
 /**
  * Replays all of one round's pool events forward, producing the probability
- * chart and the final pool state. The reconstruction is exact for reserves,
- * shares, and fee escrow: the end state must equal the current on-chain pool
- * (asserted in tests).
+ * chart and the final pool state. The reconstruction is exact for reserves
+ * and shares: they must equal the current on-chain pool (asserted here and by
+ * the contract suite's testFuzz_poolEventsReplayToTheExactPool).
  */
 export function replayRound(events: readonly PoolEvent[]): ReplayResult {
   let pool = EMPTY_POOL;

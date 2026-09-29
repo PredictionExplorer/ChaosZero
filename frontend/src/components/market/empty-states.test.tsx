@@ -38,4 +38,11 @@ describe("empty states", () => {
       unmount();
     }
   });
+
+  it("BetClosed falls back to a generic reason for phases that normally allow betting", () => {
+    render(<BetClosed phase="live" />);
+    expect(screen.getByTestId("bet-closed")).toHaveTextContent(
+      "Betting is not available for this round.",
+    );
+  });
 });

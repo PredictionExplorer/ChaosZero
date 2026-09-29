@@ -22,12 +22,19 @@ export interface PositionPanelProps {
  * The connected user's outcome tokens: YES/NO balances, their mark-to-market
  * value, redeeming complete sets, and claiming after resolution.
  */
-export function PositionPanel({ snapshot, user, pendingAction, onRedeemSets, onClaim }: PositionPanelProps) {
+export function PositionPanel({
+  snapshot,
+  user,
+  pendingAction,
+  onRedeemSets,
+  onClaim,
+}: PositionPanelProps) {
   const phase = roundPhase(snapshot);
   const value = positionValueFloat(snapshot, user);
   const sets = user.yesBalance < user.noBalance ? user.yesBalance : user.noBalance;
   const probability = displayedProbability(snapshot);
-  const claimable = phase === "resolved" ? claimValue(user.yesBalance, user.noBalance, snapshot.yesWon) : 0n;
+  const claimable =
+    phase === "resolved" ? claimValue(user.yesBalance, user.noBalance, snapshot.yesWon) : 0n;
 
   if (!hasPosition(user)) return null;
 
@@ -98,15 +105,22 @@ export function PositionPanel({ snapshot, user, pendingAction, onRedeemSets, onC
             />
           </p>
           <p className="mt-1 font-mono text-lg font-semibold" data-testid="position-value">
-            <AnimatedNumber value={value} format={(v) => v.toLocaleString("en-US", { maximumFractionDigits: 2 })} />{" "}
+            <AnimatedNumber
+              value={value}
+              format={(v) => v.toLocaleString("en-US", { maximumFractionDigits: 2 })}
+            />{" "}
             <span className="text-xs text-ink-dim">CST</span>
           </p>
         </div>
       </div>
 
       {phase === "decided" && (
-        <p className="mt-3 rounded-xl border border-ended/30 bg-ended/8 p-3 text-center text-xs text-ended" data-testid="decided-note">
-          The count crossed the threshold — YES has already won. Resolve the round to unlock claiming.
+        <p
+          className="mt-3 rounded-xl border border-ended/30 bg-ended/8 p-3 text-center text-xs text-ended"
+          data-testid="decided-note"
+        >
+          The count crossed the threshold — YES has already won. Resolve the round to unlock
+          claiming.
         </p>
       )}
 

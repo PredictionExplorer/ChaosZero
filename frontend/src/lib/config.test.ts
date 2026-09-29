@@ -77,7 +77,9 @@ describe("resolveMarketAddress", () => {
   const configured = "0x2222222222222222222222222222222222222222" as const;
 
   it("prefers a valid query override", () => {
-    expect(resolveMarketAddress(configured, MARKET)).toBe("0x1111111111111111111111111111111111111111");
+    expect(resolveMarketAddress(configured, MARKET)).toBe(
+      "0x1111111111111111111111111111111111111111",
+    );
   });
 
   it("falls back to configured for missing or invalid overrides", () => {

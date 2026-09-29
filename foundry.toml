@@ -2,8 +2,21 @@
 src = "src"
 out = "out"
 libs = ["lib"]
-# GenerateVectors.s.sol writes the frontend's differential test fixtures.
-fs_permissions = [{ access = "read-write", path = "frontend/src/test/fixtures" }]
+# solc records every remapping it is given in the metadata the deployed CBOR
+# hash covers, so the list is pinned to the deployed one. Auto-detection would
+# add a remapping for any directory that appears under lib/ (a test helper, a
+# submodule left behind by another branch) and change the hash of an
+# unchanged src/.
+remappings = ["forge-std/=lib/forge-std/src/"]
+auto_detect_remappings = false
+# GenerateVectors.s.sol writes the frontend's differential test fixtures;
+# DeploymentIntegrity.t.sol reads the deployment record and the production
+# frontend config (read-only).
+fs_permissions = [
+  { access = "read-write", path = "frontend/src/test/fixtures" },
+  { access = "read", path = "broadcast/Deploy.s.sol/42161/run-latest.json" },
+  { access = "read", path = "frontend/.env.production" },
+]
 
 # Production compiler settings. Kept in the DEFAULT profile on purpose: tests,
 # CI and deployments must all exercise the exact bytecode that ships.
@@ -33,5 +46,51 @@ max_test_rejects = 1000000
 runs = 512
 depth = 256
 fail_on_revert = true
+
+# `forge lint --deny warnings` is the lint gate (CI, pre-push, `make lint`).
+# Rationale for every entry: tools/analysis/README.md#forge-lint
+[lint]
+severity = ["high", "med", "low"]
+# Forge's ports of three Slither detectors. They do not model the contract-wide
+# `nonReentrant` lock, so on the deployed (frozen) contract they only produce
+# false positives, which cannot be suppressed inline without changing its
+# metadata hash. Slither runs the originals over src/ with per-finding triage
+# (slither.db.json), so any NEW instance of these classes still fails CI.
+exclude_lints = ["reentrancy-no-eth", "reentrancy-events", "divide-before-multiply"]
+# Lint once, as its own gate: builds for tests, coverage, Slither, Halmos and
+# mutation runs stay quiet, and lint-on-build only sees recompiled files.
+lint_on_build = false
+
+# Symbolic tests: FOUNDRY_PROFILE=halmos, driven by tools/analysis/halmos.sh.
+# Inherits the production compiler settings above, so the properties are
+# proven against the exact bytecode that is deployed. Only test/halmos/ is
+# built as tests, into its own directories, leaving the default build alone.
+[profile.halmos]
+test = "test/halmos"
+out = ".analysis/halmos/forge-out"
+cache_path = ".analysis/halmos/forge-cache"
+# Foundry's dynamic test linking compiles `new GestureSeriesMarket(...)` in a
+# test into a `vm.deployCode` cheatcode call, which Halmos does not support;
+# keep the plain CREATE so the proofs deploy the contract compiled here.
+dynamic_test_linking = false
+
+# Mutation testing: FOUNDRY_PROFILE=mutation, driven by tools/analysis/mutation.sh
+# (weekly CI). Legacy codegen without the optimizer rebuilds a mutant in ~2 s
+# instead of ~55 s; tests and fuzz/invariant strength are inherited unchanged.
+[profile.mutation]
+via_ir = false
+optimizer = false
+out = ".analysis/mutation/forge-out"
+cache_path = ".analysis/mutation/forge-cache"
+
+[profile.mutation.fuzz]
+# A fixed seed makes fuzz and invariant inputs, and so the set of surviving
+# mutants, reproducible from run to run.
+seed = "0x5eed"
+
+[profile.mutation.invariant]
+# A killed mutant needs one failing test, not a minimal counterexample:
+# shrinking a broken invariant sequence costs ~15 s per mutant for nothing.
+shrink_run_limit = 0
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
