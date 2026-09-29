@@ -362,6 +362,11 @@ cmd_setup() {
     (cd frontend && node_modules/.bin/lefthook install)
   fi
 
+  step "git blame"
+  # Skip mechanical reformatting commits (listed in .git-blame-ignore-revs).
+  git config blame.ignoreRevsFile .git-blame-ignore-revs
+  say "blame.ignoreRevsFile = .git-blame-ignore-revs"
+
   if ! have forge && [ ! -x "$foundry_bin/forge" ]; then
     warn "forge not found: run make foundry (pinned, checksum-verified) or foundryup --install $FOUNDRY_VERSION"
   fi

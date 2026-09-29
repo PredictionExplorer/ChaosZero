@@ -1,0 +1,6 @@
+# Commits that only reformat code; `git blame` skips them.
+# Local setup (make setup does this): git config blame.ignoreRevsFile .git-blame-ignore-revs
+# GitHub's blame view honours this file automatically.
+
+# Format the frontend with Prettier
+5515976d1f3b2815fb9c6efead6b1c5494312b5d
