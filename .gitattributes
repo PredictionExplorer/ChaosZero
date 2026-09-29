@@ -1,0 +1,24 @@
+# LF in the repository and in every checkout, on every OS, so forge fmt,
+# Prettier, shell scripts and the byte-for-byte vector check all agree.
+* text=auto eol=lf
+
+# Generated: collapsed in GitHub diffs and left out of language statistics.
+foundry.lock                                     linguist-generated=true
+frontend/pnpm-lock.yaml                          linguist-generated=true
+frontend/src/test/fixtures/contract-vectors.json linguist-generated=true
+broadcast/**                                     linguist-generated=true
+snapshots/**                                     linguist-generated=true
+
+# Binary: never normalized, never diffed as text.
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.avif  binary
+*.ico   binary
+*.ttf   binary
+*.otf   binary
+*.woff  binary
+*.woff2 binary
+*.pdf   binary
