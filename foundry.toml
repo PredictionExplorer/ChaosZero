@@ -2,8 +2,14 @@
 src = "src"
 out = "out"
 libs = ["lib"]
-# GenerateVectors.s.sol writes the frontend's differential test fixtures.
-fs_permissions = [{ access = "read-write", path = "frontend/src/test/fixtures" }]
+# GenerateVectors.s.sol writes the frontend's differential test fixtures;
+# DeploymentIntegrity.t.sol reads the deployment record and the production
+# frontend config (read-only).
+fs_permissions = [
+  { access = "read-write", path = "frontend/src/test/fixtures" },
+  { access = "read", path = "broadcast/Deploy.s.sol/42161/run-latest.json" },
+  { access = "read", path = "frontend/.env.production" },
+]
 
 # Production compiler settings. Kept in the DEFAULT profile on purpose: tests,
 # CI and deployments must all exercise the exact bytecode that ships.
