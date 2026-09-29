@@ -1,0 +1,276 @@
+# Every night, on main, whether or not anything was committed:
+#
+# - the heavy fuzz and invariant campaign (FOUNDRY_PROFILE=heavy), too slow for
+#   pull requests, with a fresh random seed each night printed for exact
+#   reproduction, so the campaigns add up to ever more explored inputs
+# - the fork suites against the chain head: the deployed bytecode still
+#   matches this repository and the live game still has the interface the
+#   market reads (the game is an upgradeable proxy, so this can break without
+#   any commit here)
+# - the Halmos proofs (also a CI gate; nightly they also catch drift in the
+#   solvers and other transitive dependencies pip resolves afresh)
+# - an audit of the frontend's production dependencies, which catches
+#   advisories published after the lockfile last changed
+#
+# Any failure opens (or comments on) one tracking issue labelled
+# nightly-failure; the next green run closes it.
+name: Nightly
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  heavy-fuzz:
+    name: Heavy fuzz and invariant campaign
+    runs-on: ubuntu-latest
+    # About 4 minutes today (4 cores); room for longer campaigns.
+    timeout-minutes: 90
+    permissions:
+      contents: read # check out the repository
+    outputs:
+      seed: ${{ steps.seed.outputs.seed }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Load pinned tool versions
+        env:
+          REQUIRED: FOUNDRY_VERSION
+        run: |
+          # Strict KEY=value lines only: nothing else may reach $GITHUB_ENV.
+          if grep -nEv '^(#.*|[A-Z][A-Z0-9_]*=[A-Za-z0-9._+-]*)?$' tools/versions.env; then
+            echo "::error file=tools/versions.env::only KEY=value lines and # comments are allowed (see above)"
+            exit 1
+          fi
+          for key in $REQUIRED; do
+            grep -Eq "^${key}=.+" tools/versions.env || { echo "::error file=tools/versions.env::${key} is not set"; exit 1; }
+          done
+          grep -E '^[A-Z][A-Z0-9_]*=' tools/versions.env >> "$GITHUB_ENV"
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: ${{ env.FOUNDRY_VERSION }}
+          cache: false
+
+      - name: Pick a random fuzz seed
+        id: seed
+        run: |
+          seed="0x$(openssl rand -hex 32)"
+          echo "seed=${seed}" >> "$GITHUB_OUTPUT"
+          echo "Fuzz seed: ${seed}"
+          {
+            echo "### Heavy fuzz campaign"
+            echo
+            echo "Seed \`${seed}\`. Reproduce this exact campaign with:"
+            echo
+            echo '```sh'
+            echo "FOUNDRY_PROFILE=heavy FOUNDRY_FUZZ_SEED=${seed} forge test"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run the heavy campaign
+        env:
+          FOUNDRY_PROFILE: heavy
+          FOUNDRY_FUZZ_SEED: ${{ steps.seed.outputs.seed }}
+        run: forge test -vvv
+
+      # forge persists every counterexample it finds; keep them for replay.
+      - name: Upload the failure corpus
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-failures
+          path: |
+            cache/fuzz/
+            cache/invariant/
+          if-no-files-found: ignore
+          retention-days: 30
+
+  fork-live:
+    name: Fork tests against the live chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Holds the ARBITRUM_RPC_URL secret; see the fork job in ci.yml.
+    environment:
+      name: arbitrum-rpc
+      deployment: false
+    permissions:
+      contents: read # check out the repository
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Load pinned tool versions
+        env:
+          REQUIRED: FOUNDRY_VERSION
+        run: |
+          # Strict KEY=value lines only: nothing else may reach $GITHUB_ENV.
+          if grep -nEv '^(#.*|[A-Z][A-Z0-9_]*=[A-Za-z0-9._+-]*)?$' tools/versions.env; then
+            echo "::error file=tools/versions.env::only KEY=value lines and # comments are allowed (see above)"
+            exit 1
+          fi
+          for key in $REQUIRED; do
+            grep -Eq "^${key}=.+" tools/versions.env || { echo "::error file=tools/versions.env::${key} is not set"; exit 1; }
+          done
+          grep -E '^[A-Z][A-Z0-9_]*=' tools/versions.env >> "$GITHUB_ENV"
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: ${{ env.FOUNDRY_VERSION }}
+          # Forks follow the chain head; forge caches RPC state only for pinned blocks.
+          cache: false
+
+      - name: Run the fork suites (bytecode integrity, live interface, market flow)
+        env:
+          ARBITRUM_RPC_URL: ${{ secrets.ARBITRUM_RPC_URL || 'https://arb1.arbitrum.io/rpc' }}
+          REQUIRE_FORK_TESTS: "true"
+        run: forge test --match-contract Fork -vvv
+
+  symbolic:
+    name: Symbolic tests (Halmos)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # check out the repository
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Load pinned tool versions
+        env:
+          REQUIRED: FOUNDRY_VERSION HALMOS_VERSION
+        run: |
+          # Strict KEY=value lines only: nothing else may reach $GITHUB_ENV.
+          if grep -nEv '^(#.*|[A-Z][A-Z0-9_]*=[A-Za-z0-9._+-]*)?$' tools/versions.env; then
+            echo "::error file=tools/versions.env::only KEY=value lines and # comments are allowed (see above)"
+            exit 1
+          fi
+          for key in $REQUIRED; do
+            grep -Eq "^${key}=.+" tools/versions.env || { echo "::error file=tools/versions.env::${key} is not set"; exit 1; }
+          done
+          grep -E '^[A-Z][A-Z0-9_]*=' tools/versions.env >> "$GITHUB_ENV"
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: ${{ env.FOUNDRY_VERSION }}
+          cache: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: tools/versions.env
+
+      - name: Install Halmos
+        run: python -m pip install "halmos==${HALMOS_VERSION}"
+
+      - name: Prove the symbolic properties
+        run: tools/analysis/halmos.sh
+
+  audit:
+    name: Frontend production dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read # check out the repository
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm (version from package.json)
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Set up Node.js (version from .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Audit the production dependencies
+        # Reads the lockfile; no install needed.
+        run: pnpm audit --prod --audit-level=moderate
+
+  report:
+    name: Report to the tracking issue
+    needs: [heavy-fuzz, fork-live, symbolic, audit]
+    # Only for the default branch: a manual run on a feature branch reports
+    # through its own run page, not the shared issue.
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write # open, comment on and close the tracking issue
+    steps:
+      - name: Open, update or close the tracking issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RESULTS: ${{ toJSON(needs) }}
+          SEED: ${{ needs.heavy-fuzz.outputs.seed }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ github.sha }}
+        run: |
+          title="Nightly checks are failing"
+          label="nightly-failure"
+          failed="$(jq -r 'to_entries[] | select(.value.result != "success") | "- `\(.key)`: \(.value.result)"' <<<"$RESULTS")"
+
+          # One issue, found by label and exact title, so reruns never duplicate it.
+          gh label create "$label" --color B60205 \
+            --description "Opened and closed automatically by the nightly workflow" --force
+          issue="$(gh issue list --state open --label "$label" --limit 100 --json number,title \
+            --jq "map(select(.title == \"${title}\")) | first | .number // empty")"
+
+          if [[ -n "$failed" ]]; then
+            body="$(cat <<EOF
+          The nightly run on ${SHA} failed: ${RUN_URL}
+
+          ${failed}
+
+          Heavy fuzz seed: \`${SEED:-n/a}\` (reproduce with \`FOUNDRY_PROFILE=heavy FOUNDRY_FUZZ_SEED=<seed> forge test\`).
+
+          This issue collects every failing nightly run and is closed by the next green one.
+          EOF
+          )"
+            if [[ -n "$issue" ]]; then
+              gh issue comment "$issue" --body "$body"
+              echo "Commented on #${issue}"
+            else
+              gh issue create --title "$title" --label "$label" --body "$body"
+            fi
+          elif [[ -n "$issue" ]]; then
+            gh issue close "$issue" --reason completed --comment "The nightly run on ${SHA} passed again: ${RUN_URL}"
+            echo "Closed #${issue}"
+          else
+            echo "All nightly checks passed."
+          fi
