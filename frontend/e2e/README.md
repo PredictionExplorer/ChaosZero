@@ -24,11 +24,11 @@ box). Where browsers cannot be downloaded, point
 
 ## Suites
 
-| Tag      | Spec             | What it proves                                                                                                   |
-| -------- | ---------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `@smoke` | `smoke.spec.ts`  | Pages render and hydrate, navigation works, header controls stay reachable down to 320 px, SEO/AI routes answer. |
-| `@a11y`  | `a11y.spec.ts`   | Zero axe violations against WCAG 2.0/2.1/2.2 A and AA, including the wallet dialog and connected states.         |
-| `@chain` | `market.spec.ts` | Bets, liquidity, fee claims, withdrawals, early and normal resolution, and claims, through the UI.               |
+| Tag      | Spec             | What it proves                                                                                                                                                             |
+| -------- | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@smoke` | `smoke.spec.ts`  | Pages render and hydrate, navigation works, header controls stay reachable down to 320 px, SEO/AI routes answer.                                                           |
+| `@a11y`  | `a11y.spec.ts`   | Zero axe violations against WCAG 2.0/2.1/2.2 A and AA, including the wallet dialog and connected states; header controls stay reachable at 320 px with a wallet connected. |
+| `@chain` | `market.spec.ts` | Bets, liquidity, fee claims, withdrawals, early and normal resolution, and claims, through the UI.                                                                         |
 
 The `chromium` project runs everything; the `mobile` project (Pixel 7) runs
 `@smoke`. Against a deployed preview, run the chain-agnostic suites with

@@ -40,8 +40,8 @@ export default defineConfig({
     actionTimeout: 15_000,
     navigationTimeout: 30_000,
     // A trace (DOM snapshots, network, console, per-action screenshots) is
-    // the debugging artifact: kept for every failed attempt, so even the
-    // first failure in CI is debuggable from the uploaded report.
+    // the debugging artifact: kept for every failed attempt, including one
+    // that passes on retry; CI uploads the report on every run.
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     launchOptions: executablePath ? { executablePath } : {},

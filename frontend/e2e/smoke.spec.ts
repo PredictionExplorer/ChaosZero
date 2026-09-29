@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures";
+import { expectHeaderControlsReachable } from "./support/reachability";
 
 /**
  * Smoke: every page renders, hydrates and navigates without a single console
@@ -40,25 +41,15 @@ test.describe("smoke", { tag: "@smoke" }, () => {
       page,
     }) => {
       await page.goto(path);
-      const banner = page.getByRole("banner");
-      // Once hydrated, the header's action slot has its final (widest) content.
+      // Once hydrated, the header's action slot has its final content: here,
+      // with no wallet connected. The connected state is covered in
+      // a11y.spec.ts, which has a chain to connect to.
       if (path === "/")
         await expect(
-          banner.getByRole("button", { name: "Connect wallet", exact: true }),
+          page.getByRole("banner").getByRole("button", { name: "Connect wallet", exact: true }),
         ).toBeEnabled();
 
-      // This project's viewport, then 320 px: the narrowest width WCAG 1.4.10
-      // (Reflow) requires to work without losing functionality.
-      for (const viewport of [page.viewportSize(), { width: 320, height: 640 }]) {
-        if (viewport) await page.setViewportSize(viewport);
-        const controls = await banner.locator("a:visible, button:visible").all();
-        expect(controls.length).toBeGreaterThanOrEqual(3);
-        for (const control of controls) {
-          // A trial click runs every actionability check, including that the
-          // control itself (not something drawn over it) receives the pointer.
-          await control.click({ trial: true, timeout: 5_000 });
-        }
-      }
+      await expectHeaderControlsReachable(page);
     });
   }
 

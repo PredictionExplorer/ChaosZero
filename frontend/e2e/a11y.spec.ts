@@ -3,6 +3,7 @@ import type { Page, TestInfo } from "@playwright/test";
 import { parseEther } from "viem";
 import { expect, test } from "./fixtures";
 import { ACCOUNTS } from "./support/chain";
+import { expectHeaderControlsReachable } from "./support/reachability";
 
 /** Every WCAG 2.0 / 2.1 / 2.2 success criterion at levels A and AA that axe can check. */
 const WCAG_A_AA = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"];
@@ -73,6 +74,18 @@ test.describe("accessibility", { tag: "@a11y" }, () => {
       await market.openTab("Liquidity");
       await expect(market.liquidityPanel.getByTestId("lp-position")).toBeVisible();
       await expectNoViolations(market.page, testInfo);
+    },
+  );
+
+  test(
+    "header controls stay reachable down to 320 px with a wallet connected",
+    { tag: "@chain" },
+    async ({ market }) => {
+      // The connected account button replaces "Connect wallet" in the header's
+      // action slot; on phones it must shrink too (WCAG 1.4.10, Reflow).
+      await market.goto();
+      await market.connectWallet();
+      await expectHeaderControlsReachable(market.page);
     },
   );
 

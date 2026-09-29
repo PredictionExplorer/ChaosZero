@@ -39,9 +39,10 @@ export function ConnectButton() {
     return () => document.removeEventListener("pointerdown", handler);
   }, [menuOpen]);
 
-  // Below `sm` the label is visually hidden (still the accessible name): on
-  // phones the full-width button would cover the header's nav links. The bet
-  // panel's own "Connect wallet to bet" button carries the words there.
+  // Below `sm` every state's label is visually hidden (still the accessible
+  // name), leaving an icon-sized button: on phones a full-width one would
+  // cover the header's nav links. The bet panel's own "Connect wallet to bet"
+  // button carries the words there.
   if (!mounted) {
     return (
       <Button variant="outline" disabled>
@@ -78,7 +79,7 @@ export function ConnectButton() {
         loading={switchChain.isPending}
       >
         <TriangleAlert className="size-4" aria-hidden />
-        Switch to {appConfig.chain.name}
+        <span className="sr-only sm:not-sr-only">Switch to {appConfig.chain.name}</span>
       </Button>
     );
   }
@@ -87,7 +88,9 @@ export function ConnectButton() {
     <div className="relative" ref={menuRef}>
       <Button variant="outline" onClick={() => setMenuOpen((v) => !v)} aria-expanded={menuOpen}>
         <span className="size-2 rounded-full bg-higher shadow-glow-higher" aria-hidden />
-        <span className="font-mono text-xs">{shortAddress(connection.address ?? "")}</span>
+        <span className="sr-only font-mono text-xs sm:not-sr-only">
+          {shortAddress(connection.address ?? "")}
+        </span>
         <ChevronDown className="size-3.5 text-ink-dim" aria-hidden />
       </Button>
       {menuOpen && (
