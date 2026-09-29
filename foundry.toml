@@ -2,6 +2,13 @@
 src = "src"
 out = "out"
 libs = ["lib"]
+# solc records every remapping it is given in the metadata the deployed CBOR
+# hash covers, so the list is pinned to the deployed one. Auto-detection would
+# add a remapping for any directory that appears under lib/ (a test helper, a
+# submodule left behind by another branch) and change the hash of an
+# unchanged src/.
+remappings = ["forge-std/=lib/forge-std/src/"]
+auto_detect_remappings = false
 # GenerateVectors.s.sol writes the frontend's differential test fixtures;
 # DeploymentIntegrity.t.sol reads the deployment record and the production
 # frontend config (read-only).
@@ -40,7 +47,7 @@ runs = 512
 depth = 256
 fail_on_revert = true
 
-# `forge lint --deny warnings` is the lint gate (CI, pre-commit, `make lint`).
+# `forge lint --deny warnings` is the lint gate (CI, pre-push, `make lint`).
 # Rationale for every entry: tools/analysis/README.md#forge-lint
 [lint]
 severity = ["high", "med", "low"]

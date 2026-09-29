@@ -196,7 +196,9 @@ contract DeploymentIntegrityTest is BroadcastReader {
             "): ",
             what,
             ". Something under src/ or a [profile.default] compiler setting (solc, optimizer, optimizer_runs, via_ir,"
-            " evm_version, metadata/bytecode_hash, remappings) changed. The deployed contract is immutable: revert the"
+            " evm_version, metadata/bytecode_hash, the pinned remappings list, which solc records in the metadata even"
+            " for libraries src/ never imports) changed. Run `forge clean` first if foundry.toml changed: forge's"
+            " cache does not rebuild on a remapping change. The deployed contract is immutable: revert the"
             " change, or ship it as a NEW deployment (new broadcast record, frontend/.env.production, README) so the"
             " repository never describes code other than what users run."
         );

@@ -106,7 +106,7 @@ The same rationale is stored with each entry in `slither.db.json`.
 ## forge lint
 
 ```sh
-forge lint --deny warnings    # the gate: CI, pre-commit, make lint
+forge lint --deny warnings    # the gate: CI, pre-push, make lint
 ```
 
 `foundry.toml` `[lint]`:
@@ -130,13 +130,8 @@ forge lint --deny warnings    # the gate: CI, pre-commit, make lint
   Slither, Halmos and mutation runs stay quiet, and lint-on-build only sees
   files that were recompiled, which makes its output depend on cache state.
 
-With this configuration `forge lint` reports nothing on `src/` and
-`script/`. The only remaining warning is in a test file
-(`environment-read-across-mutation` at
-`test/GestureSeriesMarketHardening.t.sol:163`), which the test-suite owners
-fix in the test itself. Foundry 1.8.3's closing line ("aborting due to 12
-linter warning(s)") also counts the excluded diagnostics; the exit status
-and the printed warnings are what matter.
+With this configuration `forge lint` reports nothing on `src/`, `script/`
+or `test/`, and `--deny warnings` keeps it that way.
 
 ## Halmos
 
@@ -245,19 +240,21 @@ sample with this configuration (4 jobs on a shared 4-CPU machine) reached
 mutant 70 in 6 minutes, build included, which projects to about 1.9 hours
 for the whole campaign; the real figure is lower, because Foundry skips
 the remaining mutants of any expression that already has a survivor. The
-CI job therefore runs on a 4-core runner with a 180-minute timeout; on a
-2-core runner, expect roughly twice as long and raise the timeout.
+CI job therefore runs on a 4-core runner with a 300-minute timeout; on a
+2-core runner, expect roughly twice as long.
 
 How it runs:
 
 - **Never touches the checkout.** The script copies the project
-  (`foundry.toml`, `src`, `test`, `script`, `lib`) into a temporary
+  (`foundry.toml`, `src`, `test`, `script`, `lib`; not `broadcast/` or
+  `frontend/`) into a temporary
   directory, runs Foundry there, removes the copy on exit (also on Ctrl-C or
   a cancelled job) and fails if `src/` changed. Foundry itself tests each
   mutant in a separate per-mutant workspace inside that copy.
 - **Fast profile.** `FOUNDRY_PROFILE=mutation` compiles with legacy codegen
   and no optimizer (about 2 s per mutant instead of about 55 s under
-  via-IR; the whole suite compiles and passes that way). Test strength is
+  via-IR; every suite except the excluded ones below compiles and passes
+  that way). Test strength is
   unchanged: the profile inherits the default 1000 fuzz runs and the 64 x 64
   invariant campaign. It fixes the fuzz seed, so the set of survivors is
   reproducible, and disables invariant shrinking, which only minimizes a
@@ -267,8 +264,11 @@ How it runs:
   instead of up to 15 s (measured: a broken invariant spends ~15 s
   shrinking otherwise). Survivors still run the full suite.
 - **Excluded suites:** `Fork` (needs an RPC, and the fork runs deployed
-  bytecode, not the mutant) and `GasBenchmarks` (gas numbers, not
-  behavior). Override with `MUTATION_EXCLUDE`.
+  bytecode, not the mutant), `GasBenchmarks` (gas numbers, not behavior)
+  and `DeploymentIntegrity` (it compares the build with the deployed
+  bytecode, which the unoptimized profile never reproduces and which every
+  mutant changes, so it would fail the baseline and "kill" every mutant).
+  Override with `MUTATION_EXCLUDE`.
 - **Per-mutant timeout** of 120 s (`MUTATION_TIMEOUT`), about 20 times a
   normal mutant, so a mutant that makes a campaign pathologically slow is
   recorded as timed out instead of stalling the job.

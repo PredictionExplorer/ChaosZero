@@ -9,7 +9,8 @@
 #   MUTATION_JOBS      parallel mutants        (default: CPU count)
 #   MUTATION_TIMEOUT   seconds per mutant      (default 120, ~20x a normal mutant)
 #   MUTATION_EXCLUDE   --no-match-contract regex for suites that cannot kill
-#                      mutants deterministically (default "Fork|GasBenchmarks")
+#                      mutants meaningfully (default
+#                      "Fork|GasBenchmarks|DeploymentIntegrity")
 #   MUTATION_MAX_SURVIVING_EXPRESSIONS
 #                      optional gate: fail when more distinct source expressions
 #                      have a surviving mutant than this
@@ -35,7 +36,7 @@ check_version forge "$(forge_version)" "$(pinned_version FOUNDRY_VERSION 1.8.3)"
 target=${MUTATION_TARGET:-src/GestureSeriesMarket.sol}
 jobs=${MUTATION_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}
 per_mutant_timeout=${MUTATION_TIMEOUT:-120}
-exclude=${MUTATION_EXCLUDE:-Fork|GasBenchmarks}
+exclude=${MUTATION_EXCLUDE:-Fork|GasBenchmarks|DeploymentIntegrity}
 [[ -f $target ]] || die "mutation target $target does not exist"
 
 out="$ANALYSIS_OUT/mutation"
