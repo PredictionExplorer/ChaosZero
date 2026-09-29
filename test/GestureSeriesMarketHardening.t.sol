@@ -160,8 +160,10 @@ contract GestureSeriesMarketHardeningTest is SeriesTestBase {
     /// every price-sensitive function honors its deadline.
     function test_attack_staleTransactionsRejectedByDeadline() public {
         _seedPool(LIQ);
-        uint256 deadline = block.timestamp + 300;
-        vm.warp(block.timestamp + 301);
+        // vm.getBlockTimestamp(), not block.timestamp: the via-IR optimizer
+        // may reuse one block.timestamp read across the vm.warp below.
+        uint256 deadline = vm.getBlockTimestamp() + 300;
+        vm.warp(vm.getBlockTimestamp() + 301);
 
         vm.startPrank(alice);
         vm.expectRevert(GestureSeriesMarket.DeadlineExpired.selector);
@@ -457,6 +459,44 @@ contract GestureSeriesMarketHardeningTest is SeriesTestBase {
         vm.prank(alice);
         vm.expectRevert(GestureSeriesMarket.RoundNotActive.selector);
         market.betYes(ROUND, 1_000e18, 0, NO_DEADLINE);
+    }
+
+    /// Defense in depth. An opened pool can never lose its liquidity: the
+    /// DEAD_SHARES locked at address(0) keep totalShares > 0 and both reserves
+    /// >= 1 forever (invariant_openedPoolsNeverClose), and nobody can sign
+    /// for address(0) — so the zero-liquidity guards in `_bet` and `_quote`
+    /// are unreachable on-chain. Simulating that impossible exit with a prank
+    /// proves the guards fail closed (a clean InsufficientLiquidity, zero
+    /// quotes) instead of dividing by zero.
+    function test_defense_sharelessPoolFailsClosed() public {
+        uint256 adaShares = _seedPool(LIQ);
+        vm.prank(carol);
+        market.betYes(ROUND, 1_000e18, 0, NO_DEADLINE);
+        vm.prank(lpAda);
+        market.removeLiquidity(ROUND, adaShares, 0, 0, NO_DEADLINE);
+
+        // The last real LP leaving still leaves a (dust) pool that trades.
+        (uint256 rY, uint256 rN) = _reserves(ROUND);
+        assertEq(_totalShares(ROUND), DEAD_SHARES);
+        assertGt(rY, 0, "dead shares keep a YES reserve");
+        assertGt(rN, 0, "dead shares keep a NO reserve");
+        assertGt(market.quoteBetYes(ROUND, 1e18), 0, "the dust pool still quotes");
+
+        // The impossible: the dead-share holder exits.
+        vm.prank(address(0));
+        market.removeLiquidity(ROUND, DEAD_SHARES, 0, 0, NO_DEADLINE);
+        (rY, rN) = _reserves(ROUND);
+        assertEq(_totalShares(ROUND) + rY + rN, 0, "sanity: the pool is empty");
+
+        vm.startPrank(alice);
+        vm.expectRevert(GestureSeriesMarket.InsufficientLiquidity.selector);
+        market.betYes(ROUND, 1e18, 0, NO_DEADLINE);
+        vm.expectRevert(GestureSeriesMarket.InsufficientLiquidity.selector);
+        market.betNo(ROUND, 1e18, 0, NO_DEADLINE);
+        vm.stopPrank();
+        assertEq(market.quoteBetYes(ROUND, 1e18), 0, "an empty pool quotes 0");
+        assertEq(market.quoteBetNo(ROUND, 1e18), 0, "an empty pool quotes 0");
+        assertEq(market.currentFeeBps(ROUND), 0, "an empty pool charges no fee");
     }
 
     /// LP funds are never trapped by resolution timing games: exits work

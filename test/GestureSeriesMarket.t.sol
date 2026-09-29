@@ -4,6 +4,7 @@ pragma solidity ^0.8.35;
 import {GestureSeriesMarket} from "../src/GestureSeriesMarket.sol";
 import {ICosmicSignatureGame} from "../src/ICosmicSignatureGame.sol";
 import {SeriesTestBase} from "./utils/SeriesTestBase.sol";
+import {MockGame} from "./utils/Mocks.sol";
 
 /// @notice Core unit tests: happy paths, guards, and known edge cases for
 /// every external function of the series market.
@@ -20,6 +21,14 @@ contract GestureSeriesMarketTest is SeriesTestBase {
     function test_constructorRejectsZeroGame() public {
         vm.expectRevert(GestureSeriesMarket.InvalidParams.selector);
         new GestureSeriesMarket(ICosmicSignatureGame(address(0)));
+    }
+
+    /// CST is read from the game at construction; a game that reports no
+    /// token must not produce a market bound to address(0).
+    function test_constructorRejectsGameWithoutToken() public {
+        MockGame tokenless = new MockGame(address(0));
+        vm.expectRevert(GestureSeriesMarket.InvalidParams.selector);
+        new GestureSeriesMarket(ICosmicSignatureGame(address(tokenless)));
     }
 
     // ------------------------------------------------------------------
@@ -330,6 +339,43 @@ contract GestureSeriesMarketTest is SeriesTestBase {
         vm.stopPrank();
     }
 
+    /// The NO side has its own slippage check (and every other guard):
+    /// mirror of test_betGuards.
+    function test_betNoGuards() public {
+        _seedPool(LIQ);
+        uint256 quoted = market.quoteBetNo(ROUND, 1_000e18);
+
+        vm.startPrank(alice);
+        // Slippage: one wei above the quote reverts...
+        vm.expectRevert(GestureSeriesMarket.Slippage.selector);
+        market.betNo(ROUND, 1_000e18, quoted + 1, NO_DEADLINE);
+        // Deadline.
+        vm.expectRevert(GestureSeriesMarket.DeadlineExpired.selector);
+        market.betNo(ROUND, 1_000e18, 0, block.timestamp - 1);
+        // Zero amount.
+        vm.expectRevert(GestureSeriesMarket.InvalidParams.selector);
+        market.betNo(ROUND, 0, 0, NO_DEADLINE);
+        // Uninitialized round.
+        vm.expectRevert(GestureSeriesMarket.RoundNotInitialized.selector);
+        market.betNo(ROUND + 1, 1_000e18, 0, NO_DEADLINE);
+        // ...while a floor of exactly the quote fills: the bound is inclusive.
+        assertEq(market.betNo(ROUND, 1_000e18, quoted, NO_DEADLINE), quoted);
+        vm.stopPrank();
+    }
+
+    /// Quotes report 0 exactly when no bet could fill: no pool yet, or no input.
+    function test_quotesAreZeroWhenNothingCanTrade() public {
+        assertEq(market.quoteBetYes(ROUND, 1_000e18), 0, "no pool: YES quote");
+        assertEq(market.quoteBetNo(ROUND, 1_000e18), 0, "no pool: NO quote");
+        assertEq(market.currentFeeBps(ROUND), 0, "no pool: no fee");
+
+        _seedPool(LIQ);
+        assertEq(market.quoteBetYes(ROUND, 0), 0, "zero input: YES quote");
+        assertEq(market.quoteBetNo(ROUND, 0), 0, "zero input: NO quote");
+        assertGt(market.quoteBetYes(ROUND, 1), 0, "a live pool quotes even 1 wei");
+        assertGt(market.quoteBetNo(ROUND, 1), 0, "a live pool quotes even 1 wei");
+    }
+
     // ------------------------------------------------------------------
     // Sets
     // ------------------------------------------------------------------
@@ -367,6 +413,24 @@ contract GestureSeriesMarketTest is SeriesTestBase {
         vm.expectRevert(GestureSeriesMarket.InsufficientShares.selector);
         market.redeemSets(ROUND, 10e18 + 1);
         vm.stopPrank();
+    }
+
+    function test_redeemSetsGuards() public {
+        _seedPool(LIQ);
+        vm.startPrank(alice);
+        market.mintSets(ROUND, 10e18);
+        // Zero amount.
+        vm.expectRevert(GestureSeriesMarket.InvalidParams.selector);
+        market.redeemSets(ROUND, 0);
+        // A lopsided holder redeems only what pairs up: extra YES from a bet
+        // does not make NO appear.
+        market.betYes(ROUND, 5e18, 0, NO_DEADLINE);
+        assertGt(_yesBal(alice), 10e18);
+        vm.expectRevert(GestureSeriesMarket.InsufficientShares.selector);
+        market.redeemSets(ROUND, 10e18 + 1);
+        market.redeemSets(ROUND, 10e18);
+        vm.stopPrank();
+        assertEq(_noBal(alice), 0, "every NO was paired and redeemed");
     }
 
     function test_exitBetEarlyViaOppositeSidePlusRedeem() public {
