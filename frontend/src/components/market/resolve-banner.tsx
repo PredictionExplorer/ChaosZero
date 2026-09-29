@@ -20,14 +20,24 @@ interface ResolveBannerProps {
  * Shown when the round is resolvable but unresolved: either it ended, or the
  * count crossed the threshold mid-round (early YES resolution).
  */
-export function ResolveBanner({ snapshot, pending, connected, onResolve, onConnect }: ResolveBannerProps) {
+export function ResolveBanner({
+  snapshot,
+  pending,
+  connected,
+  onResolve,
+  onConnect,
+}: ResolveBannerProps) {
   const early = roundPhase(snapshot) === "decided";
   return (
     <Card accent="ended" className="p-5" data-testid="resolve-banner">
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h2 className="flex items-center gap-2 font-display text-lg font-semibold text-ended">
-            {early ? <Zap className="size-5" aria-hidden /> : <Sparkles className="size-5" aria-hidden />}
+            {early ? (
+              <Zap className="size-5" aria-hidden />
+            ) : (
+              <Sparkles className="size-5" aria-hidden />
+            )}
             {early ? "Threshold crossed — YES already won" : "The round has ended"}
           </h2>
           <p className="mt-1 text-sm text-ink-dim">
@@ -37,8 +47,9 @@ export function ResolveBanner({ snapshot, pending, connected, onResolve, onConne
                 <span className="font-mono font-semibold text-ink" data-testid="banner-count">
                   {formatCount(snapshot.currentCount)}
                 </span>{" "}
-                gestures, beating last round&apos;s {formatCount(snapshot.threshold)} while still live. The count only
-                goes up, so the outcome is certain — trading halted automatically.
+                gestures, beating last round&apos;s {formatCount(snapshot.threshold)} while still
+                live. The count only goes up, so the outcome is certain — trading halted
+                automatically.
               </>
             ) : (
               <>

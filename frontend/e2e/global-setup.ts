@@ -43,9 +43,11 @@ async function assertFreshSandbox(chain: LocalChain): Promise<void> {
   const state = await chain.roundState(round);
   const pool = await chain.pool(round);
   const problems: string[] = [];
-  if (!state.initialized || pool.totalShares === 0n) problems.push(`round ${round} has no liquidity`);
+  if (!state.initialized || pool.totalShares === 0n)
+    problems.push(`round ${round} has no liquidity`);
   if (state.resolved) problems.push(`round ${round} is already resolved`);
-  if (!state.thresholdKnown || state.currentCount > state.threshold) problems.push(`round ${round} is not live`);
+  if (!state.thresholdKnown || state.currentCount > state.threshold)
+    problems.push(`round ${round} is not live`);
   for (const [name, account] of Object.entries(ACCOUNTS)) {
     if (name === "deployer") continue;
     const [tokens, lp, allowance, balance] = await Promise.all([
@@ -54,7 +56,8 @@ async function assertFreshSandbox(chain: LocalChain): Promise<void> {
       chain.cstAllowance(account),
       chain.cstBalance(account),
     ]);
-    if (tokens.yes + tokens.no + lp.shares + allowance > 0n) problems.push(`${name} ${account} already traded`);
+    if (tokens.yes + tokens.no + lp.shares + allowance > 0n)
+      problems.push(`${name} ${account} already traded`);
     if (balance === 0n) problems.push(`${name} ${account} holds no CST`);
   }
   if (problems.length > 0) {

@@ -58,7 +58,9 @@ function deferred<T>() {
 function renderActions() {
   const queryClient = createTestQueryClient();
   const invalidate = vi.spyOn(queryClient, "invalidateQueries");
-  const hook = renderHook(() => useMarketActions(SERIES, ROUND), { wrapper: withQueryClient(queryClient) });
+  const hook = renderHook(() => useMarketActions(SERIES, ROUND), {
+    wrapper: withQueryClient(queryClient),
+  });
   return { ...hook, invalidate };
 }
 
@@ -203,31 +205,39 @@ const WRITES: readonly WriteCase[] = [
 ];
 
 describe("useMarketActions: what each action sends", () => {
-  it.each(WRITES)("$name sends $functionName to the right contract with ABI-valid args", async (write) => {
-    const { result } = renderActions();
+  it.each(WRITES)(
+    "$name sends $functionName to the right contract with ABI-valid args",
+    async (write) => {
+      const { result } = renderActions();
 
-    let ok: boolean | undefined;
-    await act(async () => {
-      ok = await write.invoke(result.current);
-    });
+      let ok: boolean | undefined;
+      await act(async () => {
+        ok = await write.invoke(result.current);
+      });
 
-    expect(ok).toBe(true);
-    expect(mocks.writeContractAsync).toHaveBeenCalledOnce();
-    expect(mocks.writeContractAsync).toHaveBeenCalledWith({
-      address: write.address,
-      abi: write.abi,
-      functionName: write.functionName,
-      args: write.args,
-    });
-    // The request must encode against the real ABI — wrong arity or types throw.
-    expect(() =>
-      encodeFunctionData({ abi: write.abi, functionName: write.functionName, args: write.args } as Parameters<
-        typeof encodeFunctionData
-      >[0]),
-    ).not.toThrow();
-    expect(mocks.toast.loading).toHaveBeenCalledWith(`${write.label} — confirm in your wallet…`);
-    expect(mocks.toast.success).toHaveBeenCalledWith(`${write.label} confirmed.`, expect.anything());
-  });
+      expect(ok).toBe(true);
+      expect(mocks.writeContractAsync).toHaveBeenCalledOnce();
+      expect(mocks.writeContractAsync).toHaveBeenCalledWith({
+        address: write.address,
+        abi: write.abi,
+        functionName: write.functionName,
+        args: write.args,
+      });
+      // The request must encode against the real ABI — wrong arity or types throw.
+      expect(() =>
+        encodeFunctionData({
+          abi: write.abi,
+          functionName: write.functionName,
+          args: write.args,
+        } as Parameters<typeof encodeFunctionData>[0]),
+      ).not.toThrow();
+      expect(mocks.toast.loading).toHaveBeenCalledWith(`${write.label} — confirm in your wallet…`);
+      expect(mocks.toast.success).toHaveBeenCalledWith(
+        `${write.label} confirmed.`,
+        expect.anything(),
+      );
+    },
+  );
 
   it.each(WRITES)("$name reports itself as pending while in flight", async (write) => {
     const signing = deferred<Hash>();
@@ -282,7 +292,10 @@ describe("useMarketActions: submit → confirm → refresh", () => {
   });
 
   it("builds explorer links without a double slash", async () => {
-    mocks.chain = { ...arbitrum, blockExplorers: { default: { name: "Scan", url: "https://scan.example/" } } };
+    mocks.chain = {
+      ...arbitrum,
+      blockExplorers: { default: { name: "Scan", url: "https://scan.example/" } },
+    };
     const { result } = renderActions();
 
     await act(() => result.current.claim());
@@ -299,13 +312,17 @@ describe("useMarketActions: submit → confirm → refresh", () => {
     await act(() => result.current.claim());
 
     expect(mocks.toast.loading.mock.calls[1]![1]).toEqual({ id: TOAST_ID });
-    expect(mocks.toast.success).toHaveBeenCalledWith("Claiming winnings confirmed.", { id: TOAST_ID });
+    expect(mocks.toast.success).toHaveBeenCalledWith("Claiming winnings confirmed.", {
+      id: TOAST_ID,
+    });
   });
 });
 
 describe("useMarketActions: failures", () => {
   it("treats a wallet rejection as a cancel, not a failure to wait on", async () => {
-    mocks.writeContractAsync.mockRejectedValueOnce(new UserRejectedRequestError(new Error("User rejected")));
+    mocks.writeContractAsync.mockRejectedValueOnce(
+      new UserRejectedRequestError(new Error("User rejected")),
+    );
     const { result, invalidate } = renderActions();
 
     let ok: boolean | undefined;
@@ -315,7 +332,9 @@ describe("useMarketActions: failures", () => {
 
     expect(ok).toBe(false);
     expect(mocks.waitForTransactionReceipt).not.toHaveBeenCalled();
-    expect(mocks.toast.error).toHaveBeenCalledWith("Transaction cancelled in your wallet.", { id: TOAST_ID });
+    expect(mocks.toast.error).toHaveBeenCalledWith("Transaction cancelled in your wallet.", {
+      id: TOAST_ID,
+    });
     expect(mocks.toast.success).not.toHaveBeenCalled();
     expect(result.current.pending).toBeNull();
     expect(invalidate).toHaveBeenCalledOnce();
@@ -337,7 +356,9 @@ describe("useMarketActions: failures", () => {
   });
 
   it("explains errors raised while waiting for the receipt", async () => {
-    mocks.waitForTransactionReceipt.mockRejectedValueOnce(new Error("Timed out while waiting for transaction"));
+    mocks.waitForTransactionReceipt.mockRejectedValueOnce(
+      new Error("Timed out while waiting for transaction"),
+    );
     const { result } = renderActions();
 
     let ok: boolean | undefined;
@@ -346,7 +367,9 @@ describe("useMarketActions: failures", () => {
     });
 
     expect(ok).toBe(false);
-    expect(mocks.toast.error).toHaveBeenCalledWith("Timed out while waiting for transaction", { id: TOAST_ID });
+    expect(mocks.toast.error).toHaveBeenCalledWith("Timed out while waiting for transaction", {
+      id: TOAST_ID,
+    });
   });
 
   it("refuses a second transaction while one is in flight", async () => {

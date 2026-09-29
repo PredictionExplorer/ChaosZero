@@ -25,7 +25,11 @@ vi.mock("wagmi", () => ({
 }));
 vi.mock("sonner", () => ({ toast: { error: mocks.toastError } }));
 
-const METAMASK: FakeConnector = { uid: "io.metamask", name: "MetaMask", icon: "data:image/svg+xml;base64,PHN2Zy8+" };
+const METAMASK: FakeConnector = {
+  uid: "io.metamask",
+  name: "MetaMask",
+  icon: "data:image/svg+xml;base64,PHN2Zy8+",
+};
 const WALLETCONNECT: FakeConnector = { uid: "walletConnect", name: "WalletConnect" };
 
 beforeAll(() => {

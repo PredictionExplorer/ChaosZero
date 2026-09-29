@@ -56,64 +56,71 @@ function Pill({ color, children }: { color: string; children: string }) {
 
 export async function ogCardResponse(): Promise<ImageResponse> {
   // Vendored (SIL OFL 1.1) so the build never fetches fonts from the network.
-  const spaceGrotesk = await readFile(join(process.cwd(), "src/assets/fonts/SpaceGrotesk-Bold.ttf"));
+  const spaceGrotesk = await readFile(
+    join(process.cwd(), "src/assets/fonts/SpaceGrotesk-Bold.ttf"),
+  );
 
   return new ImageResponse(
-    (
-      <div
-        style={{
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "space-between",
-          padding: 64,
-          backgroundColor: VOID,
-          backgroundImage:
-            `radial-gradient(720px 420px at 8% -12%, ${SIGNAL}33, transparent 60%), ` +
-            `radial-gradient(560px 360px at 96% 6%, ${HIGHER}1f, transparent 60%), ` +
-            `radial-gradient(640px 440px at 55% 118%, ${LOWER}1c, transparent 62%)`,
-          fontFamily: "Space Grotesk",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: 84,
-              height: 84,
-              borderRadius: 24,
-              backgroundColor: `${SIGNAL}26`,
-            }}
-          >
-            <BrandGlyph size={52} />
-          </div>
-          <div style={{ display: "flex", fontSize: 44, color: INK }}>
-            <span>Chaos</span>
-            <span style={{ color: SIGNAL_BRIGHT }}>Zero</span>
-          </div>
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+        padding: 64,
+        backgroundColor: VOID,
+        backgroundImage:
+          `radial-gradient(720px 420px at 8% -12%, ${SIGNAL}33, transparent 60%), ` +
+          `radial-gradient(560px 360px at 96% 6%, ${HIGHER}1f, transparent 60%), ` +
+          `radial-gradient(640px 440px at 55% 118%, ${LOWER}1c, transparent 62%)`,
+        fontFamily: "Space Grotesk",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 84,
+            height: 84,
+            borderRadius: 24,
+            backgroundColor: `${SIGNAL}26`,
+          }}
+        >
+          <BrandGlyph size={52} />
         </div>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
-          <div style={{ display: "flex", fontSize: 84, lineHeight: 1.04, color: INK, maxWidth: 1020 }}>
-            Bet YES or NO on every Cosmic Signature round
-          </div>
-          <div style={{ display: "flex", fontSize: 32, lineHeight: 1.3, color: INK_DIM, maxWidth: 980 }}>
-            Will this round end with more gestures than the last? Zero oracles, zero admin keys, zero custody — settled in CST.
-          </div>
-        </div>
-
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", gap: 18 }}>
-            <Pill color={HIGHER}>YES pays 1 CST</Pill>
-            <Pill color={LOWER}>NO pays 1 CST</Pill>
-          </div>
-          <div style={{ display: "flex", fontSize: 30, color: INK_DIM }}>{new URL(SITE_URL).host}</div>
+        <div style={{ display: "flex", fontSize: 44, color: INK }}>
+          <span>Chaos</span>
+          <span style={{ color: SIGNAL_BRIGHT }}>Zero</span>
         </div>
       </div>
-    ),
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 22 }}>
+        <div
+          style={{ display: "flex", fontSize: 84, lineHeight: 1.04, color: INK, maxWidth: 1020 }}
+        >
+          Bet YES or NO on every Cosmic Signature round
+        </div>
+        <div
+          style={{ display: "flex", fontSize: 32, lineHeight: 1.3, color: INK_DIM, maxWidth: 980 }}
+        >
+          Will this round end with more gestures than the last? Zero oracles, zero admin keys, zero
+          custody — settled in CST.
+        </div>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", gap: 18 }}>
+          <Pill color={HIGHER}>YES pays 1 CST</Pill>
+          <Pill color={LOWER}>NO pays 1 CST</Pill>
+        </div>
+        <div style={{ display: "flex", fontSize: 30, color: INK_DIM }}>
+          {new URL(SITE_URL).host}
+        </div>
+      </div>
+    </div>,
     {
       ...OG_SIZE,
       fonts: [{ name: "Space Grotesk", data: spaceGrotesk, weight: 700, style: "normal" }],

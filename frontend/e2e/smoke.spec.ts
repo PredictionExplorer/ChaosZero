@@ -11,17 +11,24 @@ test.describe("smoke", { tag: "@smoke" }, () => {
     await page.goto("/");
 
     await expect(page).toHaveTitle(/Chaos Zero/);
-    await expect(page.getByRole("heading", { level: 1, name: "Bet on Cosmic Signature gestures" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Bet on Cosmic Signature gestures" }),
+    ).toBeVisible();
     await expect(
       page.getByRole("navigation", { name: "Primary" }).getByRole("link", { name: "Market" }),
     ).toHaveAttribute("aria-current", "page");
 
     // The client island hydrated and read the market from the chain.
     await expect(page.getByRole("navigation", { name: "Round navigation" })).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Place bet" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: "Place bet" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
     await expect(page.getByRole("heading", { name: "Place your bet" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible();
-    await expect(page.getByRole("banner").getByRole("button", { name: "Connect wallet", exact: true })).toBeEnabled();
+    await expect(
+      page.getByRole("banner").getByRole("button", { name: "Connect wallet", exact: true }),
+    ).toBeEnabled();
 
     // Server-rendered explainer and footer.
     await expect(page.getByRole("region", { name: "How it works" })).toBeVisible();
@@ -29,11 +36,16 @@ test.describe("smoke", { tag: "@smoke" }, () => {
   });
 
   for (const path of ["/", "/faq"]) {
-    test(`every header control on ${path} is reachable: nothing covers another`, async ({ page }) => {
+    test(`every header control on ${path} is reachable: nothing covers another`, async ({
+      page,
+    }) => {
       await page.goto(path);
       const banner = page.getByRole("banner");
       // Once hydrated, the header's action slot has its final (widest) content.
-      if (path === "/") await expect(banner.getByRole("button", { name: "Connect wallet", exact: true })).toBeEnabled();
+      if (path === "/")
+        await expect(
+          banner.getByRole("button", { name: "Connect wallet", exact: true }),
+        ).toBeEnabled();
 
       // This project's viewport, then 320 px: the narrowest width WCAG 1.4.10
       // (Reflow) requires to work without losing functionality.
@@ -56,18 +68,24 @@ test.describe("smoke", { tag: "@smoke" }, () => {
 
     await nav.getByRole("link", { name: "FAQ" }).click();
     await expect(page).toHaveURL(/\/faq$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Frequently asked questions" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Frequently asked questions" }),
+    ).toBeVisible();
     await expect(nav.getByRole("link", { name: "FAQ" })).toHaveAttribute("aria-current", "page");
 
     await nav.getByRole("link", { name: "Market" }).click();
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Bet on Cosmic Signature gestures" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Bet on Cosmic Signature gestures" }),
+    ).toBeVisible();
   });
 
   test("FAQ answers expand and collapse, and match the structured data", async ({ page }) => {
     await page.goto("/faq");
     await expect(page).toHaveTitle(/^FAQ — Chaos Zero/);
-    await expect(page.getByRole("heading", { level: 1, name: "Frequently asked questions" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Frequently asked questions" }),
+    ).toBeVisible();
     // The FAQ ships no wallet code: no connect button in its header.
     await expect(page.getByRole("banner").getByRole("button", { name: /connect/i })).toHaveCount(0);
 
@@ -83,11 +101,16 @@ test.describe("smoke", { tag: "@smoke" }, () => {
     await expect(answer).toBeHidden();
 
     // Every question on the page is in the FAQPage JSON-LD, and nothing else is.
-    const questions = await page.getByRole("main").locator("button[aria-expanded]").allTextContents();
+    const questions = await page
+      .getByRole("main")
+      .locator("button[aria-expanded]")
+      .allTextContents();
     const faqPage = (await page.locator('script[type="application/ld+json"]').allTextContents())
       .map((json) => JSON.parse(json) as { "@type"?: string; mainEntity?: { name: string }[] })
       .find((node) => node["@type"] === "FAQPage");
-    expect(faqPage?.mainEntity?.map((entry) => entry.name)).toEqual(questions.map((text) => text.trim()));
+    expect(faqPage?.mainEntity?.map((entry) => entry.name)).toEqual(
+      questions.map((text) => text.trim()),
+    );
   });
 
   test("machine-readable routes answer", async ({ request }) => {

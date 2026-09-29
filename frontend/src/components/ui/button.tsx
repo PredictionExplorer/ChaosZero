@@ -13,13 +13,16 @@ type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
 };
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  signal: "bg-signal text-void font-semibold hover:bg-signal-bright shadow-glow-signal disabled:shadow-none",
+  signal:
+    "bg-signal text-void font-semibold hover:bg-signal-bright shadow-glow-signal disabled:shadow-none",
   higher:
     "bg-higher text-void font-semibold hover:brightness-110 shadow-glow-higher disabled:shadow-none",
-  lower: "bg-lower text-void font-semibold hover:brightness-110 shadow-glow-lower disabled:shadow-none",
+  lower:
+    "bg-lower text-void font-semibold hover:brightness-110 shadow-glow-lower disabled:shadow-none",
   ended: "bg-ended text-void font-semibold hover:brightness-110 disabled:shadow-none",
   ghost: "bg-transparent text-ink-dim hover:text-ink hover:bg-surface-2",
-  outline: "border border-line-strong text-ink hover:border-signal/60 hover:text-signal-bright bg-surface/40",
+  outline:
+    "border border-line-strong text-ink hover:border-signal/60 hover:text-signal-bright bg-surface/40",
 };
 
 const SIZES: Record<ButtonSize, string> = {

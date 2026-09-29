@@ -31,7 +31,9 @@ export default defineConfig({
   // Bounded everywhere: a hung transaction fails fast instead of eating the job.
   timeout: 60_000,
   expect: { timeout: 10_000 },
-  reporter: CI ? [["list"], ["github"], ["html", { open: "never" }]] : [["list"], ["html", { open: "never" }]],
+  reporter: CI
+    ? [["list"], ["github"], ["html", { open: "never" }]]
+    : [["list"], ["html", { open: "never" }]],
 
   use: {
     baseURL: BASE_URL,

@@ -91,14 +91,21 @@ describe("the fee vote", () => {
 
   it("property: feeAfterDeclarationChange is monotone in the new vote", () => {
     fc.assert(
-      fc.property(arbLiquidity, fc.bigInt({ min: 1n, max: 10n ** 24n }), arbFee, arbFee, arbFee, (total, lpShares, oldFee, a, b) => {
-        const shares = lpShares > total ? total : lpShares;
-        const p = { feeWeight: total * oldFee, totalShares: total };
-        const feeA = feeAfterDeclarationChange(p, shares, oldFee, a);
-        const feeB = feeAfterDeclarationChange(p, shares, oldFee, b);
-        if (a <= b) expect(feeA <= feeB).toBe(true);
-        else expect(feeA >= feeB).toBe(true);
-      }),
+      fc.property(
+        arbLiquidity,
+        fc.bigInt({ min: 1n, max: 10n ** 24n }),
+        arbFee,
+        arbFee,
+        arbFee,
+        (total, lpShares, oldFee, a, b) => {
+          const shares = lpShares > total ? total : lpShares;
+          const p = { feeWeight: total * oldFee, totalShares: total };
+          const feeA = feeAfterDeclarationChange(p, shares, oldFee, a);
+          const feeB = feeAfterDeclarationChange(p, shares, oldFee, b);
+          if (a <= b) expect(feeA <= feeB).toBe(true);
+          else expect(feeA >= feeB).toBe(true);
+        },
+      ),
     );
   });
 
@@ -270,10 +277,15 @@ describe("joinPool", () => {
         // Simulate an existing position of a third of the pool at oldDecl.
         const existingShares = p.totalShares / 3n;
         const primed = { ...p, feeWeight: p.feeWeight + existingShares * oldDecl };
-        const result = joinPool(primed, cstIn, newDecl, { shares: existingShares, declaredFeeBps: oldDecl });
+        const result = joinPool(primed, cstIn, newDecl, {
+          shares: existingShares,
+          declaredFeeBps: oldDecl,
+        });
         if (result === null) return;
         const expectedWeight =
-          primed.feeWeight - existingShares * oldDecl + (existingShares + result.sharesOut) * newDecl;
+          primed.feeWeight -
+          existingShares * oldDecl +
+          (existingShares + result.sharesOut) * newDecl;
         expect(result.pool.feeWeight).toBe(expectedWeight);
       }),
     );
@@ -314,14 +326,25 @@ describe("removeLiquidity", () => {
 
   it("property: withdrawals are pro-rata and departing shares stop voting", () => {
     fc.assert(
-      fc.property(arbReserve, arbReserve, fc.bigInt({ min: 1n, max: 10n ** 24n }), arbFee, (rY, rN, shares, decl) => {
-        const total = 10n ** 24n;
-        const p = pool({ reserveYes: rY, reserveNo: rN, totalShares: total, feeWeight: total * decl });
-        const { yesOut, noOut, pool: after } = removeLiquidity(p, shares, decl);
-        expect(yesOut).toBe((rY * shares) / total);
-        expect(noOut).toBe((rN * shares) / total);
-        expect(after.feeWeight).toBe(p.feeWeight - shares * decl);
-      }),
+      fc.property(
+        arbReserve,
+        arbReserve,
+        fc.bigInt({ min: 1n, max: 10n ** 24n }),
+        arbFee,
+        (rY, rN, shares, decl) => {
+          const total = 10n ** 24n;
+          const p = pool({
+            reserveYes: rY,
+            reserveNo: rN,
+            totalShares: total,
+            feeWeight: total * decl,
+          });
+          const { yesOut, noOut, pool: after } = removeLiquidity(p, shares, decl);
+          expect(yesOut).toBe((rY * shares) / total);
+          expect(noOut).toBe((rN * shares) / total);
+          expect(after.feeWeight).toBe(p.feeWeight - shares * decl);
+        },
+      ),
     );
   });
 });
@@ -360,16 +383,21 @@ describe("fees and positions", () => {
 
   it("property: lpPositionValueFloat lies between the pro-rata YES and NO withdrawals", () => {
     fc.assert(
-      fc.property(arbReserve, arbReserve, fc.bigInt({ min: 1n, max: 10n ** 24n }), (rY, rN, shares) => {
-        const total = 10n ** 24n;
-        const p = pool({ reserveYes: rY, reserveNo: rN, totalShares: total });
-        const { yesOut, noOut } = removeLiquidity(p, shares, 0n);
-        const lo = Number(yesOut < noOut ? yesOut : noOut) / 1e18;
-        const hi = Number(yesOut > noOut ? yesOut : noOut) / 1e18;
-        const value = lpPositionValueFloat(p, shares, 0n);
-        expect(value).toBeGreaterThanOrEqual(lo * (1 - 1e-12));
-        expect(value).toBeLessThanOrEqual(hi * (1 + 1e-12));
-      }),
+      fc.property(
+        arbReserve,
+        arbReserve,
+        fc.bigInt({ min: 1n, max: 10n ** 24n }),
+        (rY, rN, shares) => {
+          const total = 10n ** 24n;
+          const p = pool({ reserveYes: rY, reserveNo: rN, totalShares: total });
+          const { yesOut, noOut } = removeLiquidity(p, shares, 0n);
+          const lo = Number(yesOut < noOut ? yesOut : noOut) / 1e18;
+          const hi = Number(yesOut > noOut ? yesOut : noOut) / 1e18;
+          const value = lpPositionValueFloat(p, shares, 0n);
+          expect(value).toBeGreaterThanOrEqual(lo * (1 - 1e-12));
+          expect(value).toBeLessThanOrEqual(hi * (1 + 1e-12));
+        },
+      ),
     );
   });
 
@@ -410,13 +438,20 @@ function expectPoolMatches(actual: PoolState, v: Record<string, string>, prefix:
 describe("differential vectors from the contract", () => {
   it(`buyAmount matches the contract on ${vectors.buyAmount.length} magnitude-swept cases`, () => {
     for (const v of vectors.buyAmount) {
-      expect(buyAmount(BigInt(v.reserveOut), BigInt(v.reserveIn), BigInt(v.net))).toBe(BigInt(v.tokensOut));
+      expect(buyAmount(BigInt(v.reserveOut), BigInt(v.reserveIn), BigInt(v.net))).toBe(
+        BigInt(v.tokensOut),
+      );
     }
   });
 
   it(`replays ${vectors.flows.length} executed open→bet→join→re-vote→bet→remove flows exactly`, () => {
     for (const raw of vectors.flows) {
-      const v = raw as unknown as Record<string, string> & { openFeeBps: number; joinFeeBps: number; revoteFeeBps: number; betYes: boolean };
+      const v = raw as unknown as Record<string, string> & {
+        openFeeBps: number;
+        joinFeeBps: number;
+        revoteFeeBps: number;
+        betYes: boolean;
+      };
 
       // Open.
       const opened = openPool(BigInt(v.liq), BigInt(v.probBps), BigInt(v.openFeeBps));
@@ -456,7 +491,10 @@ describe("differential vectors from the contract", () => {
       expect(removed.yesOut).toBe(BigInt(v.removeYes));
       expect(removed.noOut).toBe(BigInt(v.removeNo));
       // The remove settles fees; escrow drops by exactly what was paid out.
-      const finalPool = { ...removed.pool, feeReserve: removed.pool.feeReserve - BigInt(v.removeFees) };
+      const finalPool = {
+        ...removed.pool,
+        feeReserve: removed.pool.feeReserve - BigInt(v.removeFees),
+      };
       expectPoolMatches(finalPool, v, "postRemove");
     }
   });

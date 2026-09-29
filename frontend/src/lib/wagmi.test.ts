@@ -101,6 +101,8 @@ describe("wagmi config", () => {
 
     await config.storage?.setItem("recentConnectorId", "io.metamask");
 
-    expect(window.localStorage.getItem("chaos-zero.recentConnectorId")).toBe(JSON.stringify("io.metamask"));
+    expect(window.localStorage.getItem("chaos-zero.recentConnectorId")).toBe(
+      JSON.stringify("io.metamask"),
+    );
   });
 });

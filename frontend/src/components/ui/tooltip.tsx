@@ -50,8 +50,18 @@ export function computeBubblePosition(args: {
 }): BubblePosition {
   const { trigger, bubbleWidth, bubbleHeight, side, align, viewportWidth, viewportHeight } = args;
 
-  const anchorX = align === "center" ? trigger.left + trigger.width / 2 : align === "start" ? trigger.left : trigger.right;
-  const desiredLeft = align === "center" ? anchorX - bubbleWidth / 2 : align === "start" ? anchorX : anchorX - bubbleWidth;
+  const anchorX =
+    align === "center"
+      ? trigger.left + trigger.width / 2
+      : align === "start"
+        ? trigger.left
+        : trigger.right;
+  const desiredLeft =
+    align === "center"
+      ? anchorX - bubbleWidth / 2
+      : align === "start"
+        ? anchorX
+        : anchorX - bubbleWidth;
   const maxLeft = Math.max(PAD, viewportWidth - PAD - bubbleWidth);
   const left = Math.min(Math.max(desiredLeft, PAD), maxLeft);
 
@@ -170,10 +180,14 @@ export function Tooltip({
   // When the child is the focusable trigger, the description belongs on it.
   const child =
     tabIndex < 0 && isValidElement(children)
-      ? cloneElement(children as ReactElement<HTMLAttributes<HTMLElement>>, { "aria-describedby": describedBy })
+      ? cloneElement(children as ReactElement<HTMLAttributes<HTMLElement>>, {
+          "aria-describedby": describedBy,
+        })
       : children;
 
-  const bubbleStyle: CSSProperties = pos ? { top: pos.top, left: pos.left } : { visibility: "hidden" };
+  const bubbleStyle: CSSProperties = pos
+    ? { top: pos.top, left: pos.left }
+    : { visibility: "hidden" };
 
   return (
     <span
@@ -228,7 +242,14 @@ export interface InfoTipProps {
  * annotate a label. Renders a real button so it is tabbable, tappable, and
  * announced with `label`.
  */
-export function InfoTip({ label, content, side, align, className = "", iconClassName = "size-3.5" }: InfoTipProps) {
+export function InfoTip({
+  label,
+  content,
+  side,
+  align,
+  className = "",
+  iconClassName = "size-3.5",
+}: InfoTipProps) {
   return (
     <Tooltip content={content} side={side} align={align} tabIndex={-1} className={className}>
       <button

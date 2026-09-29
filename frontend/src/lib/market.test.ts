@@ -76,7 +76,9 @@ describe("roundPhase", () => {
   });
 
   it("resolved wins over everything else", () => {
-    expect(roundPhase(snapshot({ resolved: true, gameRoundNum: 9n, currentCount: 10_000n }))).toBe("resolved");
+    expect(roundPhase(snapshot({ resolved: true, gameRoundNum: 9n, currentCount: 10_000n }))).toBe(
+      "resolved",
+    );
   });
 
   it("a future round can never be decided, whatever the counts claim", () => {
@@ -87,7 +89,9 @@ describe("roundPhase", () => {
   it("an unknown threshold never triggers decided even on the current round", () => {
     // Defensive: the contract always knows the threshold for current rounds,
     // but the guard must sit on thresholdKnown, not on the raw comparison.
-    expect(roundPhase(snapshot({ thresholdKnown: false, threshold: 0n, currentCount: 5n }))).toBe("live");
+    expect(roundPhase(snapshot({ thresholdKnown: false, threshold: 0n, currentCount: 5n }))).toBe(
+      "live",
+    );
   });
 });
 
@@ -96,7 +100,9 @@ describe("tradability and resolvability", () => {
     expect(isTradable(snapshot())).toBe(true);
     expect(isTradable(futureSnapshot())).toBe(true);
     expect(isTradable(snapshot({ pool: { ...snapshot().pool, totalShares: 0n } }))).toBe(false);
-    expect(isTradable(futureSnapshot({ pool: { ...snapshot().pool, totalShares: 0n } }))).toBe(false);
+    expect(isTradable(futureSnapshot({ pool: { ...snapshot().pool, totalShares: 0n } }))).toBe(
+      false,
+    );
     expect(isTradable(snapshot({ currentCount: 801n }))).toBe(false);
     expect(isTradable(snapshot({ gameRoundNum: 6n }))).toBe(false);
     expect(isTradable(snapshot({ resolved: true }))).toBe(false);
@@ -123,7 +129,9 @@ describe("tradability and resolvability", () => {
     // Past rounds can never be opened.
     expect(canAddLiquidity(snapshot({ initialized: false, gameRoundNum: 6n }))).toBe(false);
     // Round 0 has no previous round.
-    expect(canAddLiquidity(snapshot({ initialized: false, roundId: 0n, gameRoundNum: 0n }))).toBe(false);
+    expect(canAddLiquidity(snapshot({ initialized: false, roundId: 0n, gameRoundNum: 0n }))).toBe(
+      false,
+    );
     expect(canAddLiquidity(snapshot({ currentCount: 801n }))).toBe(false);
     expect(canAddLiquidity(snapshot({ resolved: true }))).toBe(false);
     // Ended rounds are withdraw-only, even for existing LPs.
@@ -164,7 +172,11 @@ describe("displayedProbability", () => {
   });
 
   it("is null with no liquidity", () => {
-    expect(displayedProbability(snapshot({ pool: { ...snapshot().pool, reserveYes: 0n, reserveNo: 0n } }))).toBeNull();
+    expect(
+      displayedProbability(
+        snapshot({ pool: { ...snapshot().pool, reserveYes: 0n, reserveNo: 0n } }),
+      ),
+    ).toBeNull();
   });
 });
 

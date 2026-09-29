@@ -11,7 +11,13 @@ import { ONE } from "@/lib/math";
 import { createFakeChain, type FakeChain } from "@/test/fake-chain";
 import { CST, GAME, SERIES, USER } from "@/test/fixtures";
 import { createTestWagmi } from "@/test/wagmi";
-import { useCurrentGameRound, useMarket, useRoundSnapshot, useSeriesStatics, useUserSnapshot } from "./use-market";
+import {
+  useCurrentGameRound,
+  useMarket,
+  useRoundSnapshot,
+  useSeriesStatics,
+  useUserSnapshot,
+} from "./use-market";
 
 /** What the fake chain holds; tests mutate it to simulate new blocks. */
 interface World {
@@ -82,9 +88,13 @@ function deployWorld(chain: FakeChain, world: World) {
       case "pool":
         return world.pools.get(round) ?? EMPTY_POOL;
       case "balancesOf":
-        return isAddressEqual(args[1] as Address, USER) ? (world.balances.get(round) ?? [0n, 0n]) : [0n, 0n];
+        return isAddressEqual(args[1] as Address, USER)
+          ? (world.balances.get(round) ?? [0n, 0n])
+          : [0n, 0n];
       case "lpPositionOf":
-        return isAddressEqual(args[1] as Address, USER) ? (world.lpPositions.get(round) ?? [0n, 0n, 0]) : [0n, 0n, 0];
+        return isAddressEqual(args[1] as Address, USER)
+          ? (world.lpPositions.get(round) ?? [0n, 0n, 0])
+          : [0n, 0n, 0];
       default:
         throw new Error(`unexpected series read ${fn}`);
     }
@@ -187,7 +197,9 @@ describe("useCurrentGameRound", () => {
 
 describe("useRoundSnapshot", () => {
   it("assembles one round's lifecycle, pool, game round and forming threshold", async () => {
-    const { result } = renderHook(() => useRoundSnapshot(SERIES, STATICS, 5n), { wrapper: harness.wrapper });
+    const { result } = renderHook(() => useRoundSnapshot(SERIES, STATICS, 5n), {
+      wrapper: harness.wrapper,
+    });
 
     await waitFor(() => expect(result.current.snapshot).not.toBeNull());
     expect(result.current.snapshot).toEqual({
@@ -217,7 +229,9 @@ describe("useRoundSnapshot", () => {
   });
 
   it("reads round 0's own count as its forming threshold (there is no round -1)", async () => {
-    const { result } = renderHook(() => useRoundSnapshot(SERIES, STATICS, 0n), { wrapper: harness.wrapper });
+    const { result } = renderHook(() => useRoundSnapshot(SERIES, STATICS, 0n), {
+      wrapper: harness.wrapper,
+    });
 
     await waitFor(() => expect(result.current.snapshot).not.toBeNull());
     expect(result.current.snapshot?.prevRoundCount).toBe(120n);
@@ -230,7 +244,9 @@ describe("useRoundSnapshot", () => {
     ["no statics", SERIES, null, 5n],
     ["no round", SERIES, STATICS, null],
   ] as const)("stays idle with %s", async (_label, series, statics, roundId) => {
-    const { result } = renderHook(() => useRoundSnapshot(series, statics, roundId), { wrapper: harness.wrapper });
+    const { result } = renderHook(() => useRoundSnapshot(series, statics, roundId), {
+      wrapper: harness.wrapper,
+    });
 
     await act(async () => {});
     expect(result.current.snapshot).toBeNull();
@@ -241,7 +257,9 @@ describe("useRoundSnapshot", () => {
 
 describe("useUserSnapshot", () => {
   it("has no user and reads nothing while no wallet is connected", async () => {
-    const { result } = renderHook(() => useUserSnapshot(SERIES, STATICS, 5n), { wrapper: harness.wrapper });
+    const { result } = renderHook(() => useUserSnapshot(SERIES, STATICS, 5n), {
+      wrapper: harness.wrapper,
+    });
 
     await act(async () => {});
     expect(result.current.user).toBeNull();
@@ -249,7 +267,9 @@ describe("useUserSnapshot", () => {
   });
 
   it("reads the connected wallet's tokens, LP position, CST balance and allowance", async () => {
-    const { result } = renderHook(() => useUserSnapshot(SERIES, STATICS, 5n), { wrapper: harness.wrapper });
+    const { result } = renderHook(() => useUserSnapshot(SERIES, STATICS, 5n), {
+      wrapper: harness.wrapper,
+    });
 
     await act(() => harness.connectWallet());
     await waitFor(() => expect(result.current.user).not.toBeNull());
@@ -282,7 +302,11 @@ describe("useMarket", () => {
       user: null,
       error: null,
     });
-    expect(result.current.snapshot).toMatchObject({ roundId: 5n, currentCount: 500n, threshold: 800n });
+    expect(result.current.snapshot).toMatchObject({
+      roundId: 5n,
+      currentCount: 500n,
+      threshold: 800n,
+    });
   });
 
   it("pins a past round when overridden, while still tracking the live one", async () => {
@@ -290,7 +314,12 @@ describe("useMarket", () => {
 
     await waitFor(() => expect(result.current.snapshot).not.toBeNull());
     expect(result.current.roundId).toBe(3n);
-    expect(result.current.snapshot).toMatchObject({ roundId: 3n, resolved: true, yesWon: true, prevRoundCount: 610n });
+    expect(result.current.snapshot).toMatchObject({
+      roundId: 3n,
+      resolved: true,
+      yesWon: true,
+      prevRoundCount: 610n,
+    });
     await waitFor(() => expect(result.current.currentRound).toBe(5n));
   });
 
@@ -299,7 +328,11 @@ describe("useMarket", () => {
     await act(() => harness.connectWallet());
 
     await waitFor(() => expect(result.current.user).not.toBeNull());
-    expect(result.current.user).toMatchObject({ address: USER, yesBalance: 100n * ONE, lpShares: 25n * ONE });
+    expect(result.current.user).toMatchObject({
+      address: USER,
+      yesBalance: 100n * ONE,
+      lpShares: 25n * ONE,
+    });
   });
 
   it("surfaces the first failure as the market error", async () => {
@@ -307,7 +340,12 @@ describe("useMarket", () => {
     const { result } = renderHook(() => useMarket(stranger, null), { wrapper: harness.wrapper });
 
     await waitFor(() => expect(result.current.error).toBeInstanceOf(Error));
-    expect(result.current).toMatchObject({ statics: null, snapshot: null, roundId: null, isLoading: false });
+    expect(result.current).toMatchObject({
+      statics: null,
+      snapshot: null,
+      roundId: null,
+      isLoading: false,
+    });
   });
 
   it("refetchAll re-reads the chain: statics, round, snapshot and user", async () => {
@@ -359,6 +397,8 @@ describe("live polling", () => {
     await act(() => vi.advanceTimersByTimeAsync(8_500));
 
     await waitFor(() => expect(result.current.roundId).toBe(6n));
-    await waitFor(() => expect(result.current.snapshot).toMatchObject({ roundId: 6n, currentCount: 10n }));
+    await waitFor(() =>
+      expect(result.current.snapshot).toMatchObject({ roundId: 6n, currentCount: 10n }),
+    );
   });
 });

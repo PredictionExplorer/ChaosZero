@@ -161,7 +161,9 @@ async function main() {
     { file: "icon-maskable-512.png", size: 512, glyphScale: 0.44 },
   ];
   for (const { file, size, glyphScale } of manifestIcons) {
-    const png = await sharp(Buffer.from(tileSvg(size, glyphScale))).png().toBuffer();
+    const png = await sharp(Buffer.from(tileSvg(size, glyphScale)))
+      .png()
+      .toBuffer();
     await writeFile(path.join(publicDir, file), png);
   }
 

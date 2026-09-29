@@ -13,7 +13,9 @@ describe("JsonLd", () => {
   });
 
   it("never embeds a raw < that could break out of the script tag", () => {
-    const { container } = render(<JsonLd data={{ name: '</script><img src=x onerror=alert(1)>' }} />);
+    const { container } = render(
+      <JsonLd data={{ name: "</script><img src=x onerror=alert(1)>" }} />,
+    );
     const script = container.querySelector("script")!;
     expect(script.innerHTML).not.toContain("<");
     expect(script.innerHTML).toContain("\\u003c");

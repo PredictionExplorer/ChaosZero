@@ -30,7 +30,9 @@ export default defineConfig({
       // these floors to the achieved values, rounded down — and never lower one
       // to land a change.
       thresholds: {
-        autoUpdate: process.env.COVERAGE_RATCHET ? (achieved: number) => Math.floor(achieved) : false,
+        autoUpdate: process.env.COVERAGE_RATCHET
+          ? (achieved: number) => Math.floor(achieved)
+          : false,
         statements: 98,
         branches: 96,
         functions: 99,

@@ -8,7 +8,10 @@ import { USER } from "@/test/fixtures";
 import { ConnectButton } from "./connect-button";
 
 const mocks = vi.hoisted(() => ({
-  connection: { status: "disconnected", address: undefined } as { status: string; address?: `0x${string}` },
+  connection: { status: "disconnected", address: undefined } as {
+    status: string;
+    address?: `0x${string}`;
+  },
   chainId: 0,
   switchChain: { mutate: vi.fn(), isPending: false },
   disconnect: { mutate: vi.fn() },
@@ -112,7 +115,9 @@ describe("ConnectButton", () => {
       mocks.switchChain.isPending = true;
       renderButton();
 
-      expect(screen.getByRole("button", { name: `Switch to ${appConfig.chain.name}` })).toBeDisabled();
+      expect(
+        screen.getByRole("button", { name: `Switch to ${appConfig.chain.name}` }),
+      ).toBeDisabled();
     });
   });
 
@@ -132,7 +137,10 @@ describe("ConnectButton", () => {
       renderButton();
 
       await user.click(screen.getByRole("button", { name: "0x4444…4444" }));
-      expect(screen.getByRole("button", { name: "0x4444…4444" })).toHaveAttribute("aria-expanded", "true");
+      expect(screen.getByRole("button", { name: "0x4444…4444" })).toHaveAttribute(
+        "aria-expanded",
+        "true",
+      );
 
       await user.click(screen.getByRole("button", { name: "Disconnect" }));
 
@@ -171,7 +179,10 @@ describe("ConnectButton", () => {
       await user.click(screen.getByRole("button", { name: "0x4444…4444" }));
       // Press (without releasing) on the menu item: the outside-click guard
       // must not unmount it before the click lands.
-      await user.pointer({ keys: "[MouseLeft>]", target: screen.getByRole("button", { name: "Disconnect" }) });
+      await user.pointer({
+        keys: "[MouseLeft>]",
+        target: screen.getByRole("button", { name: "Disconnect" }),
+      });
 
       expect(screen.getByRole("button", { name: "Disconnect" })).toBeInTheDocument();
     });

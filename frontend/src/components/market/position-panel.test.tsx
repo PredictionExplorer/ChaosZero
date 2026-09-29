@@ -138,7 +138,14 @@ describe("PositionPanel", () => {
     const u = userEvent.setup();
     renderPanel({
       snapshot: snapshot({
-        pool: { reserveYes: 0n, reserveNo: 0n, totalShares: 0n, accFeePerShare: 0n, feeReserve: 0n, feeWeight: 0n },
+        pool: {
+          reserveYes: 0n,
+          reserveNo: 0n,
+          totalShares: 0n,
+          accFeePerShare: 0n,
+          feeReserve: 0n,
+          feeWeight: 0n,
+        },
       }),
     });
 
@@ -184,7 +191,9 @@ describe("PositionPanel — tooltips", () => {
     renderPanel();
 
     await u.hover(screen.getByRole("button", { name: "About YES tokens" }));
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/pays exactly 1 CST if this round beats/i);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      /pays exactly 1 CST if this round beats/i,
+    );
     await u.unhover(screen.getByRole("button", { name: "About YES tokens" }));
 
     await u.hover(screen.getByRole("button", { name: "About NO tokens" }));
@@ -196,7 +205,9 @@ describe("PositionPanel — tooltips", () => {
     renderPanel();
 
     await u.hover(screen.getByText("complete sets"));
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/worth exactly 1 CST no matter how the round ends/i);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      /worth exactly 1 CST no matter how the round ends/i,
+    );
   });
 
   it("explains the mark price in the header caption", async () => {

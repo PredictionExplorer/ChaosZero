@@ -12,7 +12,13 @@ const TONES: Record<BadgeTone, string> = {
 
 type BadgeProps = HTMLAttributes<HTMLSpanElement> & { tone?: BadgeTone; pulse?: boolean };
 
-export function Badge({ tone = "muted", pulse = false, className = "", children, ...rest }: BadgeProps) {
+export function Badge({
+  tone = "muted",
+  pulse = false,
+  className = "",
+  children,
+  ...rest
+}: BadgeProps) {
   return (
     <span
       {...rest}

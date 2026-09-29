@@ -73,7 +73,9 @@ export const test = base.extend<Fixtures & AutoFixtures>({
 
       await provide();
 
-      expect(problems, "the page logged errors, threw, or reached outside the local stack").toEqual([]);
+      expect(problems, "the page logged errors, threw, or reached outside the local stack").toEqual(
+        [],
+      );
     },
     { auto: true },
   ],

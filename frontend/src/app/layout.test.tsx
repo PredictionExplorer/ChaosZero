@@ -6,7 +6,11 @@ import manifest from "./manifest";
 // next/font is resolved by the Next compiler; at test time each font is just
 // the CSS variable class it contributes.
 vi.mock("next/font/google", () => {
-  const font = (variable: string) => () => ({ variable, className: variable, style: { fontFamily: variable } });
+  const font = (variable: string) => () => ({
+    variable,
+    className: variable,
+    style: { fontFamily: variable },
+  });
   return {
     Geist: font("font-geist-sans"),
     Geist_Mono: font("font-geist-mono"),
@@ -89,7 +93,10 @@ describe("search-console verification", () => {
     vi.stubEnv("NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION", "google-token");
     vi.stubEnv("NEXT_PUBLIC_BING_SITE_VERIFICATION", "bing-token");
     const { metadata } = await loadLayout();
-    expect(metadata.verification).toEqual({ google: "google-token", other: { "msvalidate.01": "bing-token" } });
+    expect(metadata.verification).toEqual({
+      google: "google-token",
+      other: { "msvalidate.01": "bing-token" },
+    });
   });
 });
 

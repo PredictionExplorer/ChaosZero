@@ -13,7 +13,13 @@ import { createTestQueryClient } from "./query";
  * fake chain) with wagmi's own mock connector for the wallet. Nothing is
  * persisted and no browser wallets are discovered, so tests stay isolated.
  */
-export function createTestWagmi({ transport, account }: { transport: Transport; account: Address }) {
+export function createTestWagmi({
+  transport,
+  account,
+}: {
+  transport: Transport;
+  account: Address;
+}) {
   const config = createConfig({
     chains: [appConfig.chain],
     connectors: [mock({ accounts: [account] })],

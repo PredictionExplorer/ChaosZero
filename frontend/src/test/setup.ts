@@ -18,7 +18,9 @@ for (const level of ["error", "warn"] as const) {
 afterEach(() => {
   const logged = unexpectedConsole.splice(0);
   if (logged.length > 0) {
-    throw new Error(`Unexpected console output (fix the cause, or silence it deliberately):\n${logged.join("\n")}`);
+    throw new Error(
+      `Unexpected console output (fix the cause, or silence it deliberately):\n${logged.join("\n")}`,
+    );
   }
 });
 

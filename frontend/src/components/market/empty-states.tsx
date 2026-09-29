@@ -51,7 +51,8 @@ const BET_CLOSED_REASONS: Partial<Record<RoundPhase, string>> = {
     "Nobody has opened this round's pool yet. Betting starts as soon as the first liquidity arrives.",
   decided:
     "The gesture count already crossed the threshold — YES is certain and betting halted. The round can be resolved now.",
-  ended: "This round is over and awaiting resolution. You can still redeem paired tokens or withdraw liquidity.",
+  ended:
+    "This round is over and awaiting resolution. You can still redeem paired tokens or withdraw liquidity.",
   resolved: "This round is resolved. Winning tokens can be claimed from the position panel below.",
 };
 

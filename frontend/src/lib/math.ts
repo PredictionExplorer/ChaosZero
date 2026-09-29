@@ -131,7 +131,12 @@ export function applyBet(side: BetSide, pool: PoolState, cstIn: bigint): BetResu
  * uses this with the `netIn` recorded in the event, so reconstruction stays
  * exact even though the fee vote moved over time.
  */
-export function applyBetWithNet(side: BetSide, pool: PoolState, fee: bigint, net: bigint): BetResult {
+export function applyBetWithNet(
+  side: BetSide,
+  pool: PoolState,
+  fee: bigint,
+  net: bigint,
+): BetResult {
   const accFeePerShare = pool.accFeePerShare + (fee * ONE) / pool.totalShares;
   const feeReserve = pool.feeReserve + fee;
   if (side === "yes") {
@@ -200,7 +205,11 @@ export interface OpenPoolResult {
  * YES probability; the surplus side stays with the LP; `DEAD_SHARES` are
  * locked forever and carry the opener's fee declaration.
  */
-export function openPool(cstIn: bigint, initialYesProbBps: bigint, declaredFeeBps: bigint): OpenPoolResult {
+export function openPool(
+  cstIn: bigint,
+  initialYesProbBps: bigint,
+  declaredFeeBps: bigint,
+): OpenPoolResult {
   if (cstIn < MIN_INITIAL_LIQUIDITY) throw new Error("openPool: below minimum initial liquidity");
   if (initialYesProbBps < MIN_PROB_BPS || initialYesProbBps > MAX_PROB_BPS) {
     throw new Error("openPool: probability out of range");
@@ -274,7 +283,8 @@ export function joinPool(
       reserveYes: reserveYes + depositYes,
       reserveNo: reserveNo + depositNo,
       totalShares: totalShares + sharesOut,
-      feeWeight: pool.feeWeight - existing.shares * existing.declaredFeeBps + newShares * declaredFeeBps,
+      feeWeight:
+        pool.feeWeight - existing.shares * existing.declaredFeeBps + newShares * declaredFeeBps,
     },
   };
 }
@@ -291,8 +301,13 @@ export interface RemoveLiquidityResult {
  * `declaredFeeBps` is the remover's declaration — their departing shares
  * stop voting.
  */
-export function removeLiquidity(pool: PoolState, shares: bigint, declaredFeeBps: bigint): RemoveLiquidityResult {
-  if (shares === 0n || shares > pool.totalShares) throw new Error("removeLiquidity: bad share amount");
+export function removeLiquidity(
+  pool: PoolState,
+  shares: bigint,
+  declaredFeeBps: bigint,
+): RemoveLiquidityResult {
+  if (shares === 0n || shares > pool.totalShares)
+    throw new Error("removeLiquidity: bad share amount");
   const yesOut = (pool.reserveYes * shares) / pool.totalShares;
   const noOut = (pool.reserveNo * shares) / pool.totalShares;
   return {
@@ -338,7 +353,11 @@ export function claimValue(yesBalance: bigint, noBalance: bigint, yesWon: boolea
  * Mark-to-market value of an outcome position at probability `p` (a float in
  * [0,1]): YES tokens worth p CST, NO tokens worth 1-p.
  */
-export function positionValueAtProbability(yesBalance: bigint, noBalance: bigint, p: number): number {
+export function positionValueAtProbability(
+  yesBalance: bigint,
+  noBalance: bigint,
+  p: number,
+): number {
   return (Number(yesBalance) * p + Number(noBalance) * (1 - p)) / 1e18;
 }
 

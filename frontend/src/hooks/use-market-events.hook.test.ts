@@ -15,7 +15,8 @@ import { totalVolume, useMarketEvents } from "./use-market-events";
  * real so caching, loading and invalidation behave as in the app.
  */
 const mocks = vi.hoisted(() => ({
-  client: undefined as { getLogs: ReturnType<typeof vi.fn>; getBlock: ReturnType<typeof vi.fn> } | undefined,
+  client: undefined as
+    { getLogs: ReturnType<typeof vi.fn>; getBlock: ReturnType<typeof vi.fn> } | undefined,
   watch: vi.fn(),
   deployBlock: null as bigint | null,
 }));
@@ -87,7 +88,11 @@ describe("useMarketEvents: the history scan", () => {
 
     expect(result.current.isLoading).toBe(true);
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(mocks.client!.getLogs).toHaveBeenCalledWith({ address: SERIES, fromBlock: "earliest", toBlock: "latest" });
+    expect(mocks.client!.getLogs).toHaveBeenCalledWith({
+      address: SERIES,
+      fromBlock: "earliest",
+      toBlock: "latest",
+    });
   });
 
   it("starts the scan at the market's deploy block when configured", async () => {
@@ -95,7 +100,11 @@ describe("useMarketEvents: the history scan", () => {
     const { result } = renderEvents();
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
-    expect(mocks.client!.getLogs).toHaveBeenCalledWith({ address: SERIES, fromBlock: 12_345n, toBlock: "latest" });
+    expect(mocks.client!.getLogs).toHaveBeenCalledWith({
+      address: SERIES,
+      fromBlock: 12_345n,
+      toBlock: "latest",
+    });
   });
 
   it("lists this round's activity newest-first and keeps pool events in chain order", async () => {
@@ -129,8 +138,14 @@ describe("useMarketEvents: the history scan", () => {
     const { result } = renderEvents();
 
     await waitFor(() => expect(result.current.activity).toHaveLength(2));
-    expect(result.current.activity.map((e) => e.timestamp)).toEqual([GENESIS_TIME + 20, GENESIS_TIME + 10]);
-    expect(result.current.poolEvents.map((e) => e.timestamp)).toEqual([GENESIS_TIME + 10, GENESIS_TIME + 20]);
+    expect(result.current.activity.map((e) => e.timestamp)).toEqual([
+      GENESIS_TIME + 20,
+      GENESIS_TIME + 10,
+    ]);
+    expect(result.current.poolEvents.map((e) => e.timestamp)).toEqual([
+      GENESIS_TIME + 10,
+      GENESIS_TIME + 20,
+    ]);
   });
 
   it("fetches each block's time once, and only for the 30 newest blocks", async () => {
@@ -140,11 +155,14 @@ describe("useMarketEvents: the history scan", () => {
     const { result } = renderEvents();
 
     await waitFor(() => expect(result.current.activity).toHaveLength(36));
-    const fetched = mocks.client!.getBlock.mock.calls.map(([args]) => (args as { blockNumber: bigint }).blockNumber);
+    const fetched = mocks.client!.getBlock.mock.calls.map(
+      ([args]) => (args as { blockNumber: bigint }).blockNumber,
+    );
     expect(fetched).toHaveLength(30);
     expect(new Set(fetched)).toEqual(new Set(Array.from({ length: 30 }, (_, i) => BigInt(35 - i))));
 
-    const stampOf = (block: bigint) => result.current.activity.find((e) => e.blockNumber === block)?.timestamp;
+    const stampOf = (block: bigint) =>
+      result.current.activity.find((e) => e.blockNumber === block)?.timestamp;
     expect(stampOf(35n)).toBe(GENESIS_TIME + 35);
     expect(stampOf(6n)).toBe(GENESIS_TIME + 6);
     expect(stampOf(5n)).toBeNull();
@@ -168,7 +186,9 @@ describe("useMarketEvents: the history scan", () => {
     mocks.client!.getLogs.mockRejectedValue(new Error("query returned more than 10000 results"));
     const { result } = renderEvents();
 
-    await waitFor(() => expect(result.current.error?.message).toBe("query returned more than 10000 results"));
+    await waitFor(() =>
+      expect(result.current.error?.message).toBe("query returned more than 10000 results"),
+    );
     expect(result.current).toMatchObject({ activity: [], poolEvents: [], isLoading: false });
   });
 
@@ -179,7 +199,12 @@ describe("useMarketEvents: the history scan", () => {
     const { result } = renderEvents(series, roundId);
 
     await act(async () => {});
-    expect(result.current).toMatchObject({ activity: [], poolEvents: [], isLoading: false, error: null });
+    expect(result.current).toMatchObject({
+      activity: [],
+      poolEvents: [],
+      isLoading: false,
+      error: null,
+    });
     expect(mocks.client!.getLogs).not.toHaveBeenCalled();
   });
 
@@ -232,7 +257,9 @@ describe("useMarketEvents: live updates", () => {
   it("does not watch anything without a series", () => {
     renderEvents(null, null);
 
-    expect(mocks.watch).toHaveBeenLastCalledWith(expect.objectContaining({ address: undefined, enabled: false }));
+    expect(mocks.watch).toHaveBeenLastCalledWith(
+      expect.objectContaining({ address: undefined, enabled: false }),
+    );
   });
 
   it("rescans when a new series event lands, so the feed updates", async () => {
@@ -252,7 +279,9 @@ describe("useMarketEvents: live updates", () => {
     const wrapper = withQueryClient(queryClient);
     const round5 = renderHook(() => useMarketEvents(SERIES, 5n), { wrapper });
     const round6 = renderHook(() => useMarketEvents(SERIES, 6n), { wrapper });
-    await waitFor(() => expect(round5.result.current.isLoading || round6.result.current.isLoading).toBe(false));
+    await waitFor(() =>
+      expect(round5.result.current.isLoading || round6.result.current.isLoading).toBe(false),
+    );
     expect(mocks.client!.getLogs).toHaveBeenCalledTimes(2);
 
     emitNewLogs();
@@ -278,7 +307,15 @@ describe("totalVolume", () => {
         noToPool: 0n,
       },
       { ...base, kind: "bet", user: USER, side: "no", cstIn: 4n * ONE, netIn: 0n, tokensOut: 0n },
-      { ...base, kind: "remove", provider: USER, sharesIn: 1n, yesOut: 9n * ONE, noOut: 9n * ONE, feesOut: 0n },
+      {
+        ...base,
+        kind: "remove",
+        provider: USER,
+        sharesIn: 1n,
+        yesOut: 9n * ONE,
+        noOut: 9n * ONE,
+        feesOut: 0n,
+      },
     ];
     expect(totalVolume(events)).toBe(7n * ONE);
   });

@@ -65,10 +65,20 @@ export function createFakeChain(chain: Chain) {
         return { success: false, returnData: "0x" as Hex };
       }
     });
-    return encodeFunctionResult({ abi: multicall3Abi, functionName: "aggregate3", result: results });
+    return encodeFunctionResult({
+      abi: multicall3Abi,
+      functionName: "aggregate3",
+      result: results,
+    });
   }
 
-  const request = async ({ method, params }: { method: string; params?: unknown }): Promise<unknown> => {
+  const request = async ({
+    method,
+    params,
+  }: {
+    method: string;
+    params?: unknown;
+  }): Promise<unknown> => {
     switch (method) {
       case "eth_chainId":
         return numberToHex(chain.id);
@@ -96,7 +106,8 @@ export function createFakeChain(chain: Chain) {
     /** How many times `functionName` was read (optionally on one contract). */
     readCount(functionName: string, address?: Address): number {
       return reads.filter(
-        (read) => read.functionName === functionName && (!address || isAddressEqual(read.address, address)),
+        (read) =>
+          read.functionName === functionName && (!address || isAddressEqual(read.address, address)),
       ).length;
     },
   };

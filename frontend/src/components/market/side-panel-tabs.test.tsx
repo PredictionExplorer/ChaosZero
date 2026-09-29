@@ -43,7 +43,11 @@ describe("SidePanelTabs", () => {
   it("preserves panel state across a tab round-trip (panels stay mounted)", async () => {
     const user = userEvent.setup();
     render(
-      <SidePanelTabs lpIndicator={false} bet={<input data-testid="bet-input" />} liquidity={<div />} />,
+      <SidePanelTabs
+        lpIndicator={false}
+        bet={<input data-testid="bet-input" />}
+        liquidity={<div />}
+      />,
     );
 
     await user.type(screen.getByTestId("bet-input"), "123");

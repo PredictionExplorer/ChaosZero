@@ -162,7 +162,9 @@ describe("LiquidityPanel — position, re-voting, removing, fees", () => {
     expect(screen.getByTestId("lp-revote-value")).toHaveTextContent("8%");
 
     const expected = feeAfterDeclarationChange(POOL, position.lpShares, 200n, 800n);
-    expect(screen.getByTestId("lp-revote-preview").textContent).toContain(`${Number(expected) / 100}%`);
+    expect(screen.getByTestId("lp-revote-preview").textContent).toContain(
+      `${Number(expected) / 100}%`,
+    );
 
     await user.click(screen.getByTestId("lp-revote-submit"));
     expect(props.onUpdateFee).toHaveBeenCalledWith(800);

@@ -66,7 +66,10 @@ describe("deployment facts in both documents", () => {
   /** Loads both routes fresh, so the config singleton sees the current env. */
   async function loadRoutes() {
     vi.resetModules();
-    const [short, full] = await Promise.all([import("./llms.txt/route"), import("./llms-full.txt/route")]);
+    const [short, full] = await Promise.all([
+      import("./llms.txt/route"),
+      import("./llms-full.txt/route"),
+    ]);
     return [await short.GET().text(), await full.GET().text()];
   }
 

@@ -1,6 +1,12 @@
 import type { Address } from "viem";
 import type { PoolState } from "./math";
-import { claimValue, currentFeeBps, poolIsTradable, positionValueAtProbability, probabilityFloat } from "./math";
+import {
+  claimValue,
+  currentFeeBps,
+  poolIsTradable,
+  positionValueAtProbability,
+  probabilityFloat,
+} from "./math";
 
 /**
  * Lifecycle of one round's market:
@@ -130,7 +136,13 @@ export interface UserSnapshot {
 
 type PhaseInputs = Pick<
   RoundSnapshot,
-  "initialized" | "thresholdKnown" | "resolved" | "roundId" | "gameRoundNum" | "currentCount" | "threshold"
+  | "initialized"
+  | "thresholdKnown"
+  | "resolved"
+  | "roundId"
+  | "gameRoundNum"
+  | "currentCount"
+  | "threshold"
 >;
 
 export function roundPhase(s: PhaseInputs): RoundPhase {
@@ -216,9 +228,13 @@ export function displayedProbability(s: RoundSnapshot): number | null {
  *  - decided: YES is certain (its tokens are worth 1, NO worth 0);
  *  - live/ended: marked at the displayed probability (float, display-only).
  */
-export function positionValueFloat(s: RoundSnapshot, user: Pick<UserSnapshot, "yesBalance" | "noBalance">): number {
+export function positionValueFloat(
+  s: RoundSnapshot,
+  user: Pick<UserSnapshot, "yesBalance" | "noBalance">,
+): number {
   const phase = roundPhase(s);
-  if (phase === "resolved") return Number(claimValue(user.yesBalance, user.noBalance, s.yesWon)) / 1e18;
+  if (phase === "resolved")
+    return Number(claimValue(user.yesBalance, user.noBalance, s.yesWon)) / 1e18;
   if (phase === "decided") return Number(user.yesBalance) / 1e18;
   const p = displayedProbability(s);
   return positionValueAtProbability(user.yesBalance, user.noBalance, p ?? 0.5);

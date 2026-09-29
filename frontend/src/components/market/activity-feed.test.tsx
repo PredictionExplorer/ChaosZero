@@ -85,7 +85,9 @@ describe("ActivityFeed", () => {
         isLoading={false}
       />,
     );
-    expect(screen.getByTestId("activity-feed")).toHaveTextContent(/round resolved NO at 640 gestures/);
+    expect(screen.getByTestId("activity-feed")).toHaveTextContent(
+      /round resolved NO at 640 gestures/,
+    );
   });
 
   it("links each event's transaction, labelled by age once the block time is known", () => {

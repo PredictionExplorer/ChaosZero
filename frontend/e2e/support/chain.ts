@@ -66,15 +66,27 @@ export class LocalChain {
     const client = createPublicClient({ chain: anvil, transport, pollingInterval: 50 });
     const chainId = await client.getChainId();
     if (chainId !== anvil.id) {
-      throw new Error(`E2E_RPC_URL ${env.rpcUrl} serves chain ${chainId}, expected anvil (${anvil.id}).`);
+      throw new Error(
+        `E2E_RPC_URL ${env.rpcUrl} serves chain ${chainId}, expected anvil (${anvil.id}).`,
+      );
     }
     const code = await client.getCode({ address: env.market });
     if (!code || code === "0x") {
-      throw new Error(`No contract at E2E_MARKET_ADDRESS ${env.market} — was script/DeployLocal.s.sol broadcast?`);
+      throw new Error(
+        `No contract at E2E_MARKET_ADDRESS ${env.market} — was script/DeployLocal.s.sol broadcast?`,
+      );
     }
     const [game, cst] = await Promise.all([
-      client.readContract({ address: env.market, abi: gestureSeriesMarketAbi, functionName: "game" }),
-      client.readContract({ address: env.market, abi: gestureSeriesMarketAbi, functionName: "cst" }),
+      client.readContract({
+        address: env.market,
+        abi: gestureSeriesMarketAbi,
+        functionName: "game",
+      }),
+      client.readContract({
+        address: env.market,
+        abi: gestureSeriesMarketAbi,
+        functionName: "cst",
+      }),
     ]);
     const test = createTestClient({ chain: anvil, mode: "anvil", transport });
     return new LocalChain(env.market, game, cst, transport, client, test);
@@ -90,7 +102,8 @@ export class LocalChain {
     // viem types evm_revert as void, but anvil answers `false` (rather than an
     // error) for an unknown id — which would silently leave state dirty.
     const reverted = (await this.test.request({ method: "evm_revert", params: [id] })) as unknown;
-    if (reverted !== true) throw new Error(`evm_revert(${id}) failed: the snapshot does not exist.`);
+    if (reverted !== true)
+      throw new Error(`evm_revert(${id}) failed: the snapshot does not exist.`);
   }
 
   /**
@@ -100,7 +113,8 @@ export class LocalChain {
    */
   async resetToPristine(): Promise<void> {
     const file = process.env[SNAPSHOT_FILE_ENV];
-    if (!file) throw new Error(`${SNAPSHOT_FILE_ENV} is not set — the Playwright global setup did not run.`);
+    if (!file)
+      throw new Error(`${SNAPSHOT_FILE_ENV} is not set — the Playwright global setup did not run.`);
     const { id } = JSON.parse(await readFile(file, "utf8")) as { id: Hex };
     await this.revert(id);
     await writeFile(file, JSON.stringify({ id: await this.snapshot() }));
@@ -109,7 +123,11 @@ export class LocalChain {
   // --------------------------------------------------------------- the game
 
   currentRound(): Promise<bigint> {
-    return this.client.readContract({ address: this.game, abi: mockGameAbi, functionName: "roundNum" });
+    return this.client.readContract({
+      address: this.game,
+      abi: mockGameAbi,
+      functionName: "roundNum",
+    });
   }
 
   /** Sets a round's live gesture count, as players placing bids would. */
@@ -135,12 +153,13 @@ export class LocalChain {
   // ------------------------------------------------------------------ reads
 
   async roundState(round: bigint) {
-    const [initialized, thresholdKnown, resolved, yesWon, threshold, currentCount] = await this.client.readContract({
-      address: this.market,
-      abi: gestureSeriesMarketAbi,
-      functionName: "roundState",
-      args: [round],
-    });
+    const [initialized, thresholdKnown, resolved, yesWon, threshold, currentCount] =
+      await this.client.readContract({
+        address: this.market,
+        abi: gestureSeriesMarketAbi,
+        functionName: "roundState",
+        args: [round],
+      });
     return { initialized, thresholdKnown, resolved, yesWon, threshold, currentCount };
   }
 
@@ -173,7 +192,12 @@ export class LocalChain {
   }
 
   cstBalance(owner: Address): Promise<bigint> {
-    return this.client.readContract({ address: this.cst, abi: erc20Abi, functionName: "balanceOf", args: [owner] });
+    return this.client.readContract({
+      address: this.cst,
+      abi: erc20Abi,
+      functionName: "balanceOf",
+      args: [owner],
+    });
   }
 
   cstAllowance(owner: Address): Promise<bigint> {
@@ -225,7 +249,12 @@ export class LocalChain {
   }
 
   /** Joins the round's pool straight through the contract (no UI), as `from`. */
-  async addLiquidity(from: Address, round: bigint, cstIn: bigint, declaredFeeBps: number): Promise<void> {
+  async addLiquidity(
+    from: Address,
+    round: bigint,
+    cstIn: bigint,
+    declaredFeeBps: number,
+  ): Promise<void> {
     await this.send(from, {
       address: this.cst,
       abi: erc20Abi,
@@ -244,7 +273,12 @@ export class LocalChain {
 
   /** Leaves no allowance behind, so the UI's approve step stays under test. */
   private async revokeAllowance(from: Address): Promise<void> {
-    await this.send(from, { address: this.cst, abi: erc20Abi, functionName: "approve", args: [this.market, 0n] });
+    await this.send(from, {
+      address: this.cst,
+      abi: erc20Abi,
+      functionName: "approve",
+      args: [this.market, 0n],
+    });
   }
 
   // --------------------------------------------------------------- plumbing
@@ -267,9 +301,12 @@ export class LocalChain {
     const wallet = createWalletClient({ account: from, chain: anvil, transport: this.transport });
     // `call` is fully checked against its ABI by this method's signature;
     // viem's own overloads cannot follow a generic ABI, hence the cast.
-    const hash = await wallet.writeContract(call as unknown as Parameters<typeof wallet.writeContract>[0]);
+    const hash = await wallet.writeContract(
+      call as unknown as Parameters<typeof wallet.writeContract>[0],
+    );
     const receipt = await this.client.waitForTransactionReceipt({ hash });
-    if (receipt.status !== "success") throw new Error(`${call.functionName} reverted (tx ${hash}).`);
+    if (receipt.status !== "success")
+      throw new Error(`${call.functionName} reverted (tx ${hash}).`);
     return hash;
   }
 }

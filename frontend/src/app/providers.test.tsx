@@ -117,7 +117,9 @@ describe("Providers", () => {
       </Providers>,
     );
 
-    expect(document.head.querySelector('link[rel="preconnect"][href="https://rpc.example.com"]')).not.toBeNull();
+    expect(
+      document.head.querySelector('link[rel="preconnect"][href="https://rpc.example.com"]'),
+    ).not.toBeNull();
   });
 
   it("renders the toast outlet for transaction feedback", () => {

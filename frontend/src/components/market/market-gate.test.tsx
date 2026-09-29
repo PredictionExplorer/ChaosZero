@@ -27,8 +27,18 @@ vi.mock("@/lib/config", async (importOriginal) => {
 });
 // The trading screen has its own suite; here it only reports what it was given.
 vi.mock("./market-app", () => ({
-  MarketApp: ({ seriesAddress, roundOverride }: { seriesAddress: Address; roundOverride: bigint | null }) => (
-    <div data-testid="market-app" data-series={seriesAddress} data-round={roundOverride?.toString() ?? "live"} />
+  MarketApp: ({
+    seriesAddress,
+    roundOverride,
+  }: {
+    seriesAddress: Address;
+    roundOverride: bigint | null;
+  }) => (
+    <div
+      data-testid="market-app"
+      data-series={seriesAddress}
+      data-round={roundOverride?.toString() ?? "live"}
+    />
   ),
 }));
 

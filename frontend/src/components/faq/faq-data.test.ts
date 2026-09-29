@@ -22,7 +22,9 @@ describe("FAQ data", () => {
 
   it("every entry is a real question with a substantive answer", () => {
     for (const item of allItems) {
-      expect(item.question.trim().endsWith("?"), `"${item.question}" should end with '?'`).toBe(true);
+      expect(item.question.trim().endsWith("?"), `"${item.question}" should end with '?'`).toBe(
+        true,
+      );
       expect(item.answer.length).toBeGreaterThanOrEqual(1);
       for (const paragraph of item.answer) {
         expect(paragraph.trim().length).toBeGreaterThan(40);
@@ -40,7 +42,16 @@ describe("FAQ data", () => {
 
   it("covers the essentials a bettor and an LP must know", () => {
     const questions = allItems.map((i) => i.question.toLowerCase()).join(" ");
-    for (const essential of ["fee", "slippage", "resolve", "claim", "liquidity", "tie", "safe", "beta"]) {
+    for (const essential of [
+      "fee",
+      "slippage",
+      "resolve",
+      "claim",
+      "liquidity",
+      "tie",
+      "safe",
+      "beta",
+    ]) {
       expect(questions, `expected a question about "${essential}"`).toContain(essential);
     }
   });

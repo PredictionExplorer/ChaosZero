@@ -60,7 +60,9 @@ export function Header({ active, actions }: HeaderProps) {
                   aria-current={isActive ? "page" : undefined}
                   className={[
                     "rounded-lg px-2.5 py-1.5 text-sm font-medium transition-colors sm:px-3",
-                    isActive ? "bg-signal/15 text-signal-bright" : "text-ink-dim hover:bg-surface-2 hover:text-ink",
+                    isActive
+                      ? "bg-signal/15 text-signal-bright"
+                      : "text-ink-dim hover:bg-surface-2 hover:text-ink",
                   ].join(" ")}
                 >
                   {link.label}

@@ -26,15 +26,22 @@ function impliedYesPercent(pool: { reserveYes: bigint; reserveNo: bigint }): str
 }
 
 test.describe("market", { tag: "@chain" }, () => {
-  test("bets YES then NO: exact quotes, approvals, fills, position, odds and activity", async ({ market, chain }) => {
+  test("bets YES then NO: exact quotes, approvals, fills, position, odds and activity", async ({
+    market,
+    chain,
+  }) => {
     const round = await chain.currentRound();
     await market.goto();
     await expect(market.currentRoundLabel(round)).toBeVisible();
-    await expect(market.betPanel.getByRole("button", { name: "Connect wallet to bet" })).toBeVisible();
+    await expect(
+      market.betPanel.getByRole("button", { name: "Connect wallet to bet" }),
+    ).toBeVisible();
 
     await market.connectWallet();
     const startBalance = await chain.cstBalance(wallet);
-    await expect(market.betPanel.getByRole("button", { name: `Balance: ${formatCst(startBalance)}` })).toBeVisible();
+    await expect(
+      market.betPanel.getByRole("button", { name: `Balance: ${formatCst(startBalance)}` }),
+    ).toBeVisible();
     await expect(market.positionPanel).toBeHidden();
 
     // YES: the quote shown is the contract's quote, and the fill matches it exactly.
@@ -42,8 +49,12 @@ test.describe("market", { tag: "@chain" }, () => {
     const yesQuote = await chain.quoteBet("yes", round, yesIn);
     await market.chooseSide("yes");
     await market.betAmount().fill("100");
-    await expect(market.betPanel.getByTestId("quote-tokens")).toHaveText(`${formatCst(yesQuote)} YES`);
-    await expect(market.betPanel.getByTestId("quote-payout")).toHaveText(`${formatCst(yesQuote)} CST`);
+    await expect(market.betPanel.getByTestId("quote-tokens")).toHaveText(
+      `${formatCst(yesQuote)} YES`,
+    );
+    await expect(market.betPanel.getByTestId("quote-payout")).toHaveText(
+      `${formatCst(yesQuote)} CST`,
+    );
     await market.approveAndBet("yes");
 
     expect(await chain.outcomeBalances(round, wallet)).toEqual({ yes: yesQuote, no: 0n });
@@ -59,21 +70,28 @@ test.describe("market", { tag: "@chain" }, () => {
     const noQuote = await chain.quoteBet("no", round, noIn);
     await market.chooseSide("no");
     await market.betAmount().fill("50");
-    await expect(market.betPanel.getByTestId("quote-tokens")).toHaveText(`${formatCst(noQuote)} NO`);
+    await expect(market.betPanel.getByTestId("quote-tokens")).toHaveText(
+      `${formatCst(noQuote)} NO`,
+    );
     await market.approveAndBet("no");
 
     expect(await chain.outcomeBalances(round, wallet)).toEqual({ yes: yesQuote, no: noQuote });
     const endBalance = startBalance - yesIn - noIn;
     expect(await chain.cstBalance(wallet)).toBe(endBalance);
     await expect(market.positionPanel.getByTestId("no-balance")).toHaveText(formatCst(noQuote));
-    await expect(market.betPanel.getByRole("button", { name: `Balance: ${formatCst(endBalance)}` })).toBeVisible();
+    await expect(
+      market.betPanel.getByRole("button", { name: `Balance: ${formatCst(endBalance)}` }),
+    ).toBeVisible();
     await expect(market.probability).toHaveText(impliedYesPercent(await chain.pool(round)));
     await expect(market.activityItem("bet 50 CST on NO")).toContainText(shortAddress(wallet));
     // Holding both sides makes complete sets, redeemable 1:1.
     await expect(market.positionPanel.getByRole("button", { name: "Redeem" })).toBeEnabled();
   });
 
-  test("adds liquidity from the Liquidity tab: the preview is what the pool mints", async ({ market, chain }) => {
+  test("adds liquidity from the Liquidity tab: the preview is what the pool mints", async ({
+    market,
+    chain,
+  }) => {
     const round = await chain.currentRound();
     await market.goto();
     await market.connectWallet();
@@ -107,11 +125,16 @@ test.describe("market", { tag: "@chain" }, () => {
     await expect(lpBox).toContainText(`${formatCst(position.shares)} shares`);
     await expect(lpBox.getByTestId("lp-my-vote")).toHaveText("2.5%");
     await expect(lp.getByTestId("lp-pool-fee")).toHaveText(formatBps(feeAfter));
-    await expect(market.tradeTabs.getByRole("tab", { name: /you have a liquidity position/ })).toBeVisible();
+    await expect(
+      market.tradeTabs.getByRole("tab", { name: /you have a liquidity position/ }),
+    ).toBeVisible();
     await expect(market.activityItem("added 500 CST of liquidity")).toContainText("voting 2.5%");
   });
 
-  test("an LP earns fees from other traders' bets, claims them, then withdraws", async ({ market, chain }) => {
+  test("an LP earns fees from other traders' bets, claims them, then withdraws", async ({
+    market,
+    chain,
+  }) => {
     const round = await chain.currentRound();
     await chain.addLiquidity(wallet, round, parseEther("2000"), 200);
 
@@ -154,8 +177,12 @@ test.describe("market", { tag: "@chain" }, () => {
       `${formatCst(tokensAfter.yes - tokensBefore.yes)} YES + ${formatCst(tokensAfter.no - tokensBefore.no)} NO`,
     );
     await expect(lp.getByTestId("lp-no-position")).toBeVisible();
-    await expect(market.positionPanel.getByTestId("yes-balance")).toHaveText(formatCst(tokensAfter.yes));
-    await expect(market.positionPanel.getByTestId("no-balance")).toHaveText(formatCst(tokensAfter.no));
+    await expect(market.positionPanel.getByTestId("yes-balance")).toHaveText(
+      formatCst(tokensAfter.yes),
+    );
+    await expect(market.positionPanel.getByTestId("no-balance")).toHaveText(
+      formatCst(tokensAfter.no),
+    );
   });
 
   test("early resolution: the count crosses the threshold live, then resolve and claim pay YES", async ({
@@ -180,17 +207,25 @@ test.describe("market", { tag: "@chain" }, () => {
     ).toBeVisible({
       timeout: LIVE_UPDATE_TIMEOUT,
     });
-    await expect(market.resolveBanner.getByTestId("banner-count")).toHaveText(formatCount(finalCount));
+    await expect(market.resolveBanner.getByTestId("banner-count")).toHaveText(
+      formatCount(finalCount),
+    );
     // Betting halted in the same block; the bet panel explains why.
     await expect(market.betPanel.getByTestId("bet-closed")).toBeVisible();
     await expect(market.positionPanel.getByTestId("decided-note")).toBeVisible();
 
     await market.resolveBanner.getByRole("button", { name: "Resolve round" }).click();
     await expect(market.toast("Resolving round confirmed.")).toBeVisible();
-    expect(await chain.roundState(round)).toMatchObject({ resolved: true, yesWon: true, currentCount: finalCount });
+    expect(await chain.roundState(round)).toMatchObject({
+      resolved: true,
+      yesWon: true,
+      currentCount: finalCount,
+    });
     await expect(market.resolveBanner).toBeHidden();
     await expect(market.positionPanel).toContainText("settled — YES won");
-    await expect(market.activityItem("round resolved")).toContainText(`YES at ${formatCount(finalCount)} gestures`);
+    await expect(market.activityItem("round resolved")).toContainText(
+      `YES at ${formatCount(finalCount)} gestures`,
+    );
 
     const beforeClaim = await chain.cstBalance(wallet);
     await market.positionPanel.getByRole("button", { name: `Claim ${formatCst(yes)} CST` }).click();
@@ -199,7 +234,9 @@ test.describe("market", { tag: "@chain" }, () => {
     expect(await chain.cstBalance(wallet)).toBe(beforeClaim + yes);
     expect(await chain.outcomeBalances(round, wallet)).toEqual({ yes: 0n, no: 0n });
     await expect(market.positionPanel).toBeHidden();
-    await expect(market.activityItem(`claimed ${formatCst(yes)} CST`)).toContainText(shortAddress(wallet));
+    await expect(market.activityItem(`claimed ${formatCst(yes)} CST`)).toContainText(
+      shortAddress(wallet),
+    );
   });
 
   test("normal resolution: the round ends short of the threshold, then resolve and claim pay NO", async ({
@@ -220,19 +257,29 @@ test.describe("market", { tag: "@chain" }, () => {
     const finalCount = threshold - 10n;
     await chain.setGestureCount(round, finalCount);
     await chain.setGameRound(round + 1n);
-    await expect(market.currentRoundLabel(round + 1n)).toBeVisible({ timeout: LIVE_UPDATE_TIMEOUT });
+    await expect(market.currentRoundLabel(round + 1n)).toBeVisible({
+      timeout: LIVE_UPDATE_TIMEOUT,
+    });
     await expect(market.betPanel.getByTestId("bet-closed")).toBeVisible();
 
     // Back to the ended round to settle it.
     await market.roundNav.getByRole("button", { name: `Round ${round}`, exact: true }).click();
     await expect(market.page).toHaveURL(new RegExp(`\\?round=${round}$`));
     await expect(market.currentRoundLabel(round)).toBeVisible();
-    await expect(market.resolveBanner.getByRole("heading", { name: "The round has ended" })).toBeVisible();
-    await expect(market.resolveBanner.getByTestId("banner-count")).toHaveText(formatCount(finalCount));
+    await expect(
+      market.resolveBanner.getByRole("heading", { name: "The round has ended" }),
+    ).toBeVisible();
+    await expect(market.resolveBanner.getByTestId("banner-count")).toHaveText(
+      formatCount(finalCount),
+    );
 
     await market.resolveBanner.getByRole("button", { name: "Resolve round" }).click();
     await expect(market.toast("Resolving round confirmed.")).toBeVisible();
-    expect(await chain.roundState(round)).toMatchObject({ resolved: true, yesWon: false, currentCount: finalCount });
+    expect(await chain.roundState(round)).toMatchObject({
+      resolved: true,
+      yesWon: false,
+      currentCount: finalCount,
+    });
     await expect(market.positionPanel).toContainText("settled — NO won");
 
     const beforeClaim = await chain.cstBalance(wallet);

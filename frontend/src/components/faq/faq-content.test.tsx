@@ -57,7 +57,10 @@ describe("FaqContent", () => {
   it("closes with links back to the market and to the game", () => {
     render(<FaqContent />);
     const outro = screen.getByTestId("faq-outro");
-    expect(within(outro).getByRole("link", { name: /go to the market/i })).toHaveAttribute("href", "/");
+    expect(within(outro).getByRole("link", { name: /go to the market/i })).toHaveAttribute(
+      "href",
+      "/",
+    );
     expect(within(outro).getByRole("link", { name: /play cosmic signature/i })).toHaveAttribute(
       "href",
       "https://cosmicsignature.com",

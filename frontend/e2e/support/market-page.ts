@@ -57,7 +57,9 @@ export class MarketPage {
     const dialog = this.page.getByRole("dialog", { name: "Connect a wallet" });
     await dialog.getByRole("button", { name: "Mock Connector" }).click();
     await expect(dialog).toBeHidden();
-    await expect(this.header.getByRole("button", { name: shortAddress(ACCOUNTS.wallet) })).toBeVisible();
+    await expect(
+      this.header.getByRole("button", { name: shortAddress(ACCOUNTS.wallet) }),
+    ).toBeVisible();
   }
 
   async openTab(name: "Place bet" | "Liquidity"): Promise<void> {
@@ -68,7 +70,9 @@ export class MarketPage {
 
   /** A sonner toast, by its exact message. */
   toast(message: string): Locator {
-    return this.page.getByRole("region", { name: /^Notifications/ }).getByText(message, { exact: true });
+    return this.page
+      .getByRole("region", { name: /^Notifications/ })
+      .getByText(message, { exact: true });
   }
 
   /** Activity feed entries containing `text`. */
@@ -83,7 +87,10 @@ export class MarketPage {
   }
 
   async chooseSide(side: Side): Promise<void> {
-    const tab = this.betPanel.getByRole("tab", { name: side === "yes" ? "Yes" : "No", exact: true });
+    const tab = this.betPanel.getByRole("tab", {
+      name: side === "yes" ? "Yes" : "No",
+      exact: true,
+    });
     await tab.click();
     await expect(tab).toHaveAttribute("aria-selected", "true");
   }

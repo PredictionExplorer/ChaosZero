@@ -42,6 +42,9 @@ describe("IntroHero", () => {
 
   it("links down to the how-it-works section", () => {
     render(<IntroHero />);
-    expect(screen.getByRole("link", { name: /how it works/i })).toHaveAttribute("href", "#how-it-works");
+    expect(screen.getByRole("link", { name: /how it works/i })).toHaveAttribute(
+      "href",
+      "#how-it-works",
+    );
   });
 });

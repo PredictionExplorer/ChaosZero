@@ -35,7 +35,9 @@ describe("Home page — server-rendered HTML", () => {
   });
 
   it("renders a hydration-safe wallet placeholder in the header", () => {
-    const button = [...page().querySelectorAll("header button")].find((b) => b.textContent === "Connect");
+    const button = [...page().querySelectorAll("header button")].find(
+      (b) => b.textContent === "Connect",
+    );
     expect(button).toBeDefined();
     expect(button).toHaveProperty("disabled", true);
   });

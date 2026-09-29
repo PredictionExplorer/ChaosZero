@@ -53,7 +53,12 @@ afterAll(() => {
 
 let market: MarketState;
 let actions: { -readonly [K in keyof MarketActions]: MarketActions[K] } & Record<string, unknown>;
-let events: { activity: ActivityEvent[]; poolEvents: PoolEvent[]; isLoading: boolean; error: Error | null };
+let events: {
+  activity: ActivityEvent[];
+  poolEvents: PoolEvent[];
+  isLoading: boolean;
+  error: Error | null;
+};
 
 function marketState(overrides: Partial<MarketState> = {}): MarketState {
   return {
@@ -114,7 +119,10 @@ describe("MarketApp: data wiring", () => {
   });
 
   it("follows the round the market resolved for events and actions", () => {
-    market = marketState({ roundId: 7n, snapshot: roundSnapshot({ roundId: 7n, gameRoundNum: 7n }) });
+    market = marketState({
+      roundId: 7n,
+      snapshot: roundSnapshot({ roundId: 7n, gameRoundNum: 7n }),
+    });
     renderApp();
 
     expect(mocks.useMarketEvents).toHaveBeenCalledWith(SERIES, 7n);
@@ -142,7 +150,9 @@ describe("MarketApp: loading and errors", () => {
     market = marketState({ snapshot: null, error: new Error("HTTP request failed. Status: 429") });
     renderApp();
 
-    expect(screen.getByTestId("market-error")).toHaveTextContent("HTTP request failed. Status: 429");
+    expect(screen.getByTestId("market-error")).toHaveTextContent(
+      "HTTP request failed. Status: 429",
+    );
     await user.click(screen.getByRole("button", { name: "Try again" }));
     expect(market.refetchAll).toHaveBeenCalledOnce();
   });
@@ -208,7 +218,9 @@ describe("MarketApp: a live round", () => {
     ];
     renderApp();
 
-    const volume = within(screen.getByTestId("stats-grid")).getByText("Volume").closest("div")!.parentElement!;
+    const volume = within(screen.getByTestId("stats-grid"))
+      .getByText("Volume")
+      .closest("div")!.parentElement!;
     expect(volume).toHaveTextContent(formatCst(7n * ONE));
   });
 
@@ -310,17 +322,20 @@ describe("MarketApp: a live round", () => {
     );
   });
 
-  it.each(["approve", "addLiquidity"] as const)("spins the deposit button while %s is in flight", async (pending) => {
-    const user = userEvent.setup();
-    connect();
-    market = marketState({ user: userSnapshot({ cstAllowance: 1_000_000n * ONE }) });
-    actions.pending = pending;
-    renderApp();
+  it.each(["approve", "addLiquidity"] as const)(
+    "spins the deposit button while %s is in flight",
+    async (pending) => {
+      const user = userEvent.setup();
+      connect();
+      market = marketState({ user: userSnapshot({ cstAllowance: 1_000_000n * ONE }) });
+      actions.pending = pending;
+      renderApp();
 
-    await user.click(screen.getByTestId("side-tab-liquidity"));
-    await user.type(screen.getByTestId("lp-amount-input"), "10");
-    expect(screen.getByTestId("lp-add-submit")).toBeDisabled();
-  });
+      await user.click(screen.getByTestId("side-tab-liquidity"));
+      await user.type(screen.getByTestId("lp-amount-input"), "10");
+      expect(screen.getByTestId("lp-add-submit")).toBeDisabled();
+    },
+  );
 
   it("keeps the deposit button live while an unrelated action is in flight", async () => {
     const user = userEvent.setup();
@@ -412,7 +427,10 @@ describe("MarketApp: rounds that can no longer be bet on", () => {
   });
 
   it("keeps betting open on a future round the game has not reached", () => {
-    market = marketState({ snapshot: roundSnapshot({ roundId: 6n, thresholdKnown: false }), roundId: 6n });
+    market = marketState({
+      snapshot: roundSnapshot({ roundId: 6n, thresholdKnown: false }),
+      roundId: 6n,
+    });
     renderApp(6n);
 
     expect(screen.getByTestId("bet-submit")).toBeInTheDocument();

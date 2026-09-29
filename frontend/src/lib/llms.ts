@@ -38,7 +38,7 @@ function keyFacts(): string {
     "Key facts:",
     "",
     "- One market per Cosmic Signature round, launched automatically, forever. Future rounds are tradable before they start.",
-    '- YES wins if the round\'s final gesture count is STRICTLY greater than the previous round\'s final count (the "threshold"); a tie means NO wins.',
+    "- YES wins if the round's final gesture count is STRICTLY greater than the previous round's final count (the \"threshold\"); a tie means NO wins.",
     "- Gestures are bids in the Cosmic Signature game. The count is public on-chain while a round runs and only ever goes up, so the moment it crosses the threshold, YES is certain: betting halts atomically and the round can be resolved early.",
     "- Prices come from a constant-product AMM pool (one per round). The implied YES probability is reserveNo / (reserveYes + reserveNo). Liquidity providers vote the trading fee (share-weighted average, capped at 10%).",
     "- Fully collateralized by construction: 1 CST always mints 1 YES + 1 NO, and a pair always redeems for 1 CST. Resolution is permissionless and read directly from the game contract.",
@@ -88,7 +88,9 @@ export function llmsFullTxt(): string {
       "",
       category.description,
       "",
-      ...category.items.map((item) => [`### ${item.question}`, "", item.answer.join("\n\n"), ""].join("\n")),
+      ...category.items.map((item) =>
+        [`### ${item.question}`, "", item.answer.join("\n\n"), ""].join("\n"),
+      ),
     ].join("\n"),
   );
 

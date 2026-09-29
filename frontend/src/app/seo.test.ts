@@ -66,7 +66,10 @@ describe("manifest", () => {
     expect(data.icons?.length).toBeGreaterThanOrEqual(3);
     for (const icon of data.icons ?? []) {
       expect(icon.src.startsWith("/")).toBe(true);
-      expect(existsSync(join(PUBLIC_DIR, icon.src)), `${icon.src} missing — run \`pnpm icons\``).toBe(true);
+      expect(
+        existsSync(join(PUBLIC_DIR, icon.src)),
+        `${icon.src} missing — run \`pnpm icons\``,
+      ).toBe(true);
     }
   });
 
@@ -74,4 +77,3 @@ describe("manifest", () => {
     expect(data.icons?.some((icon) => icon.purpose === "maskable")).toBe(true);
   });
 });
-

@@ -46,10 +46,16 @@ describe("AddressLink", () => {
   });
 
   it("tolerates an explorer URL with a trailing slash", () => {
-    mocks.chain = { ...arbitrum, blockExplorers: { default: { name: "Scan", url: "https://scan.example/" } } };
+    mocks.chain = {
+      ...arbitrum,
+      blockExplorers: { default: { name: "Scan", url: "https://scan.example/" } },
+    };
     render(<AddressLink address={ADDRESS} />);
 
-    expect(screen.getByRole("link")).toHaveAttribute("href", `https://scan.example/address/${ADDRESS}`);
+    expect(screen.getByRole("link")).toHaveAttribute(
+      "href",
+      `https://scan.example/address/${ADDRESS}`,
+    );
   });
 
   it("shows plain text with the full hash on hover when the chain has no explorer", () => {

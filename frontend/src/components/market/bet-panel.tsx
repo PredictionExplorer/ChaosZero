@@ -37,7 +37,15 @@ const SLIPPAGE_PRESETS_BPS = [10, 50, 100] as const;
  * The slippage floor from the same quote is what protects the bet from
  * liquidity pulls, sandwiches, and fee-vote jumps.
  */
-export function BetPanel({ pool, balance, allowance, pendingAction, onConnect, onApprove, onBet }: BetPanelProps) {
+export function BetPanel({
+  pool,
+  balance,
+  allowance,
+  pendingAction,
+  onConnect,
+  onApprove,
+  onBet,
+}: BetPanelProps) {
   const [side, setSide] = useState<BetSide>("yes");
   const [input, setInput] = useState("");
   const [slippageBps, setSlippageBps] = useState<number>(50);
@@ -119,7 +127,9 @@ export function BetPanel({ pool, balance, allowance, pendingAction, onConnect, o
                 onClick={() => setSlippageBps(bps)}
                 className={[
                   "rounded-lg px-2.5 py-1 font-mono text-xs transition-colors",
-                  slippageBps === bps ? "bg-signal/20 text-signal-bright" : "text-ink-faint hover:text-ink",
+                  slippageBps === bps
+                    ? "bg-signal/20 text-signal-bright"
+                    : "text-ink-faint hover:text-ink",
                 ].join(" ")}
               >
                 {(bps / 100).toLocaleString("en-US")}%
@@ -163,8 +173,10 @@ export function BetPanel({ pool, balance, allowance, pendingAction, onConnect, o
 
       <p className="mt-2 text-center text-xs text-ink-faint">
         You win if this round{" "}
-        <span className={`font-semibold ${sideColor}`}>{side === "yes" ? "beats" : "doesn't beat"}</span> last
-        round&apos;s gesture count
+        <span className={`font-semibold ${sideColor}`}>
+          {side === "yes" ? "beats" : "doesn't beat"}
+        </span>{" "}
+        last round&apos;s gesture count
       </p>
 
       {/* Amount */}
@@ -192,7 +204,9 @@ export function BetPanel({ pool, balance, allowance, pendingAction, onConnect, o
             onChange={(e) => setInput(e.target.value)}
             className="w-full bg-transparent font-display text-2xl font-semibold text-ink outline-none placeholder:text-ink-faint/50"
           />
-          <span className="rounded-lg bg-surface-2 px-2.5 py-1 font-mono text-xs font-semibold text-ink-dim">CST</span>
+          <span className="rounded-lg bg-surface-2 px-2.5 py-1 font-mono text-xs font-semibold text-ink-dim">
+            CST
+          </span>
         </div>
         {parsed.error && (
           <p className="mt-1 text-xs text-lower" role="alert" data-testid="input-error">
@@ -203,7 +217,10 @@ export function BetPanel({ pool, balance, allowance, pendingAction, onConnect, o
 
       {/* Quote */}
       {quote !== null && !parsed.error && (
-        <dl className="mt-4 space-y-2 rounded-xl border border-line bg-surface-2/40 p-3 text-xs" data-testid="quote-box">
+        <dl
+          className="mt-4 space-y-2 rounded-xl border border-line bg-surface-2/40 p-3 text-xs"
+          data-testid="quote-box"
+        >
           <div className="flex justify-between">
             <dt className="flex items-center gap-1 text-ink-faint">
               You receive
@@ -237,7 +254,9 @@ export function BetPanel({ pool, balance, allowance, pendingAction, onConnect, o
               />
             </dt>
             <dd className="font-mono text-ink" data-testid="quote-entry">
-              {quote.entry === null ? "—" : `${(quote.entry * 100).toLocaleString("en-US", { maximumFractionDigits: 1 })}%`}
+              {quote.entry === null
+                ? "—"
+                : `${(quote.entry * 100).toLocaleString("en-US", { maximumFractionDigits: 1 })}%`}
             </dd>
           </div>
           <div className="flex justify-between">
@@ -280,8 +299,9 @@ export function BetPanel({ pool, balance, allowance, pendingAction, onConnect, o
       </Button>
 
       <p className="mt-3 text-center text-[11px] leading-relaxed text-ink-faint">
-        Bets are placed in CST on {appConfig.chain.name}. A winning token pays exactly 1 CST at resolution; a losing
-        token pays 0. Exit early any time by betting the other side and redeeming pairs.
+        Bets are placed in CST on {appConfig.chain.name}. A winning token pays exactly 1 CST at
+        resolution; a losing token pays 0. Exit early any time by betting the other side and
+        redeeming pairs.
       </p>
     </Card>
   );

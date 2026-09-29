@@ -17,7 +17,10 @@ describe("FAQ page metadata", () => {
 
   it("shares with the FAQ title, branded", () => {
     expect(metadata.openGraph).toMatchObject({ url: "/faq", title: `FAQ — ${SITE_NAME}` });
-    expect(metadata.twitter).toMatchObject({ card: "summary_large_image", title: `FAQ — ${SITE_NAME}` });
+    expect(metadata.twitter).toMatchObject({
+      card: "summary_large_image",
+      title: `FAQ — ${SITE_NAME}`,
+    });
   });
 });
 
@@ -47,6 +50,9 @@ describe("FAQ page", () => {
     expect(faq).toMatchObject({ "@type": "FAQPage" });
     expect((faq!.mainEntity as unknown[]).length).toBe(QUESTIONS.length);
     expect(breadcrumb).toMatchObject({ "@type": "BreadcrumbList" });
-    expect((breadcrumb!.itemListElement as { name: string }[]).map((entry) => entry.name)).toEqual(["Home", "FAQ"]);
+    expect((breadcrumb!.itemListElement as { name: string }[]).map((entry) => entry.name)).toEqual([
+      "Home",
+      "FAQ",
+    ]);
   });
 });

@@ -44,7 +44,10 @@ test.describe("accessibility", { tag: "@a11y" }, () => {
 
   test("wallet dialog", async ({ page }, testInfo) => {
     await page.goto("/");
-    await page.getByRole("banner").getByRole("button", { name: "Connect wallet", exact: true }).click();
+    await page
+      .getByRole("banner")
+      .getByRole("button", { name: "Connect wallet", exact: true })
+      .click();
     const dialog = page.getByRole("dialog", { name: "Connect a wallet" });
     await expect(dialog).toBeVisible();
     await expectNoViolations(page, testInfo, '[role="dialog"]');

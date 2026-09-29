@@ -3,7 +3,16 @@ import { describe, expect, it } from "vitest";
 import type { BetEvent, LiquidityAddedEvent, LiquidityRemovedEvent, PoolEvent } from "./history";
 import { applyPoolEvent, replayRound, sortEvents } from "./history";
 import type { PoolState } from "./math";
-import { applyBet, currentFeeBps, DEAD_SHARES, EMPTY_POOL, joinPool, ONE, openPool, removeLiquidity } from "./math";
+import {
+  applyBet,
+  currentFeeBps,
+  DEAD_SHARES,
+  EMPTY_POOL,
+  joinPool,
+  ONE,
+  openPool,
+  removeLiquidity,
+} from "./math";
 
 /**
  * Simulates a contract execution with the math lib while emitting the exact
@@ -23,7 +32,9 @@ const HEX = "0xabc" as `0x${string}`;
 const USER = "0x1111111111111111111111111111111111111111" as `0x${string}`;
 
 const arbStep: fc.Arbitrary<SimStep> = fc.record({
-  action: fc.constantFrom("join", "removeHalf", "betYes", "betNo", "revote") as fc.Arbitrary<SimStep["action"]>,
+  action: fc.constantFrom("join", "removeHalf", "betYes", "betNo", "revote") as fc.Arbitrary<
+    SimStep["action"]
+  >,
   amount: fc.bigInt({ min: 10n ** 6n, max: 10n ** 23n }),
   feeBps: fc.bigInt({ min: 0n, max: 1_000n }),
 });
@@ -39,7 +50,12 @@ function simulate(
   let logIndex = startLogIndex;
   let sharesHeld: bigint;
   let declared = openFee;
-  const base = () => ({ blockNumber: 1n, logIndex: logIndex++, transactionHash: HEX, timestamp: null });
+  const base = () => ({
+    blockNumber: 1n,
+    logIndex: logIndex++,
+    transactionHash: HEX,
+    timestamp: null,
+  });
 
   const opened = openPool(openAmount, probBps, openFee);
   let pool = opened.pool;
@@ -57,7 +73,10 @@ function simulate(
 
   for (const step of steps) {
     if (step.action === "join") {
-      const joined = joinPool(pool, step.amount, step.feeBps, { shares: sharesHeld, declaredFeeBps: declared });
+      const joined = joinPool(pool, step.amount, step.feeBps, {
+        shares: sharesHeld,
+        declaredFeeBps: declared,
+      });
       if (joined === null) continue;
       events.push({
         kind: "add",
@@ -89,7 +108,10 @@ function simulate(
       sharesHeld -= shares;
     } else if (step.action === "revote") {
       // No event consumed by replay; the vote only changes future fees.
-      pool = { ...pool, feeWeight: pool.feeWeight - sharesHeld * declared + sharesHeld * step.feeBps };
+      pool = {
+        ...pool,
+        feeWeight: pool.feeWeight - sharesHeld * declared + sharesHeld * step.feeBps,
+      };
       declared = step.feeBps;
     } else {
       const side = step.action === "betYes" ? "yes" : "no";

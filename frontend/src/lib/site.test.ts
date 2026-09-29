@@ -10,7 +10,9 @@ describe("parseSiteUrl", () => {
 
   it("normalizes to the origin, dropping trailing slashes and paths", () => {
     expect(parseSiteUrl("https://chaoszero.com/")).toBe("https://chaoszero.com");
-    expect(parseSiteUrl("https://preview.example.com/some/path")).toBe("https://preview.example.com");
+    expect(parseSiteUrl("https://preview.example.com/some/path")).toBe(
+      "https://preview.example.com",
+    );
   });
 
   it("keeps explicit ports (local previews)", () => {

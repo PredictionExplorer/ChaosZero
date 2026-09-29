@@ -61,7 +61,11 @@ describe("BetPanel", () => {
 
     expect(screen.getByTestId("tab-no")).toHaveAttribute("aria-selected", "true");
     const expected = quoteBet("no", POOL, 50n * ONE);
-    expect(props.onBet).toHaveBeenCalledWith("no", 50n * ONE, minTokensOutForSlippage(expected, 50));
+    expect(props.onBet).toHaveBeenCalledWith(
+      "no",
+      50n * ONE,
+      minTokensOutForSlippage(expected, 50),
+    );
   });
 
   it("adjusting slippage tightens the submitted floor", async () => {
@@ -74,7 +78,11 @@ describe("BetPanel", () => {
     await user.click(screen.getByTestId("bet-submit"));
 
     const expected = quoteBet("yes", POOL, 50n * ONE);
-    expect(props.onBet).toHaveBeenCalledWith("yes", 50n * ONE, minTokensOutForSlippage(expected, 10));
+    expect(props.onBet).toHaveBeenCalledWith(
+      "yes",
+      50n * ONE,
+      minTokensOutForSlippage(expected, 10),
+    );
   });
 
   it("routes through approval when allowance is too low", async () => {
@@ -104,7 +112,9 @@ describe("BetPanel", () => {
   });
 
   it("disables betting into an unfunded pool", () => {
-    renderPanel({ pool: { ...POOL, reserveYes: 0n, reserveNo: 0n, totalShares: 0n, feeWeight: 0n } });
+    renderPanel({
+      pool: { ...POOL, reserveYes: 0n, reserveNo: 0n, totalShares: 0n, feeWeight: 0n },
+    });
     expect(screen.getByTestId("bet-submit")).toHaveTextContent(/no liquidity/i);
     expect(screen.getByTestId("bet-submit")).toBeDisabled();
   });

@@ -65,7 +65,14 @@ describe("StatsGrid", () => {
     render(
       <StatsGrid
         snapshot={snapshot({
-          pool: { reserveYes: 0n, reserveNo: 0n, totalShares: 0n, accFeePerShare: 0n, feeReserve: 0n, feeWeight: 0n },
+          pool: {
+            reserveYes: 0n,
+            reserveNo: 0n,
+            totalShares: 0n,
+            accFeePerShare: 0n,
+            feeReserve: 0n,
+            feeWeight: 0n,
+          },
         })}
         volume={0n}
       />,
@@ -75,7 +82,10 @@ describe("StatsGrid", () => {
 
   it("keeps the liquidity and fee stats intact for future pools", () => {
     render(
-      <StatsGrid snapshot={snapshot({ roundId: 7n, gameRoundNum: 5n, thresholdKnown: false })} volume={123n * ONE} />,
+      <StatsGrid
+        snapshot={snapshot({ roundId: 7n, gameRoundNum: 5n, thresholdKnown: false })}
+        volume={123n * ONE}
+      />,
     );
     expect(statValue(/liquidity/i)).toContain("4,000");
     expect(statValue(/pool fee/i)).toContain("2.5%");
@@ -84,7 +94,14 @@ describe("StatsGrid", () => {
 
   it("gives every stat a help tooltip", () => {
     render(<StatsGrid snapshot={snapshot()} volume={0n} />);
-    for (const label of ["Gestures so far", "To beat", "Volume", "Liquidity", "Pool fee", "LP fees unclaimed"]) {
+    for (const label of [
+      "Gestures so far",
+      "To beat",
+      "Volume",
+      "Liquidity",
+      "Pool fee",
+      "LP fees unclaimed",
+    ]) {
       expect(screen.getByRole("button", { name: `About "${label}"` })).toBeInTheDocument();
     }
   });
@@ -109,6 +126,8 @@ describe("StatsGrid", () => {
     );
 
     await user.hover(screen.getByRole("button", { name: 'About "To beat"' }));
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/locks at the previous round's final count/i);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      /locks at the previous round's final count/i,
+    );
   });
 });

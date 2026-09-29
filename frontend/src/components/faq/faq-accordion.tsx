@@ -28,7 +28,9 @@ function FaqAccordionItem({ item }: { item: FaqItem }) {
           data-testid={`faq-question-${item.id}`}
           className="flex w-full items-center justify-between gap-4 p-5 text-left transition-colors hover:bg-surface-2/40"
         >
-          <span className="font-display text-sm font-semibold text-ink sm:text-base">{item.question}</span>
+          <span className="font-display text-sm font-semibold text-ink sm:text-base">
+            {item.question}
+          </span>
           <ChevronDown
             className={[
               "size-4 shrink-0 text-ink-faint transition-transform duration-200",
