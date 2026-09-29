@@ -204,7 +204,7 @@ jobs:
 
       - name: Load pinned tool versions
         env:
-          REQUIRED: FOUNDRY_VERSION SLITHER_VERSION
+          REQUIRED: FOUNDRY_VERSION SLITHER_VERSION CRYTIC_COMPILE_VERSION
         run: |
           # Strict KEY=value lines only: nothing else may reach $GITHUB_ENV.
           if grep -nEv '^(#.*|[A-Z][A-Z0-9_]*=[A-Za-z0-9._+-]*)?$' tools/versions.env; then
@@ -230,20 +230,21 @@ jobs:
           cache-dependency-path: tools/versions.env
 
       - name: Install Slither
-        run: python -m pip install "slither-analyzer==${SLITHER_VERSION}"
+        run: python -m pip install "slither-analyzer==${SLITHER_VERSION}" "crytic-compile==${CRYTIC_COMPILE_VERSION}"
 
       - name: Run Slither
-        # Exits non-zero on any finding that is not triaged in slither.db.json.
-        run: slither . --config-file slither.config.json --sarif results.sarif
+        # Exits non-zero on any finding that is not triaged in slither.db.json;
+        # writes .analysis/slither/slither.sarif with the untriaged ones only.
+        run: tools/analysis/slither.sh
 
       # Also when Slither failed: the findings then show up in code scanning
       # and as annotations on the pull request. Pull requests from forks get a
       # read-only token, so they rely on the failing step's log instead.
       - name: Upload the SARIF report to code scanning
-        if: ${{ !cancelled() && hashFiles('results.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        if: ${{ !cancelled() && hashFiles('.analysis/slither/slither.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
-          sarif_file: results.sarif
+          sarif_file: .analysis/slither/slither.sarif
           category: slither
 
   symbolic:

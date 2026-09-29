@@ -71,8 +71,8 @@ fmt-check-frontend: ## Prettier --check
 
 lint: lint-contracts lint-frontend ## forge lint + ESLint
 
-lint-contracts: ## forge lint
-	forge lint
+lint-contracts: ## forge lint, warnings are errors
+	forge lint --deny warnings
 
 lint-frontend: ## ESLint
 	cd $(FRONTEND) && pnpm lint
@@ -129,6 +129,12 @@ gas: ## Refresh the gas snapshot (snapshots/GasBenchmarksTest.json)
 
 gas-check: ## Fail if gas use drifted from the committed snapshot
 	FORGE_SNAPSHOT_CHECK=true forge test --match-contract GasBenchmarksTest
+	@# Check mode only compares existing keys: an added or removed benchmark
+	@# silently rewrites the file, so the committed snapshot must also be clean.
+	@git diff --exit-code -- snapshots/ || { \
+		echo "snapshots/ changed: review the gas diff above and commit it (make gas)." >&2; \
+		exit 1; \
+	}
 
 vectors: ## Regenerate the frontend's differential test vectors from the contract
 	forge script script/GenerateVectors.s.sol --tc GenerateVectors
@@ -141,10 +147,10 @@ vectors-check: vectors ## Fail if the committed vectors differ from the contract
 
 ##@ Analysis
 
-analyze: slither halmos ## Static analysis and symbolic tests
+analyze: lint-contracts slither halmos ## forge lint, Slither and symbolic tests
 
-slither: ## Slither; fails on any untriaged finding
-	slither . --config-file slither.config.json
+slither: ## Slither; fails on any untriaged finding (tools/analysis/slither.sh)
+	tools/analysis/slither.sh
 
 halmos: ## Symbolic tests (tools/analysis/halmos.sh)
 	tools/analysis/halmos.sh
@@ -154,8 +160,8 @@ mutation: ## Mutation testing, slow; runs weekly in CI (tools/analysis/mutation.
 
 ##@ All together
 
-check: fmt-check lint build test coverage vectors-check gas-check ## Everything CI's offline gates run, in order, fail-fast
+check: fmt-check lint typecheck build gas-check test-contracts coverage vectors-check ## Everything CI's offline gates run, in order, fail-fast
 
 clean: ## Remove build output and caches (contracts and frontend)
 	forge clean
-	rm -rf $(FRONTEND)/.next $(FRONTEND)/coverage coverage lcov.info
+	rm -rf $(FRONTEND)/.next $(FRONTEND)/coverage coverage lcov.info .analysis

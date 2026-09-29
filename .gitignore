@@ -23,14 +23,10 @@ docs/
 lcov*.info
 coverage/
 
-# Static and symbolic analysis output (slither, crytic-compile, halmos)
+# Analysis output: Slither, Halmos and mutation testing (tools/analysis/)
+.analysis/
 *.sarif
 crytic-export/
-halmos-output/
-
-# Mutation testing output (slither-mutate, gambit)
-mutation_campaign/
-gambit_out/
 
 # Personal git hook overrides (see lefthook.yml)
 lefthook-local.yml

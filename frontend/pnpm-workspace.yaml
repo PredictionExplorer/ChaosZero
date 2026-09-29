@@ -1,3 +1,6 @@
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver
+  # Its postinstall would install hooks; scripts/install-git-hooks.mjs does it
+  # from the prepare script instead, skipping CI and Vercel.
+  - lefthook

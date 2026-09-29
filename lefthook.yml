@@ -92,7 +92,7 @@ pre-push:
         - "frontend/.env.production"
         - "Makefile"
         - "tools/versions.env"
-      run: make build test-contracts vectors-check gas-check
+      run: make lint-contracts build gas-check test-contracts vectors-check
       fail_text: "Contract checks failed. Skip once with LEFTHOOK_EXCLUDE=contracts git push"
 
     - name: frontend
