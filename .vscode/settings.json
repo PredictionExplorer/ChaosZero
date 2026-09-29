@@ -1,0 +1,58 @@
+{
+  "editor.formatOnSave": true,
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+
+  "[solidity]": {
+    "editor.defaultFormatter": "NomicFoundation.hardhat-solidity",
+    "editor.tabSize": 4,
+    "editor.rulers": [120]
+  },
+  "solidity.formatter": "forge",
+
+  "prettier.requireConfig": true,
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.rulers": [100]
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.rulers": [100]
+  },
+  "[javascript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[javascriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[json]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[jsonc]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[css]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "files.trimTrailingWhitespace": false
+  },
+
+  "eslint.workingDirectories": [{ "directory": "frontend", "changeProcessCWD": true }],
+  "editor.codeActionsOnSave": { "source.fixAll.eslint": "explicit" },
+
+  "typescript.tsdk": "frontend/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "tailwindCSS.experimental.configFile": "frontend/src/app/globals.css",
+
+  "files.associations": { "*.env": "properties" },
+  "search.exclude": {
+    "**/node_modules": true,
+    "cache": true,
+    "out": true,
+    "lib": true,
+    "broadcast": true,
+    "frontend/.next": true,
+    "frontend/coverage": true,
+    "frontend/pnpm-lock.yaml": true,
+    "frontend/src/test/fixtures/contract-vectors.json": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/cache/**": true,
+    "**/out/**": true,
+    "**/.next/**": true
+  }
+}
