@@ -107,6 +107,17 @@ describe("MarketHero", () => {
     expect(screen.getByTestId("hero-threshold-unknown")).toHaveTextContent(/locks when round 8 ends/i);
     expect(screen.queryByTestId("hero-threshold")).not.toBeInTheDocument();
   });
+
+  it("never refers to a round before round 0", () => {
+    render(
+      <MarketHero
+        snapshot={snapshot({ roundId: 0n, gameRoundNum: 0n, thresholdKnown: false, threshold: 0n })}
+        history={[]}
+      />,
+    );
+    expect(screen.getByTestId("race-pending")).toHaveTextContent(/when the previous round ends/i);
+    expect(screen.getByTestId("race-pending")).not.toHaveTextContent(/round -1/);
+  });
 });
 
 describe("MarketHero — tooltips", () => {

@@ -78,6 +78,16 @@ describe("SidePanelTabs", () => {
     expect(screen.getByTestId("side-tab-liquidity")).toHaveFocus();
   });
 
+  it("leaves other keys alone (typing, Tab, Enter keep their normal meaning)", async () => {
+    const user = userEvent.setup();
+    renderTabs();
+
+    screen.getByTestId("side-tab-bet").focus();
+    await user.keyboard("{ArrowDown}x");
+    expect(screen.getByTestId("side-tab-bet")).toHaveFocus();
+    expect(screen.getByTestId("side-tab-bet")).toHaveAttribute("aria-selected", "true");
+  });
+
   it("wires tabs to panels with matching ARIA ids", () => {
     renderTabs();
     const tab = screen.getByTestId("side-tab-liquidity");

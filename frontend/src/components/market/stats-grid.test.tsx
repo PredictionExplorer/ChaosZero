@@ -61,6 +61,18 @@ describe("StatsGrid", () => {
     expect(statValue(/to beat/i)).not.toContain("0");
   });
 
+  it("shows no pool fee for an unfunded pool (there is no vote to average)", () => {
+    render(
+      <StatsGrid
+        snapshot={snapshot({
+          pool: { reserveYes: 0n, reserveNo: 0n, totalShares: 0n, accFeePerShare: 0n, feeReserve: 0n, feeWeight: 0n },
+        })}
+        volume={0n}
+      />,
+    );
+    expect(statValue(/pool fee/i)).toContain("—");
+  });
+
   it("keeps the liquidity and fee stats intact for future pools", () => {
     render(
       <StatsGrid snapshot={snapshot({ roundId: 7n, gameRoundNum: 5n, thresholdKnown: false })} volume={123n * ONE} />,

@@ -194,6 +194,72 @@ describe("LiquidityPanel — position, re-voting, removing, fees", () => {
     await user.click(screen.getByTestId("lp-mode-remove"));
     expect(screen.getByTestId("lp-no-position")).toBeInTheDocument();
   });
+
+  it("keeps the re-vote panel open when the vote transaction fails", async () => {
+    const user = userEvent.setup();
+    renderPanel({ ...position, onUpdateFee: vi.fn().mockResolvedValue(false) });
+
+    await user.click(screen.getByTestId("lp-my-vote"));
+    fireEvent.change(screen.getByTestId("lp-revote-slider"), { target: { value: "500" } });
+    await user.click(screen.getByTestId("lp-revote-submit"));
+
+    expect(screen.getByTestId("lp-revote")).toBeInTheDocument();
+    expect(screen.getByTestId("lp-revote-value")).toHaveTextContent("5%");
+  });
+
+  it("closes the re-vote panel once the new vote is confirmed", async () => {
+    const user = userEvent.setup();
+    renderPanel(position);
+
+    await user.click(screen.getByTestId("lp-my-vote"));
+    fireEvent.change(screen.getByTestId("lp-revote-slider"), { target: { value: "500" } });
+    await user.click(screen.getByTestId("lp-revote-submit"));
+
+    expect(screen.queryByTestId("lp-revote")).not.toBeInTheDocument();
+  });
+});
+
+describe("LiquidityPanel — deposit guards", () => {
+  it("blocks deposits larger than the wallet balance", async () => {
+    const user = userEvent.setup();
+    const { props } = renderPanel({ balance: 5n * ONE });
+
+    await user.type(screen.getByTestId("lp-amount-input"), "10");
+    expect(screen.getByTestId("lp-add-submit")).toHaveTextContent("Insufficient CST balance");
+    await user.click(screen.getByTestId("lp-add-submit"));
+
+    expect(props.onAdd).not.toHaveBeenCalled();
+    expect(props.onApprove).not.toHaveBeenCalled();
+  });
+
+  it("keeps the typed amount when the deposit fails, and clears it once confirmed", async () => {
+    const user = userEvent.setup();
+    const onAdd = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    renderPanel({ onAdd });
+    const input = screen.getByTestId<HTMLInputElement>("lp-amount-input");
+
+    await user.type(input, "10");
+    await user.click(screen.getByTestId("lp-add-submit"));
+    expect(input.value).toBe("10");
+
+    await user.click(screen.getByTestId("lp-add-submit"));
+    expect(onAdd).toHaveBeenCalledTimes(2);
+    expect(input.value).toBe("");
+  });
+
+  it("returns the excess YES tokens when the pool leans toward YES winning", async () => {
+    const user = userEvent.setup();
+    // Few YES tokens left in the pool = YES is the likely side; a balanced
+    // deposit can only add YES at that ratio, so the extra YES comes back.
+    const yesLikely: PoolState = { ...POOL, reserveYes: LIQ / 2n, reserveNo: LIQ };
+    renderPanel({ pool: yesLikely });
+
+    await user.type(screen.getByTestId("lp-amount-input"), "100");
+
+    const joined = joinPool(yesLikely, 100n * ONE, 200n)!;
+    expect(joined.excessYes).toBeGreaterThan(0n);
+    expect(screen.getByTestId("lp-preview-excess")).toHaveTextContent(/YES$/);
+  });
 });
 
 describe("LiquidityPanel — tooltips", () => {

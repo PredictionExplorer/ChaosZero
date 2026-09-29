@@ -14,6 +14,7 @@ import {
   entryProbability,
   feeAfterDeclarationChange,
   joinPool,
+  lpPositionValueFloat,
   MAX_FEE_BPS,
   minTokensOutForSlippage,
   ONE,
@@ -108,6 +109,11 @@ describe("the fee vote", () => {
 });
 
 describe("buyAmount / quoteBet / applyBet", () => {
+  it("refuses to price a bet into a pool without liquidity", () => {
+    expect(() => applyBet("yes", EMPTY_POOL, ONE)).toThrow(/no liquidity/);
+    expect(() => applyBet("no", pool({ reserveNo: 0n }), ONE)).toThrow(/no liquidity/);
+  });
+
   it("property: the pool never loses — k never decreases, reserves never empty", () => {
     fc.assert(
       fc.property(arbAmount, arbFee, arbReserve, arbReserve, (cstIn, feeBps, rY, rN) => {
@@ -275,11 +281,18 @@ describe("joinPool", () => {
 
   it("returns null for drained pools and dust deposits", () => {
     expect(joinPool(pool({ reserveYes: 0n, reserveNo: 100n }), ONE, 200n)).toBeNull();
+    expect(joinPool(pool({ reserveYes: 100n, reserveNo: 0n }), ONE, 200n)).toBeNull();
     expect(joinPool(pool({ reserveYes: LIQ * 3n, totalShares: LIQ / 2n }), 1n, 200n)).toBeNull();
   });
 });
 
 describe("removeLiquidity", () => {
+  it("rejects burning zero shares or more shares than exist", () => {
+    expect(() => removeLiquidity(pool(), 0n, 200n)).toThrow(/bad share amount/);
+    expect(() => removeLiquidity(pool(), LIQ + 1n, 200n)).toThrow(/bad share amount/);
+    expect(removeLiquidity(pool(), LIQ, 200n)).toMatchObject({ yesOut: LIQ, noOut: LIQ });
+  });
+
   it("property: add-then-remove can never pay out more than went in", () => {
     fc.assert(
       fc.property(
@@ -332,6 +345,32 @@ describe("fees and positions", () => {
   it("entryProbability is cost per token", () => {
     expect(entryProbability(50n * ONE, 100n * ONE)).toBeCloseTo(0.5);
     expect(entryProbability(ONE, 0n)).toBeNull();
+  });
+
+  it("lpPositionValueFloat values a position with no pool share at its unclaimed fees", () => {
+    expect(lpPositionValueFloat(pool(), 0n, 3n * ONE)).toBe(3);
+    expect(lpPositionValueFloat(EMPTY_POOL, 5n * ONE, ONE / 2n)).toBe(0.5);
+  });
+
+  it("lpPositionValueFloat marks a balanced pool's reserves at par", () => {
+    // All shares of a 50/50 pool: 10,000 YES + 10,000 NO, each worth 0.5.
+    expect(lpPositionValueFloat(pool(), LIQ, 0n)).toBeCloseTo(10_000);
+    expect(lpPositionValueFloat(pool(), LIQ / 4n, 2n * ONE)).toBeCloseTo(2_502);
+  });
+
+  it("property: lpPositionValueFloat lies between the pro-rata YES and NO withdrawals", () => {
+    fc.assert(
+      fc.property(arbReserve, arbReserve, fc.bigInt({ min: 1n, max: 10n ** 24n }), (rY, rN, shares) => {
+        const total = 10n ** 24n;
+        const p = pool({ reserveYes: rY, reserveNo: rN, totalShares: total });
+        const { yesOut, noOut } = removeLiquidity(p, shares, 0n);
+        const lo = Number(yesOut < noOut ? yesOut : noOut) / 1e18;
+        const hi = Number(yesOut > noOut ? yesOut : noOut) / 1e18;
+        const value = lpPositionValueFloat(p, shares, 0n);
+        expect(value).toBeGreaterThanOrEqual(lo * (1 - 1e-12));
+        expect(value).toBeLessThanOrEqual(hi * (1 + 1e-12));
+      }),
+    );
   });
 
   it("minTokensOutForSlippage rounds down and validates its input", () => {

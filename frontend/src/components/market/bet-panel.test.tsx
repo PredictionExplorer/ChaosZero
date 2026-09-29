@@ -171,3 +171,62 @@ describe("BetPanel — tooltips", () => {
     expect(screen.getByRole("tooltip")).toHaveTextContent(/before your bet reverts/i);
   });
 });
+
+describe("BetPanel — amount shortcuts and progress", () => {
+  it("MAX fills the whole balance, to the wei", async () => {
+    const user = userEvent.setup();
+    renderPanel({ balance: 1_234_567_890_123_456_789n });
+
+    await user.click(screen.getByTestId("max-button"));
+
+    expect(screen.getByTestId<HTMLInputElement>("amount-input").value).toBe("1.234567890123456789");
+  });
+
+  it("MAX with an empty wallet clears the amount instead of entering zero", async () => {
+    const user = userEvent.setup();
+    renderPanel({ balance: 0n });
+
+    await user.type(screen.getByTestId("amount-input"), "5");
+    await user.click(screen.getByTestId("max-button"));
+
+    expect(screen.getByTestId<HTMLInputElement>("amount-input").value).toBe("");
+  });
+
+  it("hides the balance shortcut until a wallet is connected", () => {
+    renderPanel({ balance: null, allowance: null });
+    expect(screen.queryByTestId("max-button")).not.toBeInTheDocument();
+  });
+
+  it("switches back to YES after looking at NO", async () => {
+    const user = userEvent.setup();
+    const { props } = renderPanel();
+
+    await user.click(screen.getByTestId("tab-no"));
+    await user.click(screen.getByTestId("tab-yes"));
+    await user.type(screen.getByTestId("amount-input"), "20");
+    await user.click(screen.getByTestId("bet-submit"));
+
+    expect(screen.getByTestId("tab-yes")).toHaveAttribute("aria-selected", "true");
+    expect(props.onBet).toHaveBeenCalledWith("yes", 20n * ONE, expect.any(BigInt));
+  });
+
+  it.each([
+    ["approve", "Approving…"],
+    ["bet", "Confirming…"],
+  ] as const)("shows %s progress and blocks resubmission", async (pendingAction, label) => {
+    renderPanel({ pendingAction });
+
+    expect(screen.getByTestId("bet-submit")).toHaveTextContent(label);
+    expect(screen.getByTestId("bet-submit")).toBeDisabled();
+  });
+
+  it("clears the amount after a confirmed bet", async () => {
+    const user = userEvent.setup();
+    renderPanel();
+
+    await user.type(screen.getByTestId("amount-input"), "50");
+    await user.click(screen.getByTestId("bet-submit"));
+
+    expect(screen.getByTestId<HTMLInputElement>("amount-input").value).toBe("");
+  });
+});
