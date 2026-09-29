@@ -1,0 +1,30 @@
+# gitleaks (https://github.com/gitleaks/gitleaks): secret scanning of every
+# commit in CI (the hygiene job) and of staged changes in the pre-commit hook.
+# All of gitleaks' default rules apply; the allowlists below are exact values
+# or shapes that are public by construction, each scoped as tightly as
+# possible. CI ignores inline "gitleaks:allow" comments, so this file is the
+# one place exceptions live. Never allowlist a path, a commit or a whole rule:
+# if a real secret was committed, rotate it first, then remove it from history.
+
+title = "ChaosZero"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = """\
+  Anvil/Hardhat dev account #0. Derived from the public test mnemonic \
+  ("test test ... junk") that every local anvil chain funds; it holds nothing \
+  on any real network. Used by the local deploy docs and the e2e harness."""
+regexTarget = "secret"
+regexes = ['''^(0x)?ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80$''']
+
+[[allowlists]]
+description = """\
+  EVM addresses (0x + 40 hex digits) are public on-chain identifiers, never \
+  credentials. generic-api-key flags them after words such as "token:" (the \
+  CST token address in the docs; the rule's capture can include the period \
+  that ends the sentence). Private keys are 64 hex digits and still match."""
+targetRules = ["generic-api-key"]
+regexTarget = "secret"
+regexes = ['''^0x[0-9a-fA-F]{40}\.?$''']

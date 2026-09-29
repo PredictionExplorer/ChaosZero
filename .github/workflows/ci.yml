@@ -1,0 +1,793 @@
+# The gate for every change to main. Branch protection requires exactly one
+# check, "CI OK", which passes only when every job below passed (a PR-only job
+# may be skipped outside pull requests). Adding a job means adding it to the
+# `needs` of ci-ok; nothing else in the repository settings has to change.
+#
+# Conventions, enforced by actionlint and zizmor in the workflows-lint job:
+# - permissions default to none; each job asks for what it uses, with a reason
+# - every action is pinned to a full commit SHA, the release in a comment
+#   (Dependabot keeps both current)
+# - checkouts never persist the token; untrusted values reach scripts only
+#   through environment variables, never through ${{ }} in `run:`
+# - tool versions come from tools/versions.env, Node from .nvmrc and pnpm from
+#   the packageManager field of frontend/package.json, so CI and every
+#   developer machine run the same toolchain
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+permissions: {}
+
+# A new push to a pull request cancels its superseded run. Every other event
+# (main, the merge queue, manual runs) gets a group of its own, so those runs
+# are never cancelled and never replaced while pending.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    # Explicit bash is `bash -eo pipefail`; the implicit default lacks pipefail.
+    shell: bash
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  contracts:
+    name: Contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # check out the repository
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Load pinned tool versions
+        env:
+          REQUIRED: FOUNDRY_VERSION
+        run: |
+          # Strict KEY=value lines only: nothing else may reach $GITHUB_ENV.
+          if grep -nEv '^(#.*|[A-Z][A-Z0-9_]*=[A-Za-z0-9._+-]*)?$' tools/versions.env; then
+            echo "::error file=tools/versions.env::only KEY=value lines and # comments are allowed (see above)"
+            exit 1
+          fi
+          for key in $REQUIRED; do
+            grep -Eq "^${key}=.+" tools/versions.env || { echo "::error file=tools/versions.env::${key} is not set"; exit 1; }
+          done
+          grep -E '^[A-Z][A-Z0-9_]*=' tools/versions.env >> "$GITHUB_ENV"
+
+      - name: Install Foundry
+        id: foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: ${{ env.FOUNDRY_VERSION }}
+          # Nothing here talks to a chain, so there is no RPC state to cache.
+          cache: false
+
+      # The checks below report independently (`!cancelled()`), so one push
+      # shows every failure instead of only the first one.
+      - name: Check formatting
+        if: ${{ !cancelled() && steps.foundry.outcome == 'success' }}
+        run: forge fmt --check
+
+      - name: Lint
+        if: ${{ !cancelled() && steps.foundry.outcome == 'success' }}
+        # Plain `forge lint` exits 0 on warnings; the gate is zero warnings.
+        run: forge lint --deny warnings
+
+      - name: Build and check contract sizes
+        id: build
+        if: ${{ !cancelled() && steps.foundry.outcome == 'success' }}
+        run: forge build --sizes
+
+      # Before the full test run, which rewrites the snapshot file: in check
+      # mode forge compares against the committed values instead of writing.
+      - name: Check gas snapshots
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        env:
+          FORGE_SNAPSHOT_CHECK: "true"
+        run: forge test --match-contract GasBenchmarksTest
+
+      - name: Pick a fuzz seed
+        id: seed
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: |
+          seed="0x$(openssl rand -hex 32)"
+          echo "seed=${seed}" >> "$GITHUB_OUTPUT"
+          echo "Fuzz seed: ${seed}"
+          {
+            echo "### Contract tests"
+            echo
+            echo "Fuzz and invariant seed \`${seed}\`. Reproduce a failure with:"
+            echo
+            echo '```sh'
+            echo "FOUNDRY_FUZZ_SEED=${seed} forge test"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Test (unit, fuzz, invariant; fork suites skip without an RPC)
+        if: ${{ !cancelled() && steps.seed.outcome == 'success' }}
+        env:
+          FOUNDRY_FUZZ_SEED: ${{ steps.seed.outputs.seed }}
+        run: forge test -vvv
+
+      - name: Regenerate the frontend's differential vectors
+        id: vectors
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: forge script script/GenerateVectors.s.sol --tc GenerateVectors
+
+      - name: Check that generated files are committed
+        if: ${{ !cancelled() && steps.vectors.outcome == 'success' }}
+        run: |
+          # The vectors and the gas snapshots were just regenerated from the
+          # contracts: any modified, new or deleted file is drift.
+          if ! git diff --exit-code -- frontend/src/test/fixtures/contract-vectors.json; then
+            echo "::error file=frontend/src/test/fixtures/contract-vectors.json::stale differential vectors: run 'make vectors' and commit the result"
+            exit 1
+          fi
+          if [[ -n "$(git status --porcelain --untracked-files=all)" ]]; then
+            git status --short --untracked-files=all
+            git diff
+            echo "::error::generated files are out of date (gas snapshots: 'make gas'); commit the result"
+            exit 1
+          fi
+
+  coverage-contracts:
+    name: Contract coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # check out the repository
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Load pinned tool versions
+        env:
+          REQUIRED: FOUNDRY_VERSION
+        run: |
+          # Strict KEY=value lines only: nothing else may reach $GITHUB_ENV.
+          if grep -nEv '^(#.*|[A-Z][A-Z0-9_]*=[A-Za-z0-9._+-]*)?$' tools/versions.env; then
+            echo "::error file=tools/versions.env::only KEY=value lines and # comments are allowed (see above)"
+            exit 1
+          fi
+          for key in $REQUIRED; do
+            grep -Eq "^${key}=.+" tools/versions.env || { echo "::error file=tools/versions.env::${key} is not set"; exit 1; }
+          done
+          grep -E '^[A-Z][A-Z0-9_]*=' tools/versions.env >> "$GITHUB_ENV"
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: ${{ env.FOUNDRY_VERSION }}
+          cache: false
+
+      - name: Measure coverage and enforce the thresholds
+        # Writes lcov.info and a coverage table to the job summary.
+        run: tools/coverage.sh
+
+      - name: Upload the lcov report
+        if: ${{ !cancelled() && hashFiles('lcov.info') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: contracts-lcov
+          path: lcov.info
+          if-no-files-found: error
+          retention-days: 14
+
+  static-analysis:
+    name: Static analysis (Slither)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # check out the repository
+      security-events: write # upload the SARIF report to code scanning
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Load pinned tool versions
+        env:
+          REQUIRED: FOUNDRY_VERSION SLITHER_VERSION
+        run: |
+          # Strict KEY=value lines only: nothing else may reach $GITHUB_ENV.
+          if grep -nEv '^(#.*|[A-Z][A-Z0-9_]*=[A-Za-z0-9._+-]*)?$' tools/versions.env; then
+            echo "::error file=tools/versions.env::only KEY=value lines and # comments are allowed (see above)"
+            exit 1
+          fi
+          for key in $REQUIRED; do
+            grep -Eq "^${key}=.+" tools/versions.env || { echo "::error file=tools/versions.env::${key} is not set"; exit 1; }
+          done
+          grep -E '^[A-Z][A-Z0-9_]*=' tools/versions.env >> "$GITHUB_ENV"
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: ${{ env.FOUNDRY_VERSION }}
+          cache: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: tools/versions.env
+
+      - name: Install Slither
+        run: python -m pip install "slither-analyzer==${SLITHER_VERSION}"
+
+      - name: Run Slither
+        # Exits non-zero on any finding that is not triaged in slither.db.json.
+        run: slither . --config-file slither.config.json --sarif results.sarif
+
+      # Also when Slither failed: the findings then show up in code scanning
+      # and as annotations on the pull request. Pull requests from forks get a
+      # read-only token, so they rely on the failing step's log instead.
+      - name: Upload the SARIF report to code scanning
+        if: ${{ !cancelled() && hashFiles('results.sarif') != '' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
+        with:
+          sarif_file: results.sarif
+          category: slither
+
+  symbolic:
+    name: Symbolic tests (Halmos)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # check out the repository
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Load pinned tool versions
+        env:
+          REQUIRED: FOUNDRY_VERSION HALMOS_VERSION
+        run: |
+          # Strict KEY=value lines only: nothing else may reach $GITHUB_ENV.
+          if grep -nEv '^(#.*|[A-Z][A-Z0-9_]*=[A-Za-z0-9._+-]*)?$' tools/versions.env; then
+            echo "::error file=tools/versions.env::only KEY=value lines and # comments are allowed (see above)"
+            exit 1
+          fi
+          for key in $REQUIRED; do
+            grep -Eq "^${key}=.+" tools/versions.env || { echo "::error file=tools/versions.env::${key} is not set"; exit 1; }
+          done
+          grep -E '^[A-Z][A-Z0-9_]*=' tools/versions.env >> "$GITHUB_ENV"
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: ${{ env.FOUNDRY_VERSION }}
+          cache: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: tools/versions.env
+
+      - name: Install Halmos
+        # Brings its SMT solvers (yices, z3) as Python wheels.
+        run: python -m pip install "halmos==${HALMOS_VERSION}"
+
+      - name: Prove the symbolic properties
+        # Fails on any counterexample, solver timeout, error or bounded loop;
+        # writes the results table to the job summary.
+        run: tools/analysis/halmos.sh
+
+      - name: Upload the Halmos logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: halmos-logs
+          path: |
+            .analysis/halmos/*.json
+            .analysis/halmos/*.log
+            .analysis/halmos/*.md
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
+
+  fork:
+    name: Fork tests (Arbitrum One)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Only jobs that name this environment can read its ARBITRUM_RPC_URL
+    # secret. No deployment is recorded, and the environment must not get
+    # protection rules or branch restrictions: pull requests run this job.
+    environment:
+      name: arbitrum-rpc
+      deployment: false
+    permissions:
+      contents: read # check out the repository
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Load pinned tool versions
+        env:
+          REQUIRED: FOUNDRY_VERSION
+        run: |
+          # Strict KEY=value lines only: nothing else may reach $GITHUB_ENV.
+          if grep -nEv '^(#.*|[A-Z][A-Z0-9_]*=[A-Za-z0-9._+-]*)?$' tools/versions.env; then
+            echo "::error file=tools/versions.env::only KEY=value lines and # comments are allowed (see above)"
+            exit 1
+          fi
+          for key in $REQUIRED; do
+            grep -Eq "^${key}=.+" tools/versions.env || { echo "::error file=tools/versions.env::${key} is not set"; exit 1; }
+          done
+          grep -E '^[A-Z][A-Z0-9_]*=' tools/versions.env >> "$GITHUB_ENV"
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: ${{ env.FOUNDRY_VERSION }}
+          # The forks follow the chain head (the point is to test against what
+          # is live), and forge only caches RPC state for pinned blocks.
+          cache: false
+
+      - name: Run the fork suites against Arbitrum One
+        # Proves the deployed bytecode is what this repository builds and that
+        # the live Cosmic Signature game still has the interface the market
+        # reads. The public endpoint keeps this working for pull requests from
+        # forks, which receive no secrets; a private RPC (the ARBITRUM_RPC_URL
+        # secret) avoids its rate limits. REQUIRE_FORK_TESTS turns a missing
+        # RPC into a failure instead of a skip.
+        env:
+          ARBITRUM_RPC_URL: ${{ secrets.ARBITRUM_RPC_URL || 'https://arb1.arbitrum.io/rpc' }}
+          REQUIRE_FORK_TESTS: "true"
+        run: forge test --match-contract Fork -vvv
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read # check out the repository
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install pnpm (version from package.json)
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Set up Node.js (version from .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        id: install
+        run: pnpm install --frozen-lockfile
+
+      # Independent checks: each one reports even when an earlier one failed.
+      - name: Check formatting
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm format:check
+
+      - name: Lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm lint --max-warnings=0
+
+      - name: Typecheck
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm typecheck
+
+      - name: Test with coverage thresholds
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm test:coverage
+
+      - name: Publish the coverage summary
+        if: ${{ !cancelled() && hashFiles('frontend/coverage/coverage-summary.json') != '' }}
+        run: |
+          node - <<'JS'
+          const fs = require("node:fs");
+          const { total } = JSON.parse(fs.readFileSync("coverage/coverage-summary.json", "utf8"));
+          const rows = ["statements", "branches", "functions", "lines"].map(
+            (k) => `| ${k} | ${total[k].pct}% | ${total[k].covered} / ${total[k].total} |`,
+          );
+          const table = ["### Frontend coverage", "", "| Metric | Covered | Hit / total |", "| --- | ---: | ---: |", ...rows];
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, table.join("\n") + "\n\n");
+          JS
+
+      - name: Upload the coverage report
+        if: ${{ !cancelled() && hashFiles('frontend/coverage/lcov.info') != '' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: frontend-coverage
+          path: |
+            frontend/coverage/lcov.info
+            frontend/coverage/coverage-summary.json
+          if-no-files-found: error
+          retention-days: 14
+
+      # Next.js keeps its incremental build cache (Turbopack's included) in
+      # .next/cache; restoring it turns a cold build into a warm one.
+      - name: Restore the Next.js build cache
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: frontend/.next/cache
+          key: nextjs-production-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}-${{ hashFiles('frontend/src/**', 'frontend/public/**', 'frontend/*.ts', 'frontend/*.mjs', 'frontend/*.json', 'frontend/.env.production') }}
+          restore-keys: |
+            nextjs-production-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}-
+
+      - name: Build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: pnpm build
+
+  e2e:
+    name: End-to-end (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read # check out the repository
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          submodules: recursive
+
+      - name: Load pinned tool versions
+        env:
+          REQUIRED: FOUNDRY_VERSION
+        run: |
+          # Strict KEY=value lines only: nothing else may reach $GITHUB_ENV.
+          if grep -nEv '^(#.*|[A-Z][A-Z0-9_]*=[A-Za-z0-9._+-]*)?$' tools/versions.env; then
+            echo "::error file=tools/versions.env::only KEY=value lines and # comments are allowed (see above)"
+            exit 1
+          fi
+          for key in $REQUIRED; do
+            grep -Eq "^${key}=.+" tools/versions.env || { echo "::error file=tools/versions.env::${key} is not set"; exit 1; }
+          done
+          grep -E '^[A-Z][A-Z0-9_]*=' tools/versions.env >> "$GITHUB_ENV"
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@908c540300062bd5a7e473851cdb4282204cee09 # v1.9.1
+        with:
+          version: ${{ env.FOUNDRY_VERSION }}
+          # The local anvil chain is fresh on every run; nothing to cache.
+          cache: false
+
+      - name: Install pnpm (version from package.json)
+        uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        with:
+          package_json_file: frontend/package.json
+
+      - name: Set up Node.js (version from .nvmrc)
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm install --frozen-lockfile
+
+      - name: Read the Playwright version from the lockfile
+        id: playwright
+        working-directory: frontend
+        run: |
+          # The installed copy is exactly the one pinned by pnpm-lock.yaml.
+          version="$(node -p 'require("./node_modules/@playwright/test/package.json").version')"
+          echo "Playwright ${version}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+
+      # The browser build is pinned by the Playwright release, so the cache
+      # key is that version: a Playwright bump downloads the new browser once.
+      - name: Restore cached Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ runner.arch }}-${{ steps.playwright.outputs.version }}
+
+      - name: Install Chromium and its system dependencies
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        working-directory: frontend
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Install Chromium's system dependencies (browser restored from cache)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        working-directory: frontend
+        run: pnpm exec playwright install-deps chromium
+
+      - name: Restore the Next.js build cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: frontend/.next/cache
+          key: nextjs-e2e-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}-${{ hashFiles('frontend/src/**', 'frontend/public/**', 'frontend/*.ts', 'frontend/*.mjs', 'frontend/*.json') }}
+          restore-keys: |
+            nextjs-e2e-${{ runner.os }}-${{ hashFiles('frontend/pnpm-lock.yaml') }}-
+
+      - name: Run the end-to-end suite (anvil, deploy, build, Playwright)
+        run: tools/e2e.sh
+
+      - name: Upload the Playwright report
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload the test results and server logs
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e2e-test-results
+          path: |
+            frontend/test-results/
+            .logs/e2e/
+          include-hidden-files: true
+          if-no-files-found: ignore
+          retention-days: 7
+
+  workflows-lint:
+    name: Workflow lint (actionlint, zizmor)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read # check out the repository
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Load pinned tool versions
+        id: versions
+        env:
+          REQUIRED: ACTIONLINT_VERSION ZIZMOR_VERSION
+        run: |
+          # Strict KEY=value lines only: nothing else may reach $GITHUB_ENV.
+          if grep -nEv '^(#.*|[A-Z][A-Z0-9_]*=[A-Za-z0-9._+-]*)?$' tools/versions.env; then
+            echo "::error file=tools/versions.env::only KEY=value lines and # comments are allowed (see above)"
+            exit 1
+          fi
+          for key in $REQUIRED; do
+            grep -Eq "^${key}=.+" tools/versions.env || { echo "::error file=tools/versions.env::${key} is not set"; exit 1; }
+          done
+          grep -E '^[A-Z][A-Z0-9_]*=' tools/versions.env >> "$GITHUB_ENV"
+
+      - name: Install actionlint
+        run: |
+          version="${ACTIONLINT_VERSION#v}"
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          base="https://github.com/rhysd/actionlint/releases/download/v${version}"
+          mkdir -p "$RUNNER_TEMP/actionlint"
+          cd "$RUNNER_TEMP/actionlint"
+          curl -fsSL --retry 3 -o "$archive" "$base/$archive"
+          curl -fsSL --retry 3 -o checksums.txt "$base/actionlint_${version}_checksums.txt"
+          grep -E "  ${archive}\$" checksums.txt | sha256sum --check --strict -
+          if [[ -n "${ACTIONLINT_SHA256_LINUX_AMD64:-}" ]]; then
+            echo "${ACTIONLINT_SHA256_LINUX_AMD64}  ${archive}" | sha256sum --check --strict -
+          fi
+          tar -xzf "$archive" actionlint
+
+      - name: Run actionlint
+        # Also runs shellcheck (preinstalled on the runner) on every run: block.
+        run: '"$RUNNER_TEMP/actionlint/actionlint" -color'
+
+      # zizmor reports even when actionlint failed.
+      - name: Set up Python
+        id: python
+        if: ${{ !cancelled() && steps.versions.outcome == 'success' }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: tools/versions.env
+
+      - name: Install zizmor
+        id: zizmor
+        if: ${{ !cancelled() && steps.python.outcome == 'success' }}
+        run: python -m pip install "zizmor==${ZIZMOR_VERSION}"
+
+      - name: Run zizmor
+        if: ${{ !cancelled() && steps.zizmor.outcome == 'success' }}
+        # The token enables the online audits: impostor commits, stale or
+        # mismatched version comments, known-vulnerable actions.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # .github/ holds everything zizmor audits (workflows, Dependabot);
+        # the repository root would also pull in vendored submodules.
+        run: zizmor --format=github .github
+
+  hygiene:
+    name: Hygiene (typos, gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read # check out the repository and its history
+    steps:
+      - name: Check out the repository with its full history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Load pinned tool versions
+        id: versions
+        env:
+          REQUIRED: TYPOS_VERSION GITLEAKS_VERSION
+        run: |
+          # Strict KEY=value lines only: nothing else may reach $GITHUB_ENV.
+          if grep -nEv '^(#.*|[A-Z][A-Z0-9_]*=[A-Za-z0-9._+-]*)?$' tools/versions.env; then
+            echo "::error file=tools/versions.env::only KEY=value lines and # comments are allowed (see above)"
+            exit 1
+          fi
+          for key in $REQUIRED; do
+            grep -Eq "^${key}=.+" tools/versions.env || { echo "::error file=tools/versions.env::${key} is not set"; exit 1; }
+          done
+          grep -E '^[A-Z][A-Z0-9_]*=' tools/versions.env >> "$GITHUB_ENV"
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: tools/versions.env
+
+      - name: Install typos
+        run: python -m pip install "typos==${TYPOS_VERSION}"
+
+      - name: Check spelling
+        # Configuration and the few accepted words: _typos.toml.
+        run: typos
+
+      # The secret scan reports even when the spell check failed.
+      - name: Install gitleaks
+        id: gitleaks
+        if: ${{ !cancelled() && steps.versions.outcome == 'success' }}
+        run: |
+          version="${GITLEAKS_VERSION#v}"
+          archive="gitleaks_${version}_linux_x64.tar.gz"
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${version}"
+          mkdir -p "$RUNNER_TEMP/gitleaks"
+          cd "$RUNNER_TEMP/gitleaks"
+          curl -fsSL --retry 3 -o "$archive" "$base/$archive"
+          curl -fsSL --retry 3 -o checksums.txt "$base/gitleaks_${version}_checksums.txt"
+          grep -E "  ${archive}\$" checksums.txt | sha256sum --check --strict -
+          if [[ -n "${GITLEAKS_SHA256_LINUX_X64:-}" ]]; then
+            echo "${GITLEAKS_SHA256_LINUX_X64}  ${archive}" | sha256sum --check --strict -
+          fi
+          tar -xzf "$archive" gitleaks
+
+      - name: Scan for secrets
+        if: ${{ !cancelled() && steps.gitleaks.outcome == 'success' }}
+        # Pull requests and merge groups: exactly the commits they add. Main
+        # and manual runs: the whole history of the checked-out branch.
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          MQ_BASE: ${{ github.event.merge_group.base_sha }}
+          MQ_HEAD: ${{ github.event.merge_group.head_sha }}
+        run: |
+          case "$EVENT" in
+            pull_request) range="${PR_BASE}..${PR_HEAD}" ;;
+            merge_group) range="${MQ_BASE}..${MQ_HEAD}" ;;
+            *) range="HEAD" ;;
+          esac
+          echo "Scanning ${range}"
+          # Inline "gitleaks:allow" comments are ignored: every exception is
+          # an explicit, reviewed entry in .gitleaks.toml.
+          "$RUNNER_TEMP/gitleaks/gitleaks" git --config .gitleaks.toml --ignore-gitleaks-allow \
+            --redact --no-banner --verbose --log-opts="${range}" .
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read # read the dependency graph diff of the pull request
+    steps:
+      # Blocks a pull request that adds or upgrades to a dependency (npm or a
+      # GitHub Action) with a known high or critical vulnerability, in any
+      # scope: build and test tooling runs with the same trust as the app.
+      #
+      # Licenses: an allow list, so nothing unexpected slips in unnoticed.
+      # Permissive licenses plus weak, file- or library-level copyleft (MPL,
+      # LGPL: the prebuilt libvips binaries behind sharp, lightningcss) are
+      # accepted; strong and network copyleft (GPL, AGPL, SSPL), source-
+      # available (BUSL) and non-commercial licenses fail and need a
+      # deliberate decision. A package whose license the dependency graph
+      # cannot determine is reported without failing.
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high
+          fail-on-scopes: runtime, development, unknown
+          allow-licenses: >-
+            0BSD, Apache-2.0, BlueOak-1.0.0, BSD-2-Clause, BSD-3-Clause, BSL-1.0,
+            CC-BY-3.0, CC-BY-4.0, CC0-1.0, ISC, LGPL-2.1-only, LGPL-2.1-or-later,
+            LGPL-3.0-only, LGPL-3.0-or-later, MIT, MIT-0, MPL-2.0, OFL-1.1,
+            Python-2.0, Unicode-3.0, Unicode-DFS-2016, Unlicense, WTFPL, Zlib
+          show-patched-versions: true
+          show-openssf-scorecard: true
+          warn-on-openssf-scorecard-level: 3
+
+  ci-ok:
+    name: CI OK
+    # Always runs, so a failed, cancelled or timed-out job turns this red
+    # instead of leaving a skipped (and therefore passing) required check.
+    if: always()
+    needs:
+      - contracts
+      - coverage-contracts
+      - static-analysis
+      - symbolic
+      - fork
+      - frontend
+      - e2e
+      - workflows-lint
+      - hygiene
+      - dependency-review
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Require every job to have passed
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+          EVENT: ${{ github.event_name }}
+          # Jobs that only run on pull requests: skipped is fine elsewhere.
+          PR_ONLY: dependency-review
+        run: |
+          failed="$(jq -r --arg event "$EVENT" --arg pr_only "$PR_ONLY" '
+            ($pr_only | split(" ")) as $pr_only
+            | to_entries[]
+            | select(.value.result != "success")
+            | select((.value.result == "skipped" and $event != "pull_request" and (.key | IN($pr_only[]))) | not)
+            | "\(.key): \(.value.result)"
+          ' <<<"$RESULTS")"
+          {
+            echo "### CI OK"
+            echo
+            echo "| Job | Result |"
+            echo "| --- | --- |"
+            jq -r 'to_entries[] | "| \(.key) | \(.value.result) |"' <<<"$RESULTS"
+          } >> "$GITHUB_STEP_SUMMARY"
+          if [[ -n "$failed" ]]; then
+            echo "::error::required jobs did not pass:"
+            echo "$failed"
+            exit 1
+          fi
+          echo "All required jobs passed."
