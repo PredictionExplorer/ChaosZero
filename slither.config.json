@@ -1,0 +1,5 @@
+{
+  "compile_force_framework": "foundry",
+  "filter_paths": "(^|/)lib/forge-std/,(^|/)node_modules/,(^|/)test/utils/,\\.t\\.sol$,\\.s\\.sol$",
+  "triage_database": "slither.db.json"
+}
