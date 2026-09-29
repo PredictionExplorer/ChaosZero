@@ -1,8 +1,17 @@
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   assertCleanPushTree,
   assertContractDependencies,
@@ -11,8 +20,11 @@ import {
   classifyChanges,
   formatCandidates,
   run,
+  VECTOR_GENERATORS,
   verifyGeneratedFixture,
 } from "./checks.mjs";
+
+const repoRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 function temporaryDirectory(t) {
   const directory = mkdtempSync(join(tmpdir(), "chaos-zero-checks-"));
@@ -70,6 +82,40 @@ test("fixture drift fails without rewriting the checked-in expected result", (t)
   );
   assert.equal(readFileSync(file, "utf8"), "original\n");
   assert.doesNotThrow(() => verifyGeneratedFixture(file, () => writeFileSync(file, "original\n")));
+});
+
+test("every checked-in differential fixture, including the logarithm corpus, has a reproducing generator", () => {
+  assert.deepEqual(VECTOR_GENERATORS, [
+    ["script/GenerateVectors.s.sol", "GenerateVectors", "contract-vectors.json"],
+    [
+      "script/GenerateLogBoundsVectors.s.sol",
+      "GenerateLogBoundsVectors",
+      "log2-bounds-vectors.json",
+    ],
+    [
+      "script/GenerateIndependentVectors.s.sol",
+      "GenerateIndependentVectors",
+      "independent-contract-vectors.json",
+    ],
+  ]);
+  for (const [generator, contract, output] of VECTOR_GENERATORS) {
+    const path = join(repoRoot, generator);
+    assert.ok(existsSync(path), `${generator} is missing`);
+    const source = readFileSync(path, "utf8");
+    assert.match(source, new RegExp(`\\bcontract ${contract} is Script\\b`));
+    assert.ok(
+      source.includes(`frontend/src/test/fixtures/${output}`),
+      `${generator} does not write ${output}`,
+    );
+  }
+  const fixtures = readdirSync(join(repoRoot, "frontend/src/test/fixtures"))
+    .filter((file) => file.endsWith(".json"))
+    .sort();
+  assert.deepEqual(fixtures, VECTOR_GENERATORS.map(([, , output]) => output).sort());
+  assert.match(
+    readFileSync(join(repoRoot, "scripts/check-log-bounds.py"), "utf8"),
+    /^DEFAULT_FIXTURE = ROOT \/ "frontend\/src\/test\/fixtures\/log2-bounds-vectors\.json"$/m,
+  );
 });
 
 test("shared tooling changes require both application and contract checks", () => {

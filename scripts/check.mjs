@@ -12,6 +12,7 @@ import {
   git,
   gitFiles,
   run,
+  VECTOR_GENERATORS,
   verifyGeneratedFixture,
 } from "./checks.mjs";
 
@@ -120,15 +121,7 @@ function frontendChecks({ comprehensive = false } = {}) {
 }
 
 function vectors() {
-  for (const [generator, contract, output] of [
-    ["script/GenerateVectors.s.sol", "GenerateVectors", "contract-vectors.json"],
-    ["script/GenerateSharedVectors.s.sol", "GenerateSharedVectors", "shared-contract-vectors.json"],
-    [
-      "script/GenerateIndependentVectors.s.sol",
-      "GenerateIndependentVectors",
-      "independent-contract-vectors.json",
-    ],
-  ]) {
+  for (const [generator, contract, output] of VECTOR_GENERATORS) {
     const fixture = join(frontend, "src/test/fixtures", output);
     step(`Contract/frontend differential fixture consistency: ${output}`, () =>
       verifyGeneratedFixture(fixture, () =>

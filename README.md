@@ -2,7 +2,7 @@
 
 Eight recurring questions about Cosmic Signature, each with independent CST liquidity, funded together through one market contract.
 
-**This branch is a local prototype.** It includes independent question-pool accounting, fake CST, an on-chain game simulator, and a browser interface with extensive financial/property tests. No live eight-question result adapter is shipped. The simulator and its outcome adapter reject deployment on chains other than `31337`; the prototype frontend rejects public-chain use. The existing production binary market and its configuration remain available, with their documentation in [LEGACY_MARKET.md](LEGACY_MARKET.md).
+**This branch is a local prototype.** It includes independent question-pool accounting, fake CST, an on-chain game simulator, and a browser interface with extensive financial/property tests. No live eight-question result adapter is shipped. The simulator and its outcome adapter reject deployment on chains other than `31337`; the prototype frontend rejects public-chain use. After the current live round ends, this eight-question engine is intended to replace the single-question market for new rounds. The deployed `GestureSeriesMarket`, its configuration and its interface stay unchanged so current users can exit; see [LEGACY_MARKET.md](LEGACY_MARKET.md).
 
 ## Run the complete local system
 
@@ -43,7 +43,7 @@ resolve NO.
 | 6   | Does the same gesture earn Endurance and Chrono? | The two winning record episodes originate from the same gesture. Matching wallets alone is insufficient. |
 | 7   | Higher maximum CST payment?                      | The largest CST amount actually paid for one gesture is greater.                                         |
 
-Questions 0–4 and 7 can become permanently YES before closure. The independent market keeps trading open until the game actually closes the cycle; all eight payouts settle together. A known or highly predictable question can consume only its own funding. Anyone can flip question 5 with one more gesture, even a zero-price CST gesture, and every gesture extends the countdown, so its price reflects a contest over the final gesture rather than a forecast. The source still validates monotonic facts, and the UI distinguishes those facts from final settlement.
+**Markets never end early.** Even when an answer, or all eight, is already known, buying, selling, splitting, funding and automatic distribution continue until the game's round-ending transaction (`claimMainPrize` on the live game, `closeCycle` in the simulator); merging never stops. Neither the countdown reaching zero nor the claim timeout closes a market. Payouts start only after that transaction, and all eight settle together; the interface shows no question as resolved before then. Questions 0–4 and 7 can become permanently YES before closure; that knowledge never ends trading or starts payouts. A known or highly predictable question can consume only its own funding. Anyone can flip question 5 with one more gesture, even a zero-price CST gesture, and every gesture extends the countdown, so its price reflects a contest over the final gesture rather than a forecast. The source still validates monotonic facts.
 
 ## Funding, settlement and rollover
 
@@ -89,7 +89,7 @@ There are no trading fees. Quotes specify exact amounts and an expiry; changing 
 
 ## Local simulator versus the real game
 
-The local game follows the V2 champion-record algorithm, strict tie behavior, ETH/CST calibration feedback, CST burns, and square-root gesture rewards. Its timers are shorter: a 24-minute opening countdown, one-minute extensions and a two-minute open-claim timeout. Cycle zero is a deterministic replayed fixture, making all comparisons usable immediately.
+The local game follows the V2 champion-record algorithm, strict tie behavior, ETH/CST calibration feedback, CST burns, and square-root gesture rewards. Its timers are shorter: a 24-minute opening countdown, one-minute extensions and a two-minute open-claim timeout. `closeCycle` stands in for `claimMainPrize`: it is the only transaction that ends a cycle and its markets, and the timers decide only who may call it and when. Cycle zero is a deterministic replayed fixture, making all comparisons usable immediately.
 
 The simulator simplifies ETH opening prices and rollover settings, and omits NFTs, selection, and ETH allocation tracks. It is an integration test environment, not an economic forecast model. It uses chain time; local time controls call Anvil explicitly. It has no method for supplying arbitrary market answers.
 
@@ -106,7 +106,7 @@ pnpm check           # complete pre-push gate
 pnpm test:heavy      # 50,000 fuzz cases; 512 campaigns × 256 invariant actions
 ```
 
-The normal profile runs 1,000 cases per fuzz property and 64 × 64 actions per invariant campaign. Coverage includes independent question/cycle accounting, late claims, rollover, weighted pricing boundaries, middle-window history, source contradictions, exact token transfers, receiver callbacks, and compiler/frontend differential execution. The prior shared engine’s 256 terminal and 6,561 partial-state tests remain as regression coverage. The local champion calculator is compared with an independent record-episode model.
+The normal profile runs 1,000 cases per fuzz property and 64 × 64 actions per invariant campaign. Coverage includes independent question/cycle accounting, trading on known answers until the round-ending transaction, late claims, rollover, weighted pricing boundaries, middle-window history, source contradictions, exact token transfers, receiver callbacks, and compiler/frontend differential execution. The local champion calculator is compared with an independent record-episode model.
 
 Nightly CI runs the heavy profile and records a reproducible seed. Failures must be fixed or investigated; passing tests are not a substitute for an independent security audit before real-value deployment.
 

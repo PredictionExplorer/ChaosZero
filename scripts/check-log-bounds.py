@@ -26,9 +26,10 @@ PRECISION = 170
 SCALE = 1 << 64
 MAX_INPUT = 1 << 120
 MIN_LOG_ROWS = 631
+MIN_DISTINCT_INPUTS = 607
 ADVERSARIAL_INPUT = 667601134098543439318150072872112656
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_FIXTURE = ROOT / "frontend/src/test/fixtures/shared-contract-vectors.json"
+DEFAULT_FIXTURE = ROOT / "frontend/src/test/fixtures/log2-bounds-vectors.json"
 
 
 def unsigned_integer(value, field):
@@ -91,15 +92,19 @@ def verify_fixture(path):
         raise ValueError("fixture must be an array")
     logs = []
     for row in rows:
-        if not isinstance(row, dict) or row.get("kind") not in {"log", "trade"}:
+        if not isinstance(row, dict) or row.get("kind") != "log":
             raise ValueError("fixture contains an unrecognized vector")
-        if row["kind"] == "log":
-            logs.append(row)
+        logs.append(row)
     if len(logs) < MIN_LOG_ROWS:
         raise ValueError(
             f"incomplete log corpus: expected at least {MIN_LOG_ROWS}, got {len(logs)}"
         )
     seen = {verify_log_row(row) for row in logs}
+    if len(seen) < MIN_DISTINCT_INPUTS:
+        raise ValueError(
+            f"incomplete log corpus: expected at least {MIN_DISTINCT_INPUTS} distinct inputs, "
+            f"got {len(seen)}"
+        )
     missing = required_inputs() - seen
     if missing:
         raise ValueError(
@@ -157,6 +162,34 @@ class OracleTests(unittest.TestCase):
             fixture = Path(directory) / "empty.json"
             fixture.write_text("[]", encoding="utf-8")
             with self.assertRaisesRegex(ValueError, "incomplete log corpus"):
+                verify_fixture(fixture)
+
+    def test_trade_rows_are_rejected(self):
+        rows = json.loads(DEFAULT_FIXTURE.read_text(encoding="utf-8"))
+        rows.append({"kind": "trade", "name": "retired-shared-engine"})
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory) / "mixed.json"
+            fixture.write_text(json.dumps(rows), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "unrecognized vector"):
+                verify_fixture(fixture)
+
+    def test_duplicated_inputs_cannot_replace_distinct_coverage(self):
+        rows = json.loads(DEFAULT_FIXTURE.read_text(encoding="utf-8"))
+        self.assertEqual(verify_fixture(DEFAULT_FIXTURE), (MIN_LOG_ROWS, MIN_DISTINCT_INPUTS))
+        counts = {}
+        for row in rows:
+            counts[row["input"]] = counts.get(row["input"], 0) + 1
+        required = {str(value) for value in required_inputs()}
+        index = next(
+            i for i, row in enumerate(rows)
+            if counts[row["input"]] == 1 and row["input"] not in required
+        )
+        padded = copy.deepcopy(rows)
+        padded[index] = dict(self.three)
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Path(directory) / "duplicated.json"
+            fixture.write_text(json.dumps(padded), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "distinct inputs"):
                 verify_fixture(fixture)
 
     def test_cli_fails_for_corrupted_lower_and_upper(self):

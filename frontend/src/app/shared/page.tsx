@@ -1,7 +1,4 @@
 import type { Metadata } from "next";
-import { SharedPage } from "@/shared/shared-page";
-import { sharedMarketAddress } from "@/shared/config";
-import { independentMarketAddress } from "@/independent/config";
 import { IndependentPage } from "@/independent/page";
 
 export const metadata: Metadata = {
@@ -13,5 +10,5 @@ export const metadata: Metadata = {
 };
 
 export default function MarketsPage() {
-  return independentMarketAddress || !sharedMarketAddress ? <IndependentPage /> : <SharedPage />;
+  return <IndependentPage />;
 }

@@ -125,3 +125,21 @@ describe("independent dashboard contributions", () => {
     ).toBeDisabled();
   });
 });
+describe("independent dashboard closure", () => {
+  it("keeps trading open after the countdown elapses until the cycle is closed", () => {
+    const state = snapshot();
+    state.timestamp = 2000n;
+    state.open = true;
+    state.observedMask = 0xff;
+    state.observedValues = 0xa5;
+    mocks.market.mockReturnValue({ data: state, error: null, isFetching: false, refetch: vi.fn() });
+    render(<IndependentDashboard market={MARKET} override={null} />);
+    expect(screen.getByText("Local cycle open")).toBeInTheDocument();
+    expect(screen.getByText(/Trading stays open until the cycle is closed/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Close current cycle" })).toBeEnabled();
+    for (let q = 0; q < 8; q++)
+      expect(screen.getByTestId(`question-${q}`)).toHaveTextContent("Trading");
+    expect(screen.getByRole("button", { name: "Buy YES: More gestures?" })).toBeEnabled();
+    expect(screen.queryByText(/Resolved/)).not.toBeInTheDocument();
+  });
+});

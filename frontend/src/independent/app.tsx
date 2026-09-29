@@ -42,8 +42,7 @@ export function IndependentGate() {
       <Card accent="signal" className="p-8">
         <h2 className="font-display text-xl font-semibold">Independent market not configured</h2>
         <p className="mt-3 text-sm text-ink-dim">
-          Start the local workspace to connect its independently funded questions and test CST. The
-          older shared-market contract is a separate deployment.
+          Start the local workspace to connect its independently funded questions and test CST.
         </p>
       </Card>
     );
@@ -374,7 +373,7 @@ export function IndependentDashboard({
                 {snapshot.local.deadline === 0n
                   ? "The current game cycle starts with an ETH gesture."
                   : snapshot.timestamp >= snapshot.local.deadline
-                    ? "The countdown has elapsed. The last participant can close now; others wait for the timeout."
+                    ? "The countdown has elapsed. Trading stays open until the cycle is closed. The last participant can close now; others wait for the timeout."
                     : `${formatDuration(snapshot.local.deadline - snapshot.timestamp)} until this game cycle can close.`}
               </p>
             </Card>

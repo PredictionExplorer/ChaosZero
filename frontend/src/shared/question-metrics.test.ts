@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ONE } from "./math";
-import { formatDuration, formatQuestionMetric } from "./question-metrics";
+import { formatDuration, formatQuestionMetric, type CycleStats } from "./question-metrics";
 import { QUESTION_COUNT, QUESTIONS } from "./questions";
-import type { CycleStats } from "./use-shared-market";
 
 const stats = (overrides: Partial<CycleStats> = {}): CycleStats => ({
   gestureCount: 7n,

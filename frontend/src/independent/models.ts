@@ -3,7 +3,7 @@ import type { Address } from "viem";
 import { independentYesProbabilityBps, type BinaryQuestionPool } from "@/shared/independent-math";
 import { matchedSets, type PositionAmounts } from "@/shared/positions";
 import { answerYes } from "@/shared/questions";
-import type { CycleStats } from "@/shared/use-shared-market";
+import type { CycleStats } from "@/shared/question-metrics";
 
 export interface IndependentQuestion {
   pool: BinaryQuestionPool;

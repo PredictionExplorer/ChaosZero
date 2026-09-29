@@ -10,7 +10,7 @@ struct MarketStats {
     uint256 cstPaid;       // More CST charged/burned than the previous cycle?
     uint256 maxCstPaid;    // Higher largest individual CST payment?
     uint64 firstGestureAt; // Canonical beginning of the active cycle.
-    uint64 finalizedAt;   // Actual game closure, not a later market claim.
+    uint64 finalizedAt;   // claimMainPrize time, not mainPrizeTime or a market call.
     uint8 flags;          // TRACKED_FROM_START=1, FINALIZED=2, SAME_GESTURE=4
 }
 mapping(uint256 round => MarketStats) public marketStats;
@@ -22,9 +22,10 @@ Implementation:
 
 1. **Record actual payments in the shared gesture paths.** Add final `paidEthPrice_` or `paidPrice_`, including discounts/premiums and excluding refunded ETH and separate contributions. CST means the gross gesture charge, before CST rewards offset it. Update `maxCstPaid` only on a new maximum.
 2. **Track the same-gesture answer with one bit.** Clear `SAME_GESTURE` whenever Endurance is assigned/replaced, **after** evaluating the departing champion's Chrono tenure. Set it whenever Chrono selects the current Endurance record. The existing call order makes each Endurance replacement a different gesture, even for the same wallet. No address comparison or two extra gesture IDs are needed. Resolve this question only at closure.
-3. **Freeze history at actual cycle closure.** After both final champion updates and duration snapshots, set `FINALIZED` for fully tracked cycles before resetting state/incrementing `roundNum`. Never overwrite completed records. Reuse `tryGetCurrentChampions()` for live durations; the countdown reaching zero does not finalize a cycle.
+3. **Freeze history at actual cycle closure.** After both final champion updates and duration snapshots, set `FINALIZED` for fully tracked cycles before resetting state/incrementing `roundNum`. Never overwrite completed records. Reuse `tryGetCurrentChampions()` for live durations; the countdown reaching zero does not finalize a cycle or close its markets.
 4. **Handle activation without invented history.** Set `TRACKED_FROM_START` only when observing a cycle's first gesture. Ignore a partially observed upgrade cycle. The first fully tracked cycle supplies the baseline; enable all eight markets from the following cycle. No administrator-supplied backfill.
-5. **Keep settlement read-only and separate.** An adapter reads these records and existing getters in constant time, requiring a fully tracked, finalized baseline. The current cycle must be tracked or still have zero gestures. The six increasing comparisons can resolve YES early; gesture parity and same-gesture resolve at closure. Strict-comparison ties resolve NO. Creator-funded CST liquidity needs no game funding hook.
+5. **Keep settlement read-only and separate.** An adapter reads these records and existing getters in constant time, requiring a fully tracked, finalized baseline. The current cycle must be tracked or still have zero gestures. The six increasing comparisons can become known YES before closure; that knowledge never ends trading or starts payouts. Gesture parity and same-gesture resolve at closure. Strict-comparison ties resolve NO. Creator-funded CST liquidity needs no game funding hook.
+6. **Markets never end early.** The adapter's `open` flag must derive from the game's round counter: a round is open exactly while its ID equals `roundNum` (and its predecessor is finalized), until `claimMainPrize` advances `roundNum`, regardless of known answers, `mainPrizeTime` or the claim timeout. `finalized` comes from the `FINALIZED` flag set in that same `claimMainPrize` transaction, so closing and finalizing are atomic; payouts wait for it.
 
 **Upgrade detail:** append the mapping to the shared storage layout and reduce its reserved gap by **one slot**; preserve all existing slots. Wire champion-tracking hooks into **both ordinary gestures and the V3 prize module**—adding them only to `BidStatisticsV3` misses the current hot path. Validate upgrade/module layout parity and measure gesture gas. Differential-test the equality bit against explicit gesture IDs, especially repeated wallets and ties.
 

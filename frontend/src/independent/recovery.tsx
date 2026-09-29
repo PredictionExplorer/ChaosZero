@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConnectButton } from "@/components/wallet/connect-button";
 import { formatCst } from "@/lib/format";
-import { TransferPositionPanel } from "@/shared/complete-sets-panel";
+import { TransferPositionPanel } from "@/shared/transfer-position-panel";
 import { MAX_ROUND_ID } from "@/shared/positions";
 import { QUESTIONS, type QuestionId } from "@/shared/questions";
 import { IndependentSetsPanel, fieldClass } from "./components";

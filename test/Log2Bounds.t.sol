@@ -3,7 +3,7 @@ pragma solidity 0.8.35;
 import {Test} from "forge-std/Test.sol";
 import {Log2Bounds} from "../src/libraries/Log2Bounds.sol";
 
-contract SharedOutcomeMarketMathTest is Test {
+contract Log2BoundsTest is Test {
     function test_exactAllPowersOfTwo() public pure {
         for (uint256 i; i <= 120; ++i) {
             (uint256 lo, uint256 hi) = Log2Bounds.bounds(uint256(1) << i);

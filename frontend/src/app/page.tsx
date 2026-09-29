@@ -10,8 +10,6 @@ import { MarketGate } from "@/components/market/market-gate";
 import { JsonLd } from "@/components/seo/json-ld";
 import { ConnectButton } from "@/components/wallet/connect-button";
 import { Providers } from "./providers";
-import { sharedMarketAddress } from "@/shared/config";
-import { SharedPage } from "@/shared/shared-page";
 import { independentMarketAddress } from "@/independent/config";
 import { IndependentPage } from "@/independent/page";
 
@@ -23,7 +21,6 @@ import { IndependentPage } from "@/independent/page";
  */
 export default function Home() {
   if (independentMarketAddress !== null) return <IndependentPage />;
-  if (sharedMarketAddress !== null) return <SharedPage />;
   return (
     <Providers>
       <Header active="market" actions={<ConnectButton />} />

@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConnectButton } from "@/components/wallet/connect-button";
 import { formatCst, parseCstInput } from "@/lib/format";
-import { TransferPositionPanel } from "@/shared/complete-sets-panel";
+import { TransferPositionPanel } from "@/shared/transfer-position-panel";
 import { useIndependentFundingPreview } from "./use-independent-market";
 import { quoteIndependentTrade, independentYesProbabilityBps } from "@/shared/independent-math";
 import { MAX_COLLATERAL } from "@/shared/math";

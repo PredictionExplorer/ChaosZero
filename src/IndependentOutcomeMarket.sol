@@ -23,8 +23,11 @@ interface IIndependentCollateral {
 }
 
 /// @notice Eight independently funded binary markets with ordinary ERC1155 claims.
-/// @dev A question can spend only its own collateral. Known answers do not stop
-/// trading before canonical game closure. Closure reserves winning claims 1:1 in
+/// @dev A question can spend only its own collateral. Markets never end early: buy,
+/// sell, splitPosition, fundRound and held-CST absorption stay available for as long
+/// as the source reports the cycle open, i.e. until the game's round-ending
+/// transaction, even when all eight answers are already known or the countdown has
+/// elapsed. Settlement and claims wait for finalized. Closure reserves winning claims 1:1 in
 /// an immutable vault, and recycles all remaining capital into a later funded
 /// cycle. Sponsorship creates no LP ownership or withdrawal rights.
 contract IndependentOutcomeMarket is ERC1155 {
@@ -627,6 +630,8 @@ contract IndependentOutcomeMarket is ERC1155 {
         }
     }
 
+    /// @dev The source's open flag is the only trading/splitting/funding cutoff; knownMask
+    /// never closes a cycle. finalized is the only settlement/claim gate.
     function _sync(uint256 roundId, Round storage r) private returns (bool open) {
         bool finalized;
         uint8 known;

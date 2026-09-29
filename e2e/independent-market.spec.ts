@@ -236,6 +236,14 @@ test("independent pools: isolated prices, direct transfers, full closure, protec
   await expect(trade.getByLabel(/CST to spend/)).toHaveValue("");
   const middlePrice = (await qs(1n))[0].currentYesBps;
   await page.getByRole("button", { name: "Advance 1 hour", exact: true }).click();
+  // Markets never end early: the countdown has elapsed and question 0 is known, yet
+  // trading stays open until the round-ending transaction closes the cycle.
+  await expect(page.getByText(/Trading stays open until the cycle is closed/)).toBeVisible();
+  const knownCard = page.getByTestId("question-0");
+  await expect(knownCard).toContainText("Trading");
+  await expect(knownCard).not.toContainText("Resolved");
+  await expect(knownCard.getByRole("button", { name: /^Buy YES:/ })).toBeEnabled();
+  await expect(knownCard.getByRole("button", { name: /^Buy NO:/ })).toBeEnabled();
   await page.getByRole("button", { name: "Close current cycle", exact: true }).click();
   await expect(page.getByTestId("independent-cycle")).toHaveText("Cycle 2");
   const oldUnsettled = await client.readContract({

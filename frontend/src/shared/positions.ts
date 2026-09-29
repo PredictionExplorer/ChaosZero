@@ -1,6 +1,4 @@
 import { getAddress, isAddress, zeroAddress, type Address } from "viem";
-import { claimable, feasibleReserves, yesProbabilityBps, type SharedPool } from "./math";
-import { answerYes, questionKnown } from "./questions";
 
 export type PositionAmounts = readonly [
   bigint,
@@ -56,46 +54,6 @@ export function matchedSets(yes: readonly bigint[], no: readonly bigint[]): Posi
 
 export function totalMatchedSets(yes: readonly bigint[], no: readonly bigint[]): bigint {
   return matchedSets(yes, no).reduce((sum, amount) => sum + amount, 0n);
-}
-
-export function collateralBreakdown(pool: SharedPool) {
-  const reserves = feasibleReserves(pool);
-  const minimumReserve = reserves.reduce(
-    (lowest, row) => (row.reserve < lowest ? row.reserve : lowest),
-    pool.collateral,
-  );
-  return { held: pool.collateral, maximumPayout: pool.collateral - minimumReserve, minimumReserve };
-}
-
-/**
- * Paired units have exact 1:1 value even in an unfunded market. Only unpaired,
- * unresolved units use marginal market prices. This is not an executable sale quote.
- */
-export function portfolioValue(pool: SharedPool, yes: readonly bigint[], no: readonly bigint[]) {
-  const matched = matchedSets(yes, no);
-  let indicativeValue = 0n;
-  let priceAvailable = true;
-  for (let i = 0; i < 8; i++) {
-    if (questionKnown(pool.knownMask, i)) {
-      indicativeValue += answerYes(pool.values, i) ? yes[i] : no[i];
-      continue;
-    }
-    indicativeValue += matched[i];
-    const yesRemainder = yes[i] - matched[i];
-    const noRemainder = no[i] - matched[i];
-    if (yesRemainder === 0n && noRemainder === 0n) continue;
-    const price = yesProbabilityBps(pool, i);
-    if (price === null) {
-      priceAvailable = false;
-      continue;
-    }
-    indicativeValue += (yesRemainder * price + noRemainder * (10_000n - price)) / 10_000n;
-  }
-  return {
-    matchedCollateral: matched.reduce((sum, amount) => sum + amount, 0n),
-    claimable: claimable(yes, no, pool.knownMask, pool.values),
-    indicativeValue: priceAvailable ? indicativeValue : null,
-  };
 }
 
 export function validateRecipient(

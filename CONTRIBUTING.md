@@ -95,26 +95,32 @@ fixtures in the same change:
 
 ```sh
 forge script script/GenerateVectors.s.sol --tc GenerateVectors
-forge script script/GenerateSharedVectors.s.sol --tc GenerateSharedVectors
+forge script script/GenerateLogBoundsVectors.s.sol --tc GenerateLogBoundsVectors
 forge script script/GenerateIndependentVectors.s.sol --tc GenerateIndependentVectors
 pnpm check:vectors
 ```
 
 The check reruns the generator and compares exact bytes, restoring the original
 fixture even if generation fails. It never silently accepts new expectations.
-The shared corpus contains the original trade cases plus 631 actual Solidity
-logarithm results: exact powers of two, every adjacent valid integer, the known
-adversarial boundary, and 256 deterministic pseudorandom samples across 120 bit
-widths. After fixture agreement, the gate independently checks each interval with
-Python's correctly rounded `Decimal.ln` at 170 digits, using directed arithmetic
-to enclose the reference itself. It does not copy the Solidity algorithm or allow
-an empirical epsilon. Corruption tests prove that an incorrect lower or upper
-endpoint fails the command. These finite regression checks support the documented
-rounding argument; they do not replace a proof covering every input. The separate
-independent-market corpus adds 130 compiler-generated weighted-binary cases,
-including asymmetric priors, integer boundaries, reserve checks and marginal prices.
-It also exports `MIN_AUTO_TOP_UP`, which has no on-chain getter; a frontend test
-pins the browser's copy of that 1 CST absorption threshold to the exported value.
+The logarithm corpus (`frontend/src/test/fixtures/log2-bounds-vectors.json`)
+contains 631 actual Solidity `Log2Bounds` results over 607 distinct inputs: 14
+fixed regression inputs including the known adversarial boundary, exact powers
+of two, every adjacent valid integer, and 256 deterministic pseudorandom samples
+across 120 bit widths. A frontend test requires the browser's `log2Bounds` to
+reproduce every interval exactly. After fixture agreement, the gate independently
+checks each interval with Python's correctly rounded `Decimal.ln` at 170 digits,
+using directed arithmetic to enclose the reference itself. It does not copy the
+Solidity algorithm or allow an empirical epsilon. Corruption tests prove that an
+incorrect lower or upper endpoint fails the command, and that a non-logarithm row
+or a corpus with fewer than 631 rows or 607 distinct inputs (for example, a
+duplicate replacing a distinct input) is rejected; exact row count and order are
+enforced by byte-for-byte regeneration. These finite regression
+checks support the documented rounding argument; they do not replace a proof
+covering every input. The separate independent-market corpus adds 130
+compiler-generated weighted-binary cases, including asymmetric priors, integer
+boundaries, reserve checks and marginal prices. It also exports `MIN_AUTO_TOP_UP`,
+which has no on-chain getter; a frontend test pins the browser's copy of that 1
+CST absorption threshold to the exported value.
 Avoid editing fixtures while this check runs. Ordinary gates clear the optional
 `ARBITRUM_RPC_URL` for deterministic local tests. The opt-in live fork test
 checks the legacy single-question integration only; there is no live independent

@@ -82,5 +82,4 @@ export const QUESTIONS: readonly QuestionDefinition[] = [
 
 export const QUESTION_COUNT = QUESTIONS.length;
 export type QuestionId = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
-export const questionKnown = (mask: number, question: number) => (mask & (1 << question)) !== 0;
 export const answerYes = (values: number, question: number) => (values & (1 << question)) !== 0;

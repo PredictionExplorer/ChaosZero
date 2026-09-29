@@ -8,6 +8,7 @@ Report suspected financial or authorization vulnerabilities privately to the pro
 
 - `IndependentOutcomeMarket` has immutable token, outcome-source, payout-vault and read-only helper references. It has no administrator, upgrade mechanism, CST minting authority, or sponsor withdrawal privilege.
 - The outcome source is trusted to describe the game truthfully and monotonically. The market rejects contradictions it has already observed, but this does not make an arbitrary source trustworthy. A production source needs a separately reviewed provenance mechanism.
+- The source alone decides when markets end. Its `open` flag must derive from the game's round counter: the current round is open from the time every earlier round is finalized until the game's round-ending transaction (`claimMainPrize`) advances that counter, and `finalized` becomes true, with all eight answers, in that same transaction. An adapter that closes a cycle when the countdown reaches zero, when the claim timeout elapses or when answers become known violates the design; the market has no independent check.
 - The supported collateral must have standard, exact transfers and a truthful `balanceOf`. Rebasing, transfer taxes, and arbitrary external balance destruction are unsupported. CST's upstream mint/burn authority and the game's upgradeability are part of a future deployment review.
 - The market trusts its absolute CST balance: anything above active collateral plus pending carry is held contributions, later credited to pools or pending carry. If market CST is destroyed externally, that excess saturates at zero rather than blocking trading, and later inflows first restore the missing backing; the shortfall itself is not otherwise covered.
 - The local game, local token, and local source cannot be constructed on a chain other than `31337`. The prototype frontend additionally refuses public-chain operation.
@@ -15,12 +16,14 @@ Report suspected financial or authorization vulnerabilities privately to the pro
 - ERC-1155 transfers retain standard receiver-callback composability: a receiver may forward newly received positions. All collateral and aggregate accounting is complete before safe-mint callbacks, and nested economic operations during a guarded operation revert. A receiver can redeem newly received pairs during a standalone position transfer; receiver rejection rolls back the entire call.
 - ERC-1155 is the sole holder-balance ledger. Issuance and redemption update aggregate liabilities; transfers and operator approvals do not. An operator approved for all positions can transfer them to itself and redeem them. Treat that approval as authority over every current and future position held by the approving wallet.
 - Complete-set merges redeem only equal YES/NO quantities from the same question and cycle. They do not call the outcome source and remain available after settlement or rollover; settled merges pay from the original question’s escrow. Splitting requires an open cycle but no sponsor. Split-only cycles settle without first receiving a gift.
-- All eight questions settle only after full game closure. Trading can continue while an answer is already known. Once settlement is cached, retrieval uses fixed answers without calling the source again. Before that, retrieval validates the source and canonical cycle times.
+- Markets never end early: trading, splitting, funding and absorption continue while answers are known, until the game's round-ending transaction, and merging never stops. No payout precedes finalization; all eight questions settle together. Once settlement is cached, retrieval uses fixed answers without calling the source again. Before that, retrieval validates the source and canonical cycle times.
 - Each trading question must independently back both answers. At settlement, its entire winning supply is reserved before surplus is credited to future funding. Unclaimed user funds never become sponsorship. Transfers and claim order cannot change the amount carried forward.
 
 ## Economic limitations
 
 Collateralization is not a guarantee that a prediction is profitable or that its underlying game outcome is difficult to influence. Participants can place additional game gestures, affect payment counts, and choose when to finalize a cycle. Prediction-market subsidies add incentives to do so. A real-CST pilot needs economic attack analysis in addition to code review.
+
+A question whose answer is already known keeps trading until the round-ending transaction, so informed traders can buy the known outcome and take that question's own funding. Isolation limits this to the known question; the other seven pools are unaffected. This is the intended trade-off for never ending a market early.
 
 Sponsorship, through `fundRound` or a direct transfer, is an irreversible contribution to other participants' trading opportunities. There are no redeemable LP shares. Additional funding may move prices toward the fixed initial odds. Carry is applied only at the first funding of a new cycle. Numerical headroom limits can leave exceptional excess carry or held contributions pending for later cycles. The protocol does not promise to distribute every sponsored unit as trader profit in each cycle; all unused credited collateral rolls forward. There is no winning-holder surplus bonus.
 
@@ -34,7 +37,7 @@ Recorded middle-window prices can be influenced and need not be calibrated proba
 
 ## Verification and release expectations
 
-Required gates include Solidity unit/fuzz/stateful tests, all terminal and partial answer configurations, frontend differential and property tests, a real local-chain browser lifecycle, dependency audits, and a production build. The nightly profile records reproducible seeds and retains failure artifacts.
+Required gates include Solidity unit/fuzz/stateful tests, all 256 terminal answer vectors and known-answer-while-open lifecycle tests, frontend differential and property tests, a real local-chain browser lifecycle, dependency audits, and a production build. The nightly profile records reproducible seeds and retains failure artifacts.
 
 Before real-value deployment, require an immutable authenticated result adapter for all eight questions, complete historical baselines, a liveness and recovery plan, Arbitrum gas measurements, and an independent review of financial invariants and numerical bounds. The local simulator and a caller-supplied result report are not acceptable substitutes.
 

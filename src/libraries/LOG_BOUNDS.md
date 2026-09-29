@@ -1,18 +1,12 @@
 # Integer product verification
 
-The original shared engine remains covered below. The independent engine uses
-the same enclosing logarithms, with the per-question extension at the end.
+`IndependentOutcomeMarket` verifies every trade through `BinaryMarketMath`,
+which uses the enclosing logarithms of `Log2Bounds`. Each question has two
+reserves and two fixed positive weights; no other question enters its check.
 
-`SharedOutcomeMarket` stores eight YES liabilities, eight NO liabilities and
-accounted collateral `B` for a cycle. For a feasible eight-bit ending `s`, the
-pool's virtual reserve is `B - sum(winning liabilities in s)`. Uniform sponsorship
-creates a complete set of all 256 outcomes without issuing 256 token balances.
-Only unresolved-question binary positions can trade. Known answers eliminate
-incompatible endings before the trade is priced.
-
-For each trade, every new feasible reserve must be strictly positive. The
-contract then proves that the product of feasible reserves cannot decrease.
-Neither the product itself nor a floating-point approximation is computed.
+For each trade, both new reserves must be strictly positive. The contract then
+proves that the weighted product of the reserves cannot decrease. Neither the
+product itself nor a floating-point approximation is computed.
 
 ## Enclosing log2 without an assumed error tolerance
 
@@ -56,16 +50,18 @@ Thus upward rounding cannot escape the normalized range. Ceiling division uses
 a quotient and a nonzero-remainder flag; adding `Q - 1` to the square could
 overflow and is deliberately avoided.
 
-The acceptance test is
+For reserves `rY, rN` with weights `p` and `10000 - p`, the acceptance test is
 
 ```
-sum(lowerLog2(newReserve)) >= sum(upperLog2(oldReserve)).
+p * lowerLog2(new rY) + (10000-p) * lowerLog2(new rN)
+    >= p * upperLog2(old rY) + (10000-p) * upperLog2(old rN).
 ```
 
-Identical old/new reserves cancel exactly and are skipped. The bound directions
-prove `sum(log2(newReserve)) >= sum(log2(oldReserve))`, hence the reserve product
-does not decrease. All sums fit comfortably in 256 bits: at most 256 logarithms,
-each at most `120 * 2^64`.
+Identical old/new reserves cancel exactly and are skipped. Multiplying each
+logarithm interval by a positive weight preserves its bound direction, so the
+test proves `p * log2(rY) + (10000-p) * log2(rN)` does not decrease; hence
+`rY^p * rN^(10000-p)` does not decrease. Each logarithm is at most `120 * 2^64`
+and the weights sum to 10,000, so the weighted sums fit below `2^85`.
 
 Conservative rounding can reject an economically valid trade near exact
 equality. It cannot accept an invariant-decreasing trade. Off-chain quote
@@ -73,62 +69,6 @@ search must apply the same integer acceptance rule instead of assuming that an
 analytic or floating-point quote will execute. The contract executes the exact
 cash and token quantities submitted by the user; it does not fill at a different
 quantity and does not charge a separate fee.
-
-## Complete sets and ownership
-
-Splitting amount `a` for question `q` increases `B`, `YES[q]`, and `NO[q]` by
-`a`. Every ending selects exactly one of those two liabilities. Its reserve
-therefore changes by `a - a = 0`. Merging subtracts the same amount from all
-three quantities, again changing every reserve by zero. For a batch of
-questions this argument adds: collateral falls by the sum of the pairs, and
-every ending's winning liability falls by exactly that sum. There is no product
-approximation or quote in either operation.
-
-For any feasible ending, the collateral backing the holder's matched pairs is
-part of the winning liability. The holder's pairs can therefore be paid even
-after sponsor residue is rolled forward. This exit does not require a source
-read, a cached answer, or an open cycle. Existing solvency and the ownership
-checks suffice. Pairing positions from different questions or cycles would not
-have this property and is never allowed.
-
-A cycle may initially contain only split positions. In that case every reserve
-is zero and the pool is not marked funded; trading is unavailable until it
-receives sponsorship. Claims and merges remain available without sponsorship.
-The first gift must meet the funding minimum on its own, independently of
-collateral already backing split positions.
-
-ERC-1155 is the only per-holder ledger. Standard transfers change who owns a
-claim, but never aggregate supply or collateral, so reserves are unchanged.
-Only guarded economic methods mint or burn. Collateral receipt and aggregate
-accounting finish before ERC-1155 mint acceptance callbacks. Transfers retain
-standard callback forwarding; callbacks cannot reenter a guarded economic
-operation while one is already executing. Rejected callbacks revert atomically.
-
-## Funding, partial answers and claims
-
-Additional sponsorship is an irreversible gift that increases all feasible
-reserves equally. It may move prices toward equal probabilities. There are no
-withdrawable LP shares, and no attempt to keep the pre-gift product invariant.
-Each subsequent trade compares against the actual reserves immediately before
-that trade.
-
-Known-answer claims reduce `B` and the winning liability by the same amount.
-Losing liabilities are removed only for already impossible endings. Every
-remaining feasible reserve therefore stays unchanged. After all answers are
-final, rollover moves only `B - sum(unpaid winning claims)` to a later open
-cycle. Old claims retain their collateral independently of rollover timing.
-Once finalization is cached, retrieval uses its permanently fixed answer vector
-without a further source read. This changes neither the payout nor its backing,
-and preserves redemption if the finalized source later becomes unavailable.
-
-Direct token transfers do not change the accounted collateral. Funding checks
-the actual received balance delta; payouts check both sent and received deltas.
-Token behavior inconsistent with exact CST transfers reverts atomically.
-
-This is an implementation argument, not an external security audit. The tests
-cover high-precision reference vectors, powers of two, a boundary regression,
-all 256 terminal endings, source consistency, custody and liability invariants,
-and full-state execution gas.
 
 ## Independent question pools
 
@@ -142,12 +82,12 @@ previous cycle's middle-window price in basis points. The invariant is
 rY^p * rN^(10000-p).
 ```
 
-Multiplying each existing logarithm interval by a positive weight preserves its
-bound direction. Comparing the weighted new lower sum with the weighted old
-upper sum therefore proves non-decrease. Unchanged reserve factors still cancel
-exactly. Both reserves must remain positive during trading; `C <= 2^120` bounds
-all logarithms, and the weights sum to 10,000. The weighted sums fit below
-`2^85`. The marginal YES price is
+Every trade must pass the weighted acceptance test above. Both reserves must
+remain positive during trading, and `C <= 2^120` bounds all logarithms.
+Splitting or merging amount `a` changes `C`, `Y` and `N` by `a` together, so
+both reserves and the price stay unchanged without a quote or product check.
+ERC-1155 transfers change only the holder, never `C`, `Y` or `N`. The marginal
+YES price is
 
 ```text
 10000 * p * rN / (p * rN + (10000-p) * rY).
@@ -164,10 +104,12 @@ either pass that check or revert.
 
 ## Settlement and rollover conservation
 
-When the full game result is final, set `O` to this question's winning supply and
-`R = C - O`. Solvency guarantees `R >= 0`. Reserve `O` in that question's closed
-cycle vault, set its active collateral to zero, and credit `R` to future funding.
-Across the eight questions, the exact identity is
+Settlement waits for the source's `finalized` flag, set only by the game's
+round-ending transaction; answers known earlier neither stop trading nor pay.
+Then set `O` to this question's winning supply and `R = C - O`. Solvency
+guarantees `R >= 0`. Reserve `O` in that question's closed cycle vault, set its
+active collateral to zero, and credit `R` to future funding. Across the eight
+questions, the exact identity is
 
 ```text
 old active collateral = new claim escrow + new carry credit.
@@ -235,3 +177,15 @@ Missing coverage of the window or a zero-width interval uses the prior initial
 seed, or 50% if the immediately preceding cycle has no initialized market. The seed is clamped to the strictly
 positive weight range. This is an average of recorded market quotes, not a
 claim that old prices correctly forecast the next cycle's different thresholds.
+
+## Test coverage
+
+This is an implementation argument, not an external security audit.
+`test/Log2Bounds.t.sol` covers every exact power of two, a dyadic boundary
+regression, high-precision reference vectors and fuzzed power, doubling and
+small-product properties. A compiler-generated corpus of 631 `Log2Bounds`
+intervals (`script/GenerateLogBoundsVectors.s.sol`) is checked against 170-digit
+`Decimal` logarithms and reproduced bit-for-bit by the browser's `log2Bounds`.
+`test/BinaryMarketMath.t.sol` compares weighted checks with exact integer
+products. The market tests cover all 256 terminal answer vectors, source
+consistency, custody and liability invariants, and trade gas.

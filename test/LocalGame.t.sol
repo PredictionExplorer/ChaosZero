@@ -262,6 +262,50 @@ contract LocalGameTest is Test {
         assertEq(game.roundNum(), 2);
     }
 
+    /// @dev Markets never end early: the adapter's open flag follows the round counter alone,
+    /// so neither the countdown, the claim timeout nor known answers close the cycle.
+    function test_openFollowsTheRoundCounterNotTheCountdownOrKnownAnswers() public {
+        for (uint256 i; i < 7; ++i) {
+            _eth();
+        }
+        (bool open, bool final_, uint8 known, uint8 values) = source.outcomeState(1);
+        assertTrue(open);
+        assertFalse(final_);
+        assertEq(known & 1, 1);
+        assertEq(values & 1, 1);
+        uint256[2] memory checkpoints = [game.mainPrizeTime(), game.mainPrizeTime() + game.CLAIM_TIMEOUT() + 1 days];
+        for (uint256 i; i < checkpoints.length; ++i) {
+            vm.warp(checkpoints[i]);
+            uint8 previousKnown = known;
+            uint8 previousValues = values;
+            (open, final_, known, values) = source.outcomeState(1);
+            assertTrue(open);
+            assertFalse(final_);
+            assertEq(known & previousKnown, previousKnown);
+            assertEq(values & previousKnown, previousValues & previousKnown);
+            assertEq(game.roundNum(), 1);
+        }
+        // The clock alone made the timing comparisons certain, yet the cycle stays open.
+        assertEq(known & 6, 6);
+        uint8 knownBeforeClose = known;
+        uint8 valuesBeforeClose = values;
+        game.closeCycle();
+        uint8 finalValues;
+        (open, final_, known, finalValues) = source.outcomeState(1);
+        assertFalse(open);
+        assertTrue(final_);
+        assertEq(known, 0xff);
+        assertEq(finalValues & knownBeforeClose, valuesBeforeClose);
+        (open, final_, known, values) = source.outcomeState(2);
+        assertTrue(open);
+        assertFalse(final_);
+        (open, final_, known, values) = source.outcomeState(3);
+        assertFalse(open);
+        assertFalse(final_);
+        assertEq(known, 0);
+        assertEq(values, 0);
+    }
+
     function test_faucetAndGameMintPermissions() public {
         vm.expectRevert(LocalCst.Unauthorized.selector);
         cst.mint(alice, 1);

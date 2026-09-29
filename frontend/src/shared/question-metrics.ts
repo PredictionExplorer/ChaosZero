@@ -1,7 +1,21 @@
 import { formatEther } from "viem";
 import { formatCst } from "@/lib/format";
 import { QUESTIONS, type QuestionDefinition } from "./questions";
-import type { CycleStats } from "./use-shared-market";
+
+/** One cycle's game statistics, as the question cards display them. */
+export interface CycleStats {
+  gestureCount: bigint;
+  ethSpent: bigint;
+  cstBurned: bigint;
+  highestCstPaid: bigint;
+  enduranceDuration: bigint;
+  chronoDuration: bigint;
+  enduranceGesture: bigint;
+  chronoGesture: bigint;
+  firstGestureTime: bigint;
+  lastGestureTime: bigint;
+  finalized: boolean;
+}
 
 /** Whole seconds as their two largest units: `1h 5m`, `2m 30s` or `45s`. */
 export const formatDuration = (seconds: bigint) => {

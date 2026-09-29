@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -58,6 +58,65 @@ describe("independent question interface", () => {
     expect(screen.getByText("Trading")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Buy YES: More gestures?" })).toBeEnabled();
     expect(screen.queryByText("Resolved YES")).not.toBeInTheDocument();
+  });
+  it("a fully known but open cycle keeps every question tradeable and unresolved", () => {
+    // Markets never end early: all eight answers known still means trading until closure.
+    const state = snapshot();
+    state.observedMask = 0xff;
+    state.observedValues = 0xa5;
+    state.values = 0xa5;
+    state.open = true;
+    state.finalized = false;
+    const { unmount } = render(
+      <>
+        {([0, 1, 2, 3, 4, 5, 6, 7] as const).map((q) => (
+          <IndependentQuestionCard
+            key={q}
+            question={q}
+            snapshot={state}
+            selected={false}
+            onSelect={vi.fn()}
+          />
+        ))}
+      </>,
+    );
+    for (let q = 0; q < 8; q++) {
+      const card = within(screen.getByTestId(`question-${q}`));
+      expect(card.getByText("Trading")).toBeInTheDocument();
+      expect(card.queryByText(/Resolved (YES|NO)/)).not.toBeInTheDocument();
+      for (const side of [/^Buy YES:/, /^Buy NO:/]) {
+        const button = card.getByRole("button", { name: side });
+        expect(button).toBeEnabled();
+        expect(button).not.toHaveTextContent(/(^|[^.\d])(100|0)%/);
+      }
+    }
+    unmount();
+    render(<IndependentPortfolio snapshot={state} actions={noopActions()} onSell={vi.fn()} />);
+    expect(screen.getByTestId("independent-claimable")).toHaveTextContent("0 CST");
+    expect(screen.getByRole("button", { name: "Retrieve winnings" })).toBeDisabled();
+  });
+  it("keeps splitting open for a fully known but open cycle", async () => {
+    const state = snapshot();
+    state.observedMask = 0xff;
+    state.observedValues = 0xa5;
+    state.user!.allowance = 100n * ONE;
+    const actions = { ...noopActions(), split: vi.fn().mockResolvedValue(true) };
+    render(
+      <IndependentSetsPanel
+        roundId={1n}
+        user={state.user}
+        collaterals={state.questions.map((q) => q.pool.collateral)}
+        open
+        finalized={false}
+        connected
+        actions={actions}
+      />,
+    );
+    expect(screen.queryByText(/Splitting is closed/)).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("CST to split"), "2");
+    expect(screen.getByRole("button", { name: "Split into YES + NO" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "Split into YES + NO" }));
+    expect(actions.split).toHaveBeenCalledWith(0, 2n * ONE);
   });
   it("shows the live gesture parity against its fixed condition", () => {
     render(

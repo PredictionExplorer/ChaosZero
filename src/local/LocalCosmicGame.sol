@@ -101,6 +101,9 @@ contract LocalCosmicGame {
         _observe(true, price);
     }
 
+    /// @notice Local counterpart of claimMainPrize and the only transaction that ends a round (and
+    /// therefore its markets). mainPrizeTime and CLAIM_TIMEOUT only decide who may call it and when;
+    /// neither closes a market by itself.
     function closeCycle() external nonReentrant {
         if (lastBidder == address(0) || block.timestamp < mainPrizeTime) revert NotReady();
         if (msg.sender != lastBidder && block.timestamp < mainPrizeTime + CLAIM_TIMEOUT) revert NotReady();

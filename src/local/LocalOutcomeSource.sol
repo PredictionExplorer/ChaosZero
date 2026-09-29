@@ -7,6 +7,10 @@ import {CycleMetrics} from "./CycleMetrics.sol";
 
 /// @notice Objective adapter for the local simulator. Deliberately impossible to deploy on a live chain.
 /// @dev Production requires authenticated historical game data, not an administrator supplying answers.
+/// `open = !finalized && roundId == game.roundNum()` derives solely from the round counter: the
+/// early YES answers for questions 0-4 and 7 in `knownMask` never affect `open`, and neither does
+/// the countdown. `LocalCosmicGame.closeCycle` is the local counterpart of `claimMainPrize` and
+/// flips `open` to false and `finalized` to true atomically.
 contract LocalOutcomeSource is IIndependentOutcomeSource {
     LocalCosmicGame public immutable game;
     error LocalChainOnly();

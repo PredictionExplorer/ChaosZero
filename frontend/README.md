@@ -5,8 +5,11 @@
 `pnpm dev:local` from the repository root now launches `IndependentOutcomeMarket`
 on disposable Anvil with the local game and test CST. Open `/shared` (or `/`).
 `NEXT_PUBLIC_INDEPENDENT_MARKET_ADDRESS` selects the new ABI explicitly; it never
-inherits either older market address. The launcher sets the new address and
-blanks `NEXT_PUBLIC_SHARED_MARKET_ADDRESS` and `NEXT_PUBLIC_MARKET_ADDRESS`.
+inherits the legacy market address. The launcher sets the new address and blanks
+`NEXT_PUBLIC_MARKET_ADDRESS`. `/shared` always shows the independent screen,
+which reports when no independent market is configured. Connect **Mock
+Connector 1**, **2**, or **3** to use separate unlocked local accounts. The local
+wallet and public reads both use `NEXT_PUBLIC_RPC_URL`.
 
 Each question has its own collateral and weighted binary price. A `fundRound`
 gift enters all eight pools at once. CST sent directly to the market, and carry
@@ -21,8 +24,11 @@ deferred by capacity limits. Starting odds use the previous cycle’s
 preceding game cycle has no initialized market, the fallback is 50%. This is
 recorded-price history, not an external price oracle.
 
-Trading continues until full game closure even when a comparison is already
-clear. Settlement moves normal 1:1 winning claims into a separate immutable vault,
+Markets never end early. Buying, selling, splitting and funding continue even
+when all eight answers are known and after the countdown elapses, until the
+game's round-ending transaction (`closeCycle` locally, `claimMainPrize` on the
+live game). No question shows as resolved and no claim is enabled before then.
+Settlement moves normal 1:1 winning claims into a separate immutable vault,
 zeros closed-cycle trading collateral, and carries all remaining funds forward.
 An unstarted cycle that can start is tradeable: its first trade settles the prior
 funded cycle, opens the pools from carry and held contributions, and costs a
@@ -48,58 +54,14 @@ chain. Public-chain writes remain disabled pending a verified live source.
 New implementation: `src/independent/`, using the independently verified weighted
 solver in `src/shared/independent-math.ts`. Browser coverage in
 `e2e/independent-market.spec.ts` exercises three cycles, price isolation, exact
-funding, history inheritance, source outages, protected late claims, carry, a
-cycle started by its first buy, and a direct transfer absorbed by the next buy.
+funding, trading on known answers and after the countdown elapses, history
+inheritance, source outages, protected late claims, carry, a cycle started by
+its first buy, and a direct transfer absorbed by the next buy.
 Every browser run snapshots/restores Anvil for retry isolation.
 
-## Previous shared prototype (regression implementation)
-
-The older joint-pool modules and their tests remain in `src/shared/`. To inspect
-that UI with an explicit compatible old deployment, unset the independent address
-and configure `NEXT_PUBLIC_SHARED_MARKET_ADDRESS`. The default launcher no longer
-deploys this earlier design. The following section documents that retained implementation.
-
-The previous simulator deployment used a joint market backed by one pool per cycle.
-Its explicit-address UI remains available at `/shared` for regression work.
-
-The eight recurring questions share one pool per cycle. The screen supports
-exact buy/sell quotes, explicit CST approvals, irreversible pool gifts, partial
-settlement and retrieval, completed-cycle navigation, and sponsor-residue
-rollover. Local controls provide test CST, ETH/CST gestures, time advances, and
-cycle closure. Connect **Mock Connector 1**, **2**, or **3** to use separate unlocked local accounts.
-The local wallet and public reads both use `NEXT_PUBLIC_RPC_URL`.
-
-`NEXT_PUBLIC_SHARED_MARKET_ADDRESS` explicitly selects the older shared contract. When
-present, `/` displays the shared screen as well. It never falls back to
-`NEXT_PUBLIC_MARKET_ADDRESS` or applies the shared ABI to that legacy address.
-Both the shared screen and its transaction actions reject chains other than 31337. A verified live outcome-source integration is required before this
-prototype can trade on a public chain.
-
-YES and NO positions are standard ERC-1155 tokens. The complete-set panel splits
-1 CST into one YES plus one NO for the same question, and merges matched units
-back into CST at exactly 1:1. Splits work before pool sponsorship; merges work
-after settlement too. Batch merge pairs each question independently. Portfolio
-transfers send owner-held tokens directly to another wallet or an ERC-1155 receiver.
-The UI displays total CST custody, maximum payout obligations, and minimum
-remaining reserve separately: splitting a pair increases custody but does not
-add AMM liquidity or change prices.
-
-If outcome reads fail, trading, splitting and sponsorship remain disabled. A
-narrow recovery panel refreshes only the market/token balances for an explicit
-or previously loaded cycle and allows owner merges/transfers. It does not guess
-the current cycle or reuse stale balances; polling preserves drafts while
-transaction controls wait for fresh data. Wallet, market and cycle changes reset
-those drafts. Transactions pin both the connected account and local chain.
-
-The implementation lives in `src/shared/`. The BigInt quote solver mirrors the
-contract's directed-rounding logarithm bounds and checks all feasible joint
-outcomes. Quotes are recomputed when their economic basis changes; a stale
-exact quote can revert rather than accepting worse output. The frontend shows
-no invented chain values. Unit, component, and property tests include
-Solidity-generated differential vectors in
-`src/test/fixtures/shared-contract-vectors.json`. The default `pnpm test:e2e`
-run exercises the independent deployment and skips the retained shared browser
-spec, which requires a compatible older deployment.
+`log2Bounds` in `src/shared/math.ts` mirrors the contract's directed-rounding
+logarithm bounds and must reproduce all 631 Solidity intervals in
+`src/test/fixtures/log2-bounds-vectors.json` exactly.
 
 A gift supplies capacity without creating LP shares, fee income, or withdrawal
 rights. It is separate from buying a YES/NO position. The local simulator uses

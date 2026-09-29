@@ -102,6 +102,18 @@ export function formatCandidates(files) {
   );
 }
 
+// Every checked-in differential fixture and the Forge script that reproduces it
+// byte for byte: [generator, contract, output under frontend/src/test/fixtures].
+export const VECTOR_GENERATORS = [
+  ["script/GenerateVectors.s.sol", "GenerateVectors", "contract-vectors.json"],
+  ["script/GenerateLogBoundsVectors.s.sol", "GenerateLogBoundsVectors", "log2-bounds-vectors.json"],
+  [
+    "script/GenerateIndependentVectors.s.sol",
+    "GenerateIndependentVectors",
+    "independent-contract-vectors.json",
+  ],
+];
+
 // The generator intentionally targets a checked-in fixture. Preserve the original
 // bytes even when Forge exits unsuccessfully, so a check never edits that fixture.
 export function verifyGeneratedFixture(fixture, generate) {
