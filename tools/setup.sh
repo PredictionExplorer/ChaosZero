@@ -364,8 +364,22 @@ cmd_setup() {
 
   step "git blame"
   # Skip mechanical reformatting commits (listed in .git-blame-ignore-revs).
-  git config blame.ignoreRevsFile .git-blame-ignore-revs
-  say "blame.ignoreRevsFile = .git-blame-ignore-revs"
+  # The setting lives in the shared .git/config, so it also applies to
+  # checkouts of commits older than the file, where git blame then fails.
+  # Git 2.52 added the :(optional) prefix, which makes a missing file a
+  # no-op; older git reads that prefix as part of the file name, so there
+  # the setting is left to the developer.
+  local git_major git_minor
+  IFS=. read -r git_major git_minor _ <<<"$(git --version | sed 's/^git version //')"
+  if [ "${git_major:-0}" -gt 2 ] || { [ "${git_major:-0}" -eq 2 ] && [ "${git_minor:-0}" -ge 52 ]; }; then
+    git config blame.ignoreRevsFile ':(optional).git-blame-ignore-revs'
+    say "blame.ignoreRevsFile = :(optional).git-blame-ignore-revs"
+  elif [ "$(git config blame.ignoreRevsFile || true)" = .git-blame-ignore-revs ]; then
+    say "blame.ignoreRevsFile already set (git blame fails on commits older than the file; --no-ignore-revs-file bypasses it)"
+  else
+    say "Optional, with git older than 2.52: git config blame.ignoreRevsFile .git-blame-ignore-revs"
+    say "(git blame then fails on commits older than that file; --no-ignore-revs-file bypasses it)"
+  fi
 
   if ! have forge && [ ! -x "$foundry_bin/forge" ]; then
     warn "forge not found: run make foundry (pinned, checksum-verified) or foundryup --install $FOUNDRY_VERSION"

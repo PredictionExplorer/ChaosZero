@@ -4,7 +4,10 @@
 # advisory is published.
 #
 # Pinned tool versions in tools/versions.env (Foundry, solc, Slither, Halmos,
-# the linters) are outside Dependabot's reach and are bumped by hand.
+# the linters) are outside Dependabot's reach and are bumped by hand; the
+# Python tools' hash-locked dependencies in tools/requirements/ follow them
+# (tools/requirements/lock.sh). Dependabot alerts still cover those locks
+# through the dependency graph.
 version: 2
 
 updates:

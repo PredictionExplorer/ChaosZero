@@ -25,7 +25,7 @@ export PATH := $(PATH):$(HOME)/.foundry/bin
 	test test-contracts test-frontend test-e2e test-fork test-heavy \
 	coverage coverage-contracts coverage-frontend \
 	gas gas-check vectors vectors-check \
-	analyze slither halmos mutation \
+	analyze slither halmos mutation locks locks-check \
 	check clean
 
 ##@ Getting started
@@ -158,9 +158,15 @@ halmos: ## Symbolic tests (tools/analysis/halmos.sh)
 mutation: ## Mutation testing, slow; runs weekly in CI (tools/analysis/mutation.sh)
 	tools/analysis/mutation.sh
 
+locks: ## Regenerate the hash-locked Python tool requirements (needs uv)
+	tools/requirements/lock.sh
+
+locks-check: ## Fail if a Python tool lock does not pin the version in tools/versions.env
+	tools/requirements/lock.sh --check
+
 ##@ All together
 
-check: fmt-check lint typecheck build gas-check test-contracts coverage vectors-check ## Everything CI's offline gates run, in order, fail-fast
+check: locks-check fmt-check lint typecheck build gas-check test-contracts coverage vectors-check ## Everything CI's offline gates run, in order, fail-fast
 
 clean: ## Remove build output and caches (contracts and frontend)
 	forge clean

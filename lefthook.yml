@@ -22,6 +22,11 @@
 # CI enforces all of it regardless, so skipping only defers the feedback.
 
 min_version: 2.1.14
+
+# Sourced by every hook before lefthook starts: puts Node, pnpm and Foundry on
+# PATH for GUI git clients that do not load the shell profile.
+rc: tools/hooks/env.sh
+
 # Standard globbing: `*` stops at `/`, `**` spans directories.
 glob_matcher: doublestar
 
@@ -37,9 +42,7 @@ pre-commit:
         jobs:
           - name: forge-fmt
             glob: "**/*.sol"
-            # Also find forge where foundryup and `make foundry` install it,
-            # for GUI git clients that do not load the shell profile.
-            run: PATH="$PATH:$HOME/.foundry/bin" forge fmt {staged_files}
+            run: forge fmt {staged_files}
             stage_fixed: true
             fail_text: "forge fmt failed. No forge? Install the pinned Foundry with: make foundry"
 
@@ -52,7 +55,7 @@ pre-commit:
                   glob: "**/*.{cjs,css,js,json,jsx,md,mjs,mts,cts,ts,tsx,yaml,yml}"
                   run: node_modules/.bin/prettier --write --ignore-unknown --log-level=warn {staged_files}
                   stage_fixed: true
-                  fail_text: "prettier failed. In a fresh clone or worktree, install dependencies first: make setup"
+                  fail_text: "prettier failed. 'node: not found' means your git client cannot see Node (CONTRIBUTING.md, Git hooks); in a fresh clone or worktree, run make setup first"
 
                 - name: eslint
                   glob: "**/*.{cjs,js,jsx,mjs,mts,cts,ts,tsx}"
@@ -73,34 +76,20 @@ pre-commit:
             run: tools/hooks/optional.sh typos typos --force-exclude {staged_files}
 
 pre-push:
-  # Sequential on purpose: forge and vitest each use every core. Jobs whose
-  # globs match none of the pushed files are skipped (the contract job also
-  # watches the deployment record and frontend/.env.production, which the
-  # deployment integrity test reads). The checks run on the working tree, so
-  # commit or stash unrelated edits before pushing.
+  # Sequential on purpose: forge and vitest each use every core. Each job runs
+  # its checks only when the pushed commits touch its area, as decided by
+  # tools/hooks/pre-push.sh (the contract job also watches the deployment
+  # record and frontend/.env.production, which the deployment integrity test
+  # reads). The pushed files come from that script too, not from lefthook's
+  # own lookup, which needs a local main branch. The checks run on the
+  # working tree, so commit or stash unrelated edits before pushing.
   jobs:
     - name: contracts
-      glob:
-        - "**/*.sol"
-        - "foundry.toml"
-        - "foundry.lock"
-        - "remappings.txt"
-        - "lib/**"
-        - "snapshots/**"
-        - "broadcast/**"
-        - "frontend/src/test/fixtures/contract-vectors.json"
-        - "frontend/.env.production"
-        - "Makefile"
-        - "tools/versions.env"
-      run: make lint-contracts build gas-check test-contracts vectors-check
+      files: tools/hooks/pre-push.sh --changed
+      run: tools/hooks/pre-push.sh contracts {files}
       fail_text: "Contract checks failed. Skip once with LEFTHOOK_EXCLUDE=contracts git push"
 
     - name: frontend
-      glob:
-        - "frontend/**"
-        - "Makefile"
-        - "tools/versions.env"
-      exclude:
-        - "frontend/**/*.md"
-      run: make lint-frontend typecheck test-frontend
+      files: tools/hooks/pre-push.sh --changed
+      run: tools/hooks/pre-push.sh frontend {files}
       fail_text: "Frontend checks failed. Skip once with LEFTHOOK_EXCLUDE=frontend git push"

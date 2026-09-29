@@ -1,15 +1,39 @@
 # gitleaks (https://github.com/gitleaks/gitleaks): secret scanning of every
 # commit in CI (the hygiene job) and of staged changes in the pre-commit hook.
-# All of gitleaks' default rules apply; the allowlists below are exact values
-# or shapes that are public by construction, each scoped as tightly as
-# possible. CI ignores inline "gitleaks:allow" comments, so this file is the
-# one place exceptions live. Never allowlist a path, a commit or a whole rule:
-# if a real secret was committed, rotate it first, then remove it from history.
+# All of gitleaks' default rules apply, plus two for this project's own
+# secrets (below); the allowlists are exact values or shapes that are public
+# by construction, each scoped as tightly as possible. CI ignores inline
+# "gitleaks:allow" comments and .gitleaksignore files, so this file is the one
+# place exceptions live. Never allowlist a path, a commit or a whole rule: if
+# a real secret was committed, rotate it first, then remove it from history.
 
 title = "ChaosZero"
 
 [extend]
 useDefault = true
+
+# The default rules only catch these next to a word such as "key" or
+# "secret". An RPC provider URL carries its API key in the path: the fork
+# tests' ARBITRUM_RPC_URL is one.
+[[rules]]
+id = "rpc-provider-url-key"
+description = "JSON-RPC provider URL with an embedded API key"
+regex = '''https?://[a-z0-9.-]*(?:alchemy\.com/v2|infura\.io/v3|quiknode\.pro|ankr\.com/[a-z_]+|blastapi\.io|chainstack\.com|nodereal\.io/v1)/?([A-Za-z0-9_-]{16,})'''
+secretGroup = 1
+keywords = ["alchemy", "infura", "quiknode", "ankr", "blastapi", "chainstack", "nodereal"]
+
+# A raw EVM private key: 0x and 64 hex digits, e.g. passed to
+# vm.startBroadcast or --private-key. Transaction and block hashes have the
+# same shape, so the rule leaves out the broadcast records (JSON) and needs
+# some entropy, which placeholders such as 0xaaaa... lack. A bytes32 constant
+# in source (a typehash, an event topic) needs an exact-value allowlist entry.
+[[rules]]
+id = "evm-private-key-literal"
+description = "0x followed by 64 hex digits in source, config, scripts or docs"
+regex = '''\b(0x[0-9a-fA-F]{64})\b'''
+secretGroup = 1
+entropy = 3.0
+path = '''(?i)\.(?:sol|sh|bash|zsh|toml|ya?ml|env[^/]*|mk|ts|tsx|js|mjs|cjs|py|txt|md)$|(?:^|/)(?:Makefile|\.env[^/]*)$'''
 
 [[allowlists]]
 description = """\

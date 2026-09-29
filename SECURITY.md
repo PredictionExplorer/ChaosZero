@@ -48,7 +48,8 @@ pointing the frontend at it, and helping users move. The exits of the old
 contract never close: liquidity providers can always withdraw
 (`removeLiquidity`, `claimFees`), and outcome-token holders can redeem
 complete sets before resolution (`redeemSets`) and claim after it (`claim`).
-Frontend and tooling fixes ship through a normal release.
+Frontend and tooling fixes ship as a normal pull request: every merge to `main`
+deploys the frontend to production.
 
 Because the deployed code cannot be patched, we coordinate disclosure with you
 so that users are warned and a replacement is ready before details are

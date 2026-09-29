@@ -7,8 +7,9 @@
 #   matches this repository and the live game still has the interface the
 #   market reads (the game is an upgradeable proxy, so this can break without
 #   any commit here)
-# - the Halmos proofs (also a CI gate; nightly they also catch drift in the
-#   solvers and other transitive dependencies pip resolves afresh)
+# - the Halmos proofs (also a CI gate, installed there from the hash lock in
+#   tools/requirements/halmos.txt; nightly installs unlocked, so drift in the
+#   solvers and other dependencies shows up here before the next lock)
 # - an audit of the frontend's production dependencies, which catches
 #   advisories published after the lockfile last changed
 #
