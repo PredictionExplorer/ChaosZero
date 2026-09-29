@@ -34,7 +34,9 @@ export function Header({ active, actions }: HeaderProps) {
               <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-signal/15 text-signal-bright transition-shadow group-hover:shadow-glow-signal">
                 <BrandMark className="size-5" />
               </span>
-              <span className="hidden font-display text-lg font-bold tracking-tight md:block">
+              {/* Visually hidden (not display:none) below md, so the icon-only
+                  home link keeps its accessible name on phones. */}
+              <span className="sr-only font-display text-lg font-bold tracking-tight md:not-sr-only">
                 Chaos<span className="text-signal-bright">Zero</span>
               </span>
             </Link>

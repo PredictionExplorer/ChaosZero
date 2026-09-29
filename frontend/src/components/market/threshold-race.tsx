@@ -58,7 +58,7 @@ export function ThresholdRace({
               {formatCount(currentCount)} <span className="text-[10px] uppercase">so far</span>
             </span>
           </Tooltip>
-          <span className="text-[10px] uppercase tracking-widest text-ink-faint/80">threshold pending</span>
+          <span className="text-[10px] uppercase tracking-widest text-ink-faint">threshold pending</span>
           <Tooltip
             content="The number to beat is unknown until the previous round finishes — it locks at that round's final gesture count."
             align="end"
@@ -121,7 +121,7 @@ export function ThresholdRace({
             {formatCount(currentCount)} <span className="text-[10px] uppercase">so far</span>
           </span>
         </Tooltip>
-        <span className="text-[10px] uppercase tracking-widest text-ink-faint/80">
+        <span className="text-[10px] uppercase tracking-widest text-ink-faint">
           {crossed ? "threshold crossed — YES wins" : "gestures vs last round"}
         </span>
         <Tooltip

@@ -39,11 +39,14 @@ export function ConnectButton() {
     return () => document.removeEventListener("pointerdown", handler);
   }, [menuOpen]);
 
+  // Below `sm` the label is visually hidden (still the accessible name): on
+  // phones the full-width button would cover the header's nav links. The bet
+  // panel's own "Connect wallet to bet" button carries the words there.
   if (!mounted) {
     return (
       <Button variant="outline" disabled>
         <Wallet className="size-4" aria-hidden />
-        Connect
+        <span className="sr-only sm:not-sr-only">Connect</span>
       </Button>
     );
   }
@@ -60,7 +63,7 @@ export function ConnectButton() {
           loading={connection.status === "reconnecting"}
         >
           <Wallet className="size-4" aria-hidden />
-          Connect wallet
+          <span className="sr-only sm:not-sr-only">Connect wallet</span>
         </Button>
         {modalRequested && <LazyWalletModal open={modalOpen} onClose={() => setModalOpen(false)} />}
       </>
