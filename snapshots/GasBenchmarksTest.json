@@ -1,0 +1,23 @@
+{
+  "addLiquidity_joinAsNewLp": "172859",
+  "addLiquidity_openCurrentRound": "302062",
+  "addLiquidity_openFutureRound": "272839",
+  "addLiquidity_topUpSettlingFees": "145318",
+  "betNo_addToPosition": "87020",
+  "betNo_newPosition": "104120",
+  "betYes_addToPosition": "87191",
+  "betYes_futureRound": "99484",
+  "betYes_newPosition": "104291",
+  "claimFees": "71592",
+  "claim_loser": "30380",
+  "claim_winner": "44069",
+  "deploy": "2048809",
+  "mintSets": "93555",
+  "redeemSets": "52352",
+  "removeLiquidity_fullExit": "119655",
+  "removeLiquidity_partial": "144379",
+  "resolve_afterRoundEnd": "40901",
+  "resolve_early": "40932",
+  "resolve_lockingThreshold": "65317",
+  "updateFeeDeclaration": "38977"
+}
