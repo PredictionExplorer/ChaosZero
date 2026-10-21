@@ -111,8 +111,6 @@ contract IndependentOutcomeMarketTest is Test, ERC1155Holder {
             assertEq(p.activeCollateral, 1000e18 + (q < 5 ? 1 : 0));
             assertEq(p.initialYesBps, 5000);
             assertEq(p.currentYesBps, 5000);
-            assertFalse(p.seedUsedHistory);
-            assertEq(p.checkpointCount, 1);
         }
         assertEq(market.totalActiveCollateral(), SEED + 5);
         assertEq(token.balanceOf(address(market)), SEED + 5);
@@ -246,57 +244,44 @@ contract IndependentOutcomeMarketTest is Test, ERC1155Holder {
         assertEq(market.totalActiveCollateral(), 0);
     }
 
-    function test_middleWindowSeedIsExactAndIndependentOfLateSettlement() public {
+    function test_eachCycleStartsAtFiftyFiftyDespitePriorTradesAndLateSettlement() public {
         market.fundRound(1, SEED);
-        vm.warp(140);
-        _buy(1, 0, true, 100e18, 150e18);
-        uint16 firstPrice = market.questionState(1, 0).currentYesBps;
-        vm.warp(150);
-        _buy(1, 0, true, 100e18, 150e18);
-        uint16 secondPrice = market.questionState(1, 0).currentYesBps;
+        _buy(1, 0, true, 9000e18, 9900e18 - 1e8);
+        assertGe(market.questionState(1, 0).currentYesBps, 9900);
         _close(1, 1, 100, 200);
         _open(2, 200);
-        vm.warp(1000);
-        (uint16[8] memory prices, bool[8] memory used) = market.seedPreview(2);
-        assertEq(prices[0], (uint256(firstPrice) + secondPrice) / 2);
-        assertTrue(used[0]);
+        vm.warp(type(uint64).max + uint256(1));
         market.fundRound(2, 100e18);
-        assertEq(market.questionState(2, 0).initialYesBps, prices[0]);
-        vm.warp(1100);
-        market.fundRound(2, SEED);
-        assertEq(market.questionState(2, 0).initialYesBps, prices[0]);
-        assertEq(market.roundState(1).finalizedAt, 200);
+        for (uint8 q; q < 8; ++q) {
+            assertEq(market.questionState(2, q).initialYesBps, 5000);
+            assertEq(market.questionState(2, q).currentYesBps, 5000);
+        }
+        assertTrue(market.roundState(1).settled);
     }
 
-    function test_missingMiddleHistoryUsesStoredSeedAndDoesNotInventEarlierPrices() public {
-        vm.warp(170);
+    function test_splitOnlyInitializationDoesNotChangeFiftyFiftyOpeningPrice() public {
+        _split(1, 1, 1e18);
+        assertFalse(market.roundState(1).funded);
+        market.fundRound(1, SEED);
+        for (uint8 q; q < 8; ++q) {
+            assertEq(market.questionState(1, q).initialYesBps, 5000);
+            assertEq(market.questionState(1, q).currentYesBps, 5000);
+        }
+    }
+
+    function test_neutralOperationsPreservePriceAndUnrelatedPools() public {
         market.fundRound(1, SEED);
         _buy(1, 0, true, 100e18, 150e18);
-        _close(1, 1, 100, 200);
-        _open(2, 200);
-        (uint16[8] memory prices, bool[8] memory used) = market.seedPreview(2);
-        assertEq(prices[0], 5000);
-        assertFalse(used[0]);
-        _split(2, 1, 1e18); // Neutral positions can initialize but never sponsor pools.
-        assertFalse(market.roundState(2).funded);
-        market.fundRound(2, 50e18);
-        assertEq(market.questionState(2, 0).initialYesBps, 5000);
-        assertFalse(market.questionState(2, 0).seedUsedHistory);
-    }
-
-    function test_neutralOperationsDoNotWritePriceHistory() public {
-        market.fundRound(1, SEED);
-        vm.warp(120);
+        uint16 beforePrice = market.questionState(1, 0).currentYesBps;
+        bytes32 other = keccak256(abi.encode(market.questionState(1, 1)));
         _split(1, 0, 10e18);
         uint256 id = market.positionId(1, 0, true);
         vm.prank(ALICE);
         market.safeTransferFrom(ALICE, BOB, id, 1e18, "neutral transfer");
         vm.prank(ALICE);
         market.mergePosition(1, 0, 9e18);
-        assertEq(market.historyLength(1, 0), 1);
-        _buy(1, 1, true, 1e18, 1e18);
-        assertEq(market.historyLength(1, 0), 1);
-        assertEq(market.historyLength(1, 1), 2);
+        assertEq(market.questionState(1, 0).currentYesBps, beforePrice);
+        assertEq(keccak256(abi.encode(market.questionState(1, 1))), other);
     }
 
     function test_initialCarryCapPreservesHeadroomAndDefersExcessAcrossCycles() public {
@@ -359,19 +344,13 @@ contract IndependentOutcomeMarketTest is Test, ERC1155Holder {
         assertEq(token.balanceOf(address(market)), SEED + 100e18);
     }
 
-    function test_invalidTimestampsAndContradictoryKnownAnswersRevertAtomically() public {
+    function test_contradictoryKnownAnswersRevertAtomically() public {
         market.fundRound(1, SEED);
         source.set(1, true, false, 1, 1, 100, 0);
         _buy(1, 0, true, 1e18, 1e18);
         source.set(1, true, false, 1, 0, 100, 0);
         vm.expectRevert(IndependentOutcomeMarket.InvalidSourceState.selector);
         _buy(1, 0, true, 1e18, 1e18);
-        source.set(1, false, true, 255, 1, 100, 200);
-        vm.expectRevert(IndependentOutcomeMarket.InvalidTimestamp.selector); // Future close.
-        market.settleRound(1);
-        source.set(1, false, true, 255, 1, 100, 99);
-        vm.expectRevert(IndependentOutcomeMarket.InvalidTimestamp.selector);
-        market.settleRound(1);
         assertFalse(market.roundState(1).settled);
         assertEq(market.pendingCarry(), 0);
         assertEq(market.totalActiveCollateral(), SEED + 1e18);

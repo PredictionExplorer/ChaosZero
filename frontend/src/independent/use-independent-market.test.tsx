@@ -15,11 +15,14 @@ const mocks = vi.hoisted(() => ({
   account: "0x1111111111111111111111111111111111111111" as `0x${string}` | undefined,
   config: { chain: { id: 31337 } },
   getBlock: vi.fn(),
+  getChainId: vi.fn(),
   read: vi.fn(),
 }));
 vi.mock("wagmi", () => ({
   usePublicClient: () =>
-    mocks.available ? { getBlock: mocks.getBlock, readContract: mocks.read } : undefined,
+    mocks.available
+      ? { getBlock: mocks.getBlock, getChainId: mocks.getChainId, readContract: mocks.read }
+      : undefined,
   useConnection: () => ({ address: mocks.account }),
 }));
 vi.mock("@/lib/config", () => ({ appConfig: mocks.config }));
@@ -38,6 +41,7 @@ beforeEach(() => {
   mocks.account = ACCOUNT;
   mocks.config.chain.id = 31337;
   mocks.getBlock.mockResolvedValue({ number: 123n, timestamp: 500n });
+  mocks.getChainId.mockResolvedValue(31337);
   const state = snapshot();
   data = {
     cst: TOKEN,
@@ -96,6 +100,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   cleanup();
+  vi.unstubAllEnvs();
   for (const q of clients.splice(0)) q.clear();
 });
 
@@ -137,7 +142,7 @@ describe("independent block-pinned reads", () => {
       expect.objectContaining({ functionName: "totalActiveCollateral" }),
     );
   });
-  it("uses a prior-cycle seed preview only for uninitialized questions", async () => {
+  it("uses equal opening odds without a prior-cycle read for uninitialized questions", async () => {
     data.roundState = {
       ...(data.roundState as object),
       initialized: false,
@@ -149,10 +154,9 @@ describe("independent block-pinned reads", () => {
       wrapper: wrapper(),
     });
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(result.current.data!.questions[0].pool.initialYesBps).toBe(4200);
-    expect(result.current.data!.questions[0].usedHistory).toBe(true);
-    expect(mocks.read).toHaveBeenCalledWith(
-      expect.objectContaining({ functionName: "seedPreview", args: [1n] }),
+    expect(result.current.data!.questions[0].pool.initialYesBps).toBe(5000);
+    expect(mocks.read).not.toHaveBeenCalledWith(
+      expect.objectContaining({ functionName: "seedPreview" }),
     );
   });
   it("uses cached settled results without an outcome/funding/seed source read", async () => {
@@ -337,7 +341,7 @@ describe("independent block-pinned reads", () => {
     expect(result.current.error?.message).toMatch(/inconsistent/);
   });
   it("does not automatically read on unsupported networks or without a client", () => {
-    mocks.config.chain.id = 42161;
+    mocks.config.chain.id = 1;
     const first = renderHook(() => ({ ...useIndependentMarket(MARKET, null) }), {
       wrapper: wrapper(),
     });
@@ -445,5 +449,103 @@ describe("independent preview and source-free recovery", () => {
     });
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error?.message).toMatch(/inconsistent/);
+  });
+});
+
+describe("production V3 reads", () => {
+  const realToken = "0xAD91843e6A58Ba560F577E676986AFb1dba6FBA0";
+  const realGame = "0x6a714Ae7B5b6eA520F6BCA23d2E609C4Fd5863F2";
+  function production() {
+    mocks.config.chain.id = 42161;
+    mocks.getChainId.mockResolvedValue(42161);
+    vi.stubEnv("NEXT_PUBLIC_INDEPENDENT_SOURCE_ADDRESS", SOURCE);
+    data.cst = realToken;
+    data.game = realGame;
+    data.metrics = {
+      gestureCount: 42n,
+      ethSpent: ONE,
+      cstBurned: 2n * ONE,
+      highestCstPaid: ONE,
+      enduranceDuration: 40n,
+      chronoDuration: 50n,
+      sameGesture: false,
+      finalized: false,
+      supported: true,
+    };
+  }
+  it("uses pinned V3 adapter metrics and never calls simulator methods", async () => {
+    production();
+    const { result } = renderHook(() => useIndependentMarket(MARKET, null), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.local).toBeNull();
+    expect(result.current.data!.metrics?.current?.gestureCount).toBe(42n);
+    expect(result.current.data!.metrics?.previous?.gestureCount).toBe(42n);
+    expect(
+      mocks.read.mock.calls.some(([r]) =>
+        ["roundStats", "getNextEthPrice", "getNextCstPrice", "seedPreview", "cycleTimes"].includes(
+          r.functionName,
+        ),
+      ),
+    ).toBe(false);
+    for (const [request] of mocks.read.mock.calls) expect(request.blockNumber).toBe(123n);
+  });
+  it("represents unsupported metric records as unavailable, never a zero baseline", async () => {
+    production();
+    data.metrics = { ...(data.metrics as object), supported: false, gestureCount: 0n };
+    const { result } = renderHook(() => useIndependentMarket(MARKET, 0n), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.metrics).toEqual({ current: null, previous: null });
+  });
+  it("handles an explicitly unsupported preceding round without inventing comparisons", async () => {
+    production();
+    data.metrics = { ...(data.metrics as object), supported: false };
+    const { result } = renderHook(() => useIndependentMarket(MARKET, 3n), { wrapper: wrapper() });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.metrics?.previous).toBeNull();
+  });
+  it.each(["RPC", "token", "source", "game"])(
+    "rejects a mismatched %s before exposing a trading snapshot",
+    async (kind) => {
+      production();
+      if (kind === "RPC") mocks.getChainId.mockResolvedValue(1);
+      if (kind === "token") data.cst = TOKEN;
+      if (kind === "source") data.source = TOKEN;
+      if (kind === "game") data.game = GAME;
+      const { result } = renderHook(() => useIndependentMarket(MARKET, null), {
+        wrapper: wrapper(),
+      });
+      await waitFor(() => expect(result.current.isError).toBe(true));
+      expect(result.current.data).toBeUndefined();
+    },
+  );
+  it("supports production funding previews and source-independent balance recovery", async () => {
+    production();
+    const preview = renderHook(() => useIndependentFundingPreview(MARKET, 1n, ONE, true), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(preview.result.current.isSuccess).toBe(true));
+    mocks.read.mockClear();
+    const recovery = renderHook(() => useIndependentRecovery(MARKET, 1n, true), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(recovery.result.current.isSuccess).toBe(true));
+    expect(
+      mocks.read.mock.calls.some(([r]) =>
+        ["game", "outcomeState", "metrics"].includes(r.functionName),
+      ),
+    ).toBe(false);
+  });
+  it("rejects a wrong-chain RPC for preview and recovery too", async () => {
+    production();
+    mocks.getChainId.mockResolvedValue(1);
+    const preview = renderHook(() => useIndependentFundingPreview(MARKET, 1n, ONE, true), {
+      wrapper: wrapper(),
+    });
+    const recovery = renderHook(() => useIndependentRecovery(MARKET, 1n, true), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(preview.result.current.isError).toBe(true));
+    await waitFor(() => expect(recovery.result.current.isError).toBe(true));
+    expect(mocks.read).not.toHaveBeenCalled();
   });
 });

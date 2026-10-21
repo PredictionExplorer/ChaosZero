@@ -17,15 +17,26 @@
     "check:vectors": "node scripts/check.mjs vectors",
     "check:log-bounds": "python3 scripts/check-log-bounds.py",
     "check:format": "node scripts/check.mjs format",
-    "test:tooling": "node --test scripts/checks.test.mjs scripts/local-runtime.test.mjs scripts/browser-abi.test.mjs",
+    "test:tooling": "node --test scripts/checks.test.mjs scripts/local-runtime.test.mjs scripts/browser-abi.test.mjs scripts/compiler-parity.test.mjs",
     "test:math-oracle": "python3 scripts/check-log-bounds.py --self-test",
     "test:heavy": "node scripts/check.mjs heavy",
     "test:e2e": "playwright test",
     "test:e2e:install": "playwright install chromium",
-    "audit:dependencies": "node scripts/check.mjs audit"
+    "audit:dependencies": "node scripts/check.mjs audit",
+    "build:deployment": "hardhat build --build-profile production",
+    "deploy:arbitrum": "node scripts/deploy-arbitrum.mjs deploy",
+    "deploy:resume": "node scripts/deploy-arbitrum.mjs resume",
+    "verify:arbitrum": "node scripts/deploy-arbitrum.mjs verify",
+    "test:deployment": "node --test scripts/deploy-runtime.test.mjs scripts/deploy-integration.test.mjs",
+    "verify:baseline": "node scripts/verify-round-two.mjs",
+    "test:baseline": "node --test scripts/historical-baseline.test.mjs"
   },
   "devDependencies": {
+    "@nomicfoundation/hardhat-verify": "3.1.3",
     "@playwright/test": "1.63.0",
+    "ethers": "6.17.0",
+    "hardhat": "3.20.0",
     "prettier": "3.9.8"
-  }
+  },
+  "type": "module"
 }

@@ -1,32 +1,47 @@
-# Game storage needed for ChaosZero
+# V3 integration and historical bootstrap
 
-**Add one permanent statistics record per cycle.** The missing data is for automatic settlement of the eight questions; AMM trading, splitting and merging need no additional game storage.
+The September storage proposal is superseded by the deployed Cosmic Signature V3
+and the fixed 50/50 opening policy in this checkout. **No game changes are required
+for the eight questions or the AMM's opening prices.**
 
-Reuse `getTotalNumBids(round)` for total gestures and for question 5's parity (`% 2`, read at closure). No per-type gesture counter is needed, which saves a storage write on every CST gesture. The current **V3 source already saves** both final durations in `championDurations[round]`; reuse them. V2 does not save that history, so a V2-based upgrade must also add V3's duration snapshot.
+The public `roundStats(round)` getter now retains total gestures, actual ETH and
+CST charges, maximum individual CST charge, final Endurance and Chrono durations,
+and a flag identifying the same individual gesture earning both titles. The
+adapter reads current durations with `tryGetCurrentChampions`. Its open/finalized
+state follows `roundNum`; the countdown is not a settlement condition.
 
-```solidity
-struct MarketStats {
-    uint256 ethPaid;       // More ETH paid than the previous cycle?
-    uint256 cstPaid;       // More CST charged/burned than the previous cycle?
-    uint256 maxCstPaid;    // Higher largest individual CST payment?
-    uint64 firstGestureAt; // Canonical beginning of the active cycle.
-    uint64 finalizedAt;   // claimMainPrize time, not mainPrizeTime or a market call.
-    uint8 flags;          // TRACKED_FROM_START=1, FINALIZED=2, SAME_GESTURE=4
-}
-mapping(uint256 round => MarketStats) public marketStats;
-```
+Every pool now starts at 5000 basis points. Historical first-gesture and closure
+timestamps are no longer required anywhere in market settlement or price seeding.
+No replacement timestamp oracle is necessary.
 
-This uses **four additional storage slots per cycle**: three amounts and one packed timestamps/flags word. Keep amounts full-width; check arithmetic and timestamp conversions. The timestamps define the previous cycle's 40–60% price-average window. Existing per-wallet spending totals require scanning and deduplicating participants. Event logs alone are not directly readable by another contract.
+## First market cycle
 
-Implementation:
+The intended first market cycle is 3. Its comparison baseline is cycle 2, which
+finished under V2. Gesture count remains available, but the newly introduced V3
+statistics are zero because they were not recorded. Those zeros are not valid
+historical outcomes.
 
-1. **Record actual payments in the shared gesture paths.** Add final `paidEthPrice_` or `paidPrice_`, including discounts/premiums and excluding refunded ETH and separate contributions. CST means the gross gesture charge, before CST rewards offset it. Update `maxCstPaid` only on a new maximum.
-2. **Track the same-gesture answer with one bit.** Clear `SAME_GESTURE` whenever Endurance is assigned/replaced, **after** evaluating the departing champion's Chrono tenure. Set it whenever Chrono selects the current Endurance record. The existing call order makes each Endurance replacement a different gesture, even for the same wallet. No address comparison or two extra gesture IDs are needed. Resolve this question only at closure.
-3. **Freeze history at actual cycle closure.** After both final champion updates and duration snapshots, set `FINALIZED` for fully tracked cycles before resetting state/incrementing `roundNum`. Never overwrite completed records. Reuse `tryGetCurrentChampions()` for live durations; the countdown reaching zero does not finalize a cycle or close its markets.
-4. **Handle activation without invented history.** Set `TRACKED_FROM_START` only when observing a cycle's first gesture. Ignore a partially observed upgrade cycle. The first fully tracked cycle supplies the baseline; enable all eight markets from the following cycle. No administrator-supplied backfill.
-5. **Keep settlement read-only and separate.** An adapter reads these records and existing getters in constant time, requiring a fully tracked, finalized baseline. The current cycle must be tracked or still have zero gestures. The six increasing comparisons can become known YES before closure; that knowledge never ends trading or starts payouts. Gesture parity and same-gesture resolve at closure. Strict-comparison ties resolve NO. Creator-funded CST liquidity needs no game funding hook.
-6. **Markets never end early.** The adapter's `open` flag must derive from the game's round counter: a round is open exactly while its ID equals `roundNum` (and its predecessor is finalized), until `claimMainPrize` advances `roundNum`, regardless of known answers, `mainPrizeTime` or the claim timeout. `finalized` comes from the `FINALIZED` flag set in that same `claimMainPrize` transaction, so closing and finalizing are atomic; payouts wait for it.
+The accepted bootstrap reconstructs cycle 2 from its complete gesture event
+sequence and canonical block times, cross-checks count and per-wallet payment
+totals against persistent game storage, and replays the champion record episodes.
+The same wallet can own both final records through different gestures, so wallet
+equality alone must never determine the shared-title answer.
 
-**Upgrade detail:** append the mapping to the shared storage layout and reduce its reserved gap by **one slot**; preserve all existing slots. Wire champion-tracking hooks into **both ordinary gestures and the V3 prize module**—adding them only to `BidStatisticsV3` misses the current hot path. Validate upgrade/module layout parity and measure gesture gas. Differential-test the equality bit against explicit gesture IDs, especially repeated wallets and ties.
+A reviewed baseline is fixed at adapter construction. Its public `baselineHash`
+binds the game, baseline cycle and every baseline value. There is no result setter
+or administrator correction path. Later cycles read only permanent V3 records.
 
-Source basis: V2/V3 game code at `0bc80af0`. Follow [Solidity's packing rules](https://docs.soliditylang.org/en/latest/internals/layout_in_storage.html) and [upgrade storage-gap rules](https://docs.openzeppelin.com/upgrades-plugins/writing-upgradeable#storage-gaps).
+This bootstrap is an independently reproducible historical input, not an on-chain
+receipt or storage proof. The one-time trust boundary was explicitly accepted for
+this launch, and the [published evidence](deployment/arbitrum-round-2-baseline.json)
+was checked against independent RPC providers. The deployment script must never
+silently substitute zero values, operator-entered guesses, a different baseline,
+or a different game. See [DEPLOYMENT.md](DEPLOYMENT.md).
+
+## Dependency behavior
+
+The production adapter is immutable; the upstream game is an upgradeable proxy.
+Deployment validates the expected production game and CST addresses and the V3
+getter shape. A changed or unavailable upstream source can prevent unsettled
+positions from being paid. Matched-pair merges do not need the source, and winning
+claims become source-independent after settlement reserves their collateral.

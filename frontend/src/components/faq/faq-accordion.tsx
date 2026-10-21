@@ -2,6 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
+import Link from "next/link";
 import type { FaqItem } from "./faq-data";
 import { Card } from "@/components/ui/card";
 
@@ -28,7 +29,9 @@ function FaqAccordionItem({ item }: { item: FaqItem }) {
           data-testid={`faq-question-${item.id}`}
           className="flex w-full items-center justify-between gap-4 p-5 text-left transition-colors hover:bg-surface-2/40"
         >
-          <span className="font-display text-sm font-semibold text-ink sm:text-base">{item.question}</span>
+          <span className="font-display text-sm font-semibold text-ink sm:text-base">
+            {item.question}
+          </span>
           <ChevronDown
             className={[
               "size-4 shrink-0 text-ink-faint transition-transform duration-200",
@@ -61,6 +64,14 @@ function FaqAccordionItem({ item }: { item: FaqItem }) {
                 {paragraph}
               </p>
             ))}
+            {item.reference && (
+              <Link
+                href={item.reference.href}
+                className="inline-flex text-sm text-signal-bright underline underline-offset-4"
+              >
+                {item.reference.label} ↗
+              </Link>
+            )}
           </div>
         </div>
       </div>

@@ -7,6 +7,7 @@ export interface FaqItem {
   readonly question: string;
   /** One entry per paragraph. */
   readonly answer: readonly string[];
+  readonly reference?: { readonly href: string; readonly label: string };
 }
 
 export interface FaqCategory {
@@ -17,278 +18,257 @@ export interface FaqCategory {
   readonly items: readonly FaqItem[];
 }
 
-/**
- * The whole FAQ, grouped for the jump-nav. Content mirrors the contract and
- * README — if the mechanism changes, this is the page to keep honest.
- */
+/** Shared human and machine-readable explanation of the eight-question market. */
 export const FAQ_CATEGORIES: readonly FaqCategory[] = [
   {
     id: "basics",
     title: "The basics",
-    description: "What this market is and what you need to join.",
+    description: "Eight questions. One on-chain game.",
     icon: Sparkles,
     items: [
       {
         id: "what-is-chaos-zero",
         question: "What is Chaos Zero?",
         answer: [
-          "Chaos Zero is a prediction market on the Cosmic Signature game. Every game round asks the same simple question: will this round end with more gestures (bids) than the previous round? You bet YES or NO with CST tokens, and every winning token pays out exactly 1 CST when the round resolves.",
-          "The whole series runs on one immutable smart contract on Arbitrum One — every round, forever, with no owner and no admin keys.",
+          "Chaos Zero is a set of eight recurring YES/NO prediction markets about Cosmic Signature. Each question has its own automated market maker and CST collateral. One winning position pays exactly 1 CST after final settlement.",
+          "The market reads results through an immutable adapter connected to the Cosmic Signature V3 game on Arbitrum One.",
         ],
       },
       {
         id: "why-chaos-zero",
         question: "Why is it called Chaos Zero?",
         answer: [
-          "Chaos is the thing you bet on: a live gesture count driven by hundreds of independent players, publicly visible, impossible for anyone to script. Zero is what you have to trust to bet on it: zero oracles, zero admin keys, zero custody — resolution is just the contract comparing two public on-chain numbers.",
-          "Every round also starts the same way: from zero, racing a threshold.",
+          "Chaos is the unfolding game: every gesture changes what might happen next. Zero marks a fresh start for the markets: each question opens at 50% YES and 50% NO in every cycle. Prices then move with trades.",
         ],
       },
       {
         id: "what-are-gestures",
         question: "What are gestures?",
         answer: [
-          "Gestures are bids placed in the Cosmic Signature game. Each round, players bid to win the round's prizes, and the market simply counts those bids. The count is public on-chain while the round runs, and it can only ever go up.",
-          "The market compares this round's final count against the previous round's final count — that previous count is called the threshold.",
+          "Gestures are bids placed in Cosmic Signature using ETH or CST. The eight markets track their count, payments, timing records and final outcomes. Buying a prediction-market position does not place a gesture in the game.",
         ],
       },
       {
         id: "what-is-cst",
         question: "What is CST?",
         answer: [
-          "Cosmic Signature Token (CST) is the ERC-20 token earned by playing Cosmic Signature. It is the market's only currency: bets, liquidity, fees, and payouts are all denominated in CST.",
-        ],
-      },
-      {
-        id: "yes-no-meaning",
-        question: "What exactly do YES and NO mean?",
-        answer: [
-          "YES wins if the round's final gesture count is strictly greater than the threshold. NO wins otherwise — including an exact tie. Each winning token redeems for exactly 1 CST; losing tokens are worth nothing.",
+          "Cosmic Signature Token (CST) is the ERC-20 token used for positions, AMM funding and payouts. ETH on Arbitrum pays network fees. A losing position can expire without a payout.",
         ],
       },
       {
         id: "what-do-i-need",
-        question: "What do I need to start betting?",
+        question: "What do I need to participate?",
         answer: [
-          "A wallet on Arbitrum One, some CST to bet with, and a little ETH for gas. The app discovers every injected wallet in your browser (MetaMask, Rabby, Coinbase Wallet, and friends) and supports WalletConnect for mobile wallets.",
+          "Connect a wallet on Arbitrum One, hold CST for positions and a little ETH for network fees. Approve the displayed CST amount when requested, then review and confirm the transaction in your wallet.",
         ],
       },
       {
-        id: "new-market-every-round",
-        question: "Is there a new market for every round?",
+        id: "eight-markets",
+        question: "Do all eight questions share one pool?",
         answer: [
-          "Yes. Every Cosmic Signature round gets its own independent market with its own pool, threshold, and resolution. Markets launch themselves: the first liquidity deposit for a round initializes it, with no deployments and no configuration. You can also open and bet on any future round ahead of time.",
+          "Each question keeps separate collateral and YES/NO liabilities inside one market contract. Trades are priced against that question’s own pool. Contributions enter all eight pools in equal amounts, with any indivisible remainder assigned to the lowest question IDs.",
         ],
       },
     ],
   },
   {
     id: "betting",
-    title: "Betting",
-    description: "Placing, pricing, exiting, and claiming bets.",
+    title: "Trading",
+    description: "Understand prices, positions and exact quotes.",
     icon: Target,
     items: [
       {
         id: "how-to-bet",
-        question: "How do I place a bet?",
+        question: "How do I buy a position?",
         answer: [
-          "Open the Place bet tab, pick YES or NO, and type how much CST to spend. The app shows the exact number of outcome tokens you will receive — computed client-side with the same math as the contract — plus the fee and your entry odds. The first bet also asks for a one-time CST approval.",
-          "After the transaction confirms, your tokens appear in the position panel along with their live value.",
+          "Select a question and YES or NO, then enter the CST amount. Review the exact position amount and confirm approval if needed. The position belongs to the wallet that holds its ERC-1155 tokens.",
         ],
       },
       {
         id: "how-are-odds-set",
         question: "How are the odds set?",
         answer: [
-          "Each round has a single automated pool holding YES and NO tokens (a constant-product market maker, like Uniswap). The implied probability of YES is the pool ratio: reserveNo / (reserveYes + reserveNo). Every bet moves the price — buying YES makes YES more expensive, exactly like any AMM.",
+          "Every new question pool opens at 50% YES and 50% NO. A constant-product curve updates the price as people trade. Previous-cycle prices do not determine the next cycle’s opening odds. Displayed percentages are market prices, not guaranteed probabilities.",
         ],
       },
       {
         id: "fees",
         question: "What fees do I pay?",
         answer: [
-          "One trading fee per bet, paid to the liquidity providers — there is no protocol fee and nobody else takes a cut. The fee is set by an unusual mechanism: every LP declares the fee they want (0–10%), and the pool charges the share-weighted average of all declarations. The live fee is always shown in your quote before you confirm.",
+          "The market charges no trading fee. Arbitrum network fees still apply to transactions, including transactions that revert. Opening a new cycle or distributing held funding can use more gas than an ordinary trade.",
         ],
       },
       {
         id: "slippage",
-        question: "What is slippage protection and why do I need it?",
+        question: "How does slippage protection work?",
         answer: [
-          "The pool can move between the moment you see a quote and the moment your transaction lands. Every bet is submitted with a minimum-tokens-out floor computed from your quote and your slippage tolerance (configurable in the bet panel). If execution would be even slightly worse than your floor, the transaction reverts instead of filling.",
-          "This same floor is what makes front-running, sandwich attacks, liquidity pulls, and fee changes harmless: worse execution simply cannot happen to you.",
+          "A trade submits exact input and output amounts and an expiry. If intervening activity makes those amounts invalid, the contract reverts instead of executing a worse quote. Refresh the quote and review it again. A reverted transaction can still cost network gas.",
         ],
       },
       {
         id: "exit-early",
-        question: "Can I exit a bet before the round resolves?",
+        question: "Can I sell a position before closure?",
         answer: [
-          "Yes. Buy the opposite side, then redeem pairs: every 1 YES + 1 NO pair redeems for exactly 1 CST at any time before resolution, from the position panel. There is no order book to wait on.",
-        ],
-      },
-      {
-        id: "claim",
-        question: "How do I claim winnings?",
-        answer: [
-          "Once the round is resolved, a claim button appears in your position panel and pays 1 CST per winning token. There is no deadline — winnings stay claimable forever.",
-        ],
-      },
-      {
-        id: "betting-halt",
-        question: "Why did betting suddenly stop mid-round?",
-        answer: [
-          "The gesture count is public and can only increase. The instant it crosses the threshold, YES is already certain — so betting and liquidity-adding halt in that same block, and anyone can resolve the round early. This protects everyone from trading against a known outcome.",
-          "The reverse never happens: NO cannot become certain before the round ends, because more gestures can always arrive.",
-        ],
-      },
-      {
-        id: "future-rounds-bet",
-        question: "Can I bet on rounds that have not started yet?",
-        answer: [
-          "Yes — any future round can be funded and bet on early. Use the round navigation arrows to move ahead. One caveat: a future round's threshold (the previous round's final count) is still forming, in public, and locks the moment that previous round ends. Expect the market to reprice on that reveal.",
+          "Yes, while the cycle remains open and the pool can quote your amount. Select the position in your portfolio to sell it for CST. You can also merge matching YES and NO positions for exactly 1 CST per pair.",
         ],
       },
       {
         id: "min-max",
-        question: "Is there a minimum or maximum bet?",
+        question: "Are there limits on trade amounts?",
         answer: [
-          "The contract imposes none. In practice your size is limited by pool depth: bigger bets move the price more, and your own slippage floor will stop a fill that got too expensive.",
+          "Available amounts depend on collateral, outstanding positions and integer pricing bounds. Very small amounts can be unquotable. Large trades move prices more, and every pool has a contract-enforced collateral ceiling.",
         ],
       },
     ],
   },
   {
     id: "rounds",
-    title: "Rounds & resolution",
-    description: "Thresholds, round endings, and who settles the market.",
+    title: "Cycles and results",
+    description: "Know what closes a market and what pays out.",
     icon: Timer,
     items: [
       {
-        id: "what-is-threshold",
-        question: "What exactly is the threshold?",
+        id: "historical-baseline",
+        question: "How can I check the historical launch baseline?",
         answer: [
-          "The previous round's final gesture count — the number this round has to strictly beat for YES to win. It is displayed in the count-vs-threshold race on the market screen, and it locks automatically for each round the moment its previous round finishes.",
+          "The first market cycle uses a fixed historical baseline reconstructed from game logs, independently retrieved headers and successful receipts, and permanent wallet records. The public evidence page publishes the exact values, transaction links and reproducible hashes.",
+          "This is a one-time off-chain bootstrap frozen in the adapter constructor, not an on-chain receipt-proof verifier. Later cycle comparisons use native V3 records. Run pnpm verify:baseline from the repository to reproduce the reviewed values and evidence commitments using public RPC endpoints; no wallet key or API credential is required.",
         ],
+        reference: { href: "/baseline", label: "Inspect the baseline evidence" },
       },
       {
         id: "who-resolves",
-        question: "Who resolves the market?",
+        question: "Who can resolve the markets?",
         answer: [
-          "Anyone — resolution is permissionless. When a round ends (or the count crosses the threshold early), a resolve banner appears and any wallet can trigger it. Resolution just compares two public on-chain numbers: there is no oracle, no multisig, and no human judgment involved.",
+          "Anyone can submit settlement after the game’s round-ending transaction. The result adapter reads the V3 game’s stored statistics. No market administrator chooses the answers. The game remains an upstream dependency.",
         ],
       },
       {
-        id: "round-over-unresolved",
-        question: "The round is over but not resolved — is my money stuck?",
+        id: "betting-halt",
+        question: "When does trading stop?",
         answer: [
-          "No. Betting, set-minting, and liquidity-adds freeze when a round ends, but exits never do: removing liquidity, redeeming YES+NO pairs, and claiming fees keep working forever. Claiming winnings needs one resolve transaction first, which anyone can send.",
+          "Trading continues until the game actually closes the cycle and advances its round counter, even if a question’s answer is already certain. A countdown reaching zero does not itself close the markets or release payouts.",
         ],
       },
       {
         id: "tie",
         question: "What happens on an exact tie?",
-        answer: ["NO wins. YES pays out only when the count is strictly greater than the threshold."],
+        answer: [
+          "For questions asking whether a metric exceeds its comparison value, an equal value resolves NO. The odd-count question resolves YES only for an odd final total. The dual-title question requires the same individual gesture, not merely the same wallet.",
+        ],
       },
       {
-        id: "far-future",
-        question: "What if I hold tokens for a round that is far in the future?",
+        id: "claim",
+        question: "How do I claim winnings?",
         answer: [
-          "Every round's market is fully collateralized and independent, so paired tokens (YES+NO) always redeem for CST and LPs can always withdraw — even if the round is a long way off. A one-sided position, though, can only be claimed after the round actually ends: that waiting time is a risk you choose to take.",
+          "After settlement, retrieve positions that match the final answers. Each winning unit pays 1 CST, and the tokens are burned when paid. Claims do not expire. Their CST is reserved separately from the funding carried to later cycles.",
+        ],
+      },
+      {
+        id: "future-rounds-bet",
+        question: "Can I trade future cycles?",
+        answer: [
+          "Only the current eligible game cycle can be opened and traded. The first funding or trading transaction can start its eight pools from available contributions and carry after settling the previously funded cycle.",
+        ],
+      },
+      {
+        id: "round-over-unresolved",
+        question: "What happens if settlement is unavailable?",
+        answer: [
+          "Matching YES/NO pairs can still be merged without reading the result adapter. Unmatched winning positions need settlement first. Once the answers have been cached by settlement, claims no longer need a fresh adapter response.",
         ],
       },
     ],
   },
   {
     id: "liquidity",
-    title: "Providing liquidity",
-    description: "For the LP minority: funding pools and earning fees.",
+    title: "Funding the markets",
+    description: "One contribution deepens eight independent pools.",
     icon: Droplets,
     items: [
       {
-        id: "what-is-lping",
-        question: "What does providing liquidity actually do?",
+        id: "what-is-funding",
+        question: "What does funding AMM liquidity do?",
         answer: [
-          "Liquidity providers fund the pool that bettors trade against: a CST deposit becomes YES and NO tokens sitting in the pool at the current odds. In exchange, LPs earn the trading fee on every bet, split pro rata by shares.",
+          "Funding adds CST collateral that traders can use through the eight AMMs. Every contribution is divided equally among all eight questions. One pool cannot spend the collateral backing another question.",
         ],
       },
       {
-        id: "where-is-lp-ui",
-        question: "Where is the liquidity interface?",
+        id: "funding-withdraw",
+        question: "Can I withdraw a funding contribution?",
         answer: [
-          "In the sidebar of the market screen, behind the Liquidity tab next to Place bet. Betting is the app's front door; liquidity provision is deliberately one click deeper. If you have an active LP position, the tab shows a glowing dot so your shares and fees are never hard to find.",
+          "No. Funding is an irreversible contribution. It creates no LP shares, withdrawal rights or fee income. Review the amount carefully before confirming; CST sent directly to the market is also a contribution.",
         ],
       },
       {
-        id: "fee-vote",
-        question: "How does the fee vote work?",
+        id: "direct-funding",
+        question: "Can I send CST directly to the market?",
         answer: [
-          "Every LP declares the fee they want bettors to pay (0–10%) when depositing, and can re-declare at any time without moving funds. The pool charges the share-weighted average of all declarations. Fee earnings are split by shares regardless of what you declared — the declaration is a vote on the pool's price, not a private fee tier.",
+          "Yes. A plain transfer cannot execute market code, so the next eligible buy, sell or funding call distributes it before pricing. Held amounts below 1 CST wait for more, an explicit contribution, or the next cycle’s opening.",
         ],
       },
       {
-        id: "lp-risks",
-        question: "What are the risks of providing liquidity?",
+        id: "carry",
+        question: "What happens to unused funding?",
         answer: [
-          "The big one is informed flow. The gesture count is public while the round runs, so late bettors know more than the pool does, and that certainty accumulates against LP inventory. The per-bet fee is your compensation — you vote on it yourself — and you can withdraw the moment a round stops being uncertain.",
-          "Providing across a future round's threshold reveal adds a second, sharper repricing event. Size accordingly.",
+          "At settlement, the contract first reserves all outstanding winning claims. Remaining collateral rolls forward and is divided equally among the next funded cycle’s eight pools. Unclaimed winnings are never reused as new liquidity.",
         ],
       },
       {
-        id: "lp-withdraw",
-        question: "Can I withdraw my liquidity at any time?",
+        id: "funding-prices",
+        question: "Can additional funding move prices?",
         answer: [
-          "Yes, always — mid-round, after betting halts, after the round ends, even after resolution. You receive your pro-rata share of the pool as YES + NO tokens plus your accrued fees in CST. Paired tokens redeem 1:1 for CST; any unpaired remainder is market exposure.",
-        ],
-      },
-      {
-        id: "first-lp",
-        question: "What is special about being the first LP?",
-        answer: [
-          "The first deposit opens the pool and picks the opening odds — later LPs join at the pool's current ratio. Misjudged opening odds are free money for arbitrageurs, so open near your honest estimate. The first deposit must be at least 0.001 CST, and the first LP's fee declaration becomes the opening fee.",
+          "Yes. New collateral deepens each pool and moves its price toward the fixed 50/50 opening balance. The next trade accounts for funding absorption before its exact amounts are checked. A changed quote can revert.",
         ],
       },
     ],
   },
   {
     id: "safety",
-    title: "Safety & trust",
-    description: "Collateral, attack resistance, and what Beta means.",
+    title: "Positions and risks",
+    description: "Understand ownership and the limits of the system.",
     icon: ShieldCheck,
     items: [
       {
-        id: "is-it-safe",
-        question: "Is my money safe?",
+        id: "safe",
+        question: "Is participating safe?",
         answer: [
-          "The market is fully collateralized by construction: 1 CST mints exactly 1 YES + 1 NO, a pair always redeems for 1 CST, and every payout is backed to the wei. The contract has no owner, no admin keys, no pause switch, and no upgrade path — nobody can freeze or confiscate anything.",
-          "It is hardened by an extensive suite of unit, fuzz, invariant, and scripted-attack tests, but it has not had a third-party audit and the site is in beta. Bet only what you can afford to lose.",
+          "Positions can lose their full purchase cost. Smart-contract defects, game upgrades, token behavior and unavailable result data are risks. The market has no administrator who can change its adapter or undo a transaction. Testing cannot guarantee that no bugs exist.",
         ],
       },
       {
-        id: "front-running",
-        question: "Can I get front-run, sandwiched, or rugged?",
+        id: "influence",
+        question: "Can game players influence the answers?",
         answer: [
-          "Every price-sensitive action carries a slippage floor and a deadline, so worse-than-quoted execution reverts — that neutralizes sandwiches, liquidity pulls, and fee jumps. A liquidity rug after your bet fills cannot touch your tokens either: they are backed by set collateral the pool cannot reach.",
-          "The one thing a rug can cost you is liquidity depth for exiting early, so size positions to the pool.",
+          "Yes. Players can add gestures, affect payments and influence when a cycle closes. Another gesture flips odd/even parity. Known-answer markets keep trading until closure, so informed traders can consume that question’s funding.",
         ],
       },
       {
-        id: "manipulation",
-        question: "Can someone manipulate the outcome?",
+        id: "complete-sets",
+        question: "What are complete YES/NO sets?",
         answer: [
-          "Only by actually playing: pushing the count over the threshold means placing real gestures, each costing real money in the game. That cost scales with the distance to the threshold, so modest pool sizes keep manipulation unprofitable. It is a design trade-off worth knowing about.",
+          "One CST splits into one YES and one NO position for the same question and cycle. A matching pair merges back into one CST. Positions from different questions or cycles cannot be paired. Splitting alone does not create AMM trading liquidity.",
         ],
       },
       {
-        id: "who-controls",
-        question: "Who controls the contract?",
+        id: "transfer",
+        question: "Can I transfer my positions?",
         answer: [
-          "Nobody. The market is a single immutable contract with no owner or admin functions; resolution reads public state straight from the Cosmic Signature game contract. The one trust assumption: the game itself is an upgradeable proxy operated by the Cosmic Signature team, and the market trusts its round counter and gesture counts.",
+          "Positions are ERC-1155 tokens and can be transferred to another wallet. The current holder receives sale, merge or claim proceeds. Transfers do not change a question’s total liabilities or price.",
         ],
       },
       {
-        id: "what-does-beta-mean",
-        question: "What does the Beta tag mean?",
+        id: "approvals",
+        question: "What does an operator approval allow?",
         answer: [
-          "The site just launched. The contract is immutable and thoroughly tested, but the app is young: expect rough edges, and expect the interface to improve quickly. Start small, and if something looks off, please flag it in the Cosmic Signature community channels before betting big.",
+          "An ERC-1155 operator approval permits that operator to transfer all your position types, including positions acquired later, until revoked. The interface’s direct transfers do not need an operator approval. Only approve operators you intend to trust.",
+        ],
+      },
+      {
+        id: "beta",
+        question: "What does the beta label mean?",
+        answer: [
+          "The interface and market integration are new. Review the displayed contract addresses, question rules and quote before using funds. A successful local test suite is not an independent security audit or a guarantee of economic outcomes.",
         ],
       },
     ],

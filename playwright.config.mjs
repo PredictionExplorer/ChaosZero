@@ -2,6 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 // Isolated from production hosts, browser profiles and wallets. The local
 // launcher deploys mock CST and the mock game on a disposable chain.
+// e2e/package.json keeps specs and imported frontend TypeScript in CommonJS;
+// the root package stays ESM for Hardhat without mixing Node loader modes.
 const port = 3100;
 const baseURL = `http://127.0.0.1:${port}`;
 

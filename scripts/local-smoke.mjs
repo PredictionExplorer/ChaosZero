@@ -44,12 +44,14 @@ const tokenAbi = await abi("LocalCst");
 const sourceAbi = await abi("LocalOutcomeSource");
 const vaultAbi = await abi("OutcomeSettlementVault");
 const verifierAbi = await abi("IndependentMarketViews", "IndependentOutcomeMarket");
+const productionGameAbi = await abi("ICosmicGameV3");
 for (const [file, name, compiled] of [
   ["frontend/src/independent/abi.ts", "independentMarketAbi", marketAbi],
   ["frontend/src/independent/abi.ts", "independentSourceAbi", sourceAbi],
   ["frontend/src/independent/abi.ts", "settlementVaultAbi", vaultAbi],
   ["frontend/src/shared/abi.ts", "localGameAbi", gameAbi],
   ["frontend/src/shared/abi.ts", "localTokenAbi", tokenAbi],
+  ["frontend/src/independent/abi.ts", "cosmicGameV3Abi", productionGameAbi],
 ]) {
   assertAbiSubset(name, await readBrowserAbi(root, file, name), compiled, [
     tokenAbi,
@@ -177,11 +179,10 @@ const absorbingBuy = async (round, question, yes, input) => {
   assert.ok(preview.canFund, "The next trade must absorb");
   assert.equal(preview.unallocated, await held());
   const before = await states(round);
-  const [seeds] = await read(market, marketAbi, "seedPreview", [round]);
   const effective = {
     ...pool(before[question]),
     collateral: before[question].activeCollateral + preview.allocations[question],
-    initialYesBps: Number(seeds[question]),
+    initialYesBps: 5000,
   };
   const output = quoteIndependentTrade(effective, yes, true, input);
   assert.ok(output > 0n, "Browser must find an executable quote");
@@ -204,7 +205,7 @@ const absorbingBuy = async (round, question, yes, input) => {
       before[q].activeCollateral + preview.allocations[q] + (q === question ? input : 0n),
       "Every pool deepens by exactly its allocation",
     );
-    assert.equal(Number(after[q].initialYesBps), Number(seeds[q]));
+    assert.equal(Number(after[q].initialYesBps), 5000);
     if (q !== question) {
       assert.equal(after[q].yesSupply, before[q].yesSupply);
       assert.equal(after[q].noSupply, before[q].noSupply);
@@ -301,7 +302,7 @@ try {
   const gestures = 7n;
   for (let i = 0n; i < gestures; i++)
     await send(game, gameAbi, "bidEth", [], await read(game, gameAbi, "getNextEthPrice"));
-  const [startedAt] = await read(source, sourceAbi, "cycleTimes", [round]);
+  const startedAt = (await client.getBlock()).timestamp;
   const closeAt = (await read(game, gameAbi, "mainPrizeTime")) + 1n;
   const [, finalized, known] = await read(source, sourceAbi, "outcomeState", [round]);
   assert.equal(finalized, false);
@@ -321,19 +322,11 @@ try {
 
   await tester.setNextBlockTimestamp({ timestamp: startedAt + 700n });
   await trade(round, 0, true, true, 80n * ONE);
-  const priceBeforeMiddle = Number((await states(round))[0].currentYesBps);
   await tester.setNextBlockTimestamp({ timestamp: startedAt + 900n });
   await trade(round, 0, false, true, 40n * ONE);
-  const priceAfterMiddle = Number((await states(round))[0].currentYesBps);
   await tester.setNextBlockTimestamp({ timestamp: startedAt + 1100n });
   await trade(round, 0, true, true, 10n * ONE);
-  const t40 = startedAt + ((closeAt - startedAt) * 2n) / 5n;
-  const t60 = startedAt + ((closeAt - startedAt) * 3n) / 5n;
-  const expectedMiddle = Number(
-    (BigInt(priceBeforeMiddle) * (startedAt + 900n - t40) +
-      BigInt(priceAfterMiddle) * (t60 - startedAt - 900n)) /
-      (t60 - t40),
-  );
+  assert.notEqual(Number((await states(round))[0].currentYesBps), 5000);
   await tester.setNextBlockTimestamp({ timestamp: closeAt });
   await send(game, gameAbi, "closeCycle");
   const beforeSettlement = await states(round);
@@ -369,8 +362,8 @@ try {
   }
   assert.equal(
     Number(next[0].initialYesBps),
-    expectedMiddle,
-    "Next cycle inherits the actual 40–60% time-weighted price",
+    5000,
+    "Every next cycle opens at 50/50 regardless of the preceding prices",
   );
   assert.equal(await read(market, marketAbi, "pendingCarry"), 0n);
   await send(market, marketAbi, "settleRound", [round]);

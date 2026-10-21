@@ -23,7 +23,6 @@ contract LocalCosmicGame {
     address public lastBidder;
     uint256 private _lock = 1;
     mapping(uint256 => CycleMetrics.Metrics) private _stats;
-    mapping(uint256 => uint256) public cycleClosedAt;
 
     error LocalChainOnly();
     error InvalidPayment();
@@ -48,7 +47,6 @@ contract LocalCosmicGame {
         _stats[0].observe(false, 0.02 ether, start + fixtureDuration * 1020 / 2100);
         _stats[0].observe(true, 300 ether, start + fixtureDuration * 1500 / 2100);
         _stats[0].finish(block.timestamp);
-        cycleClosedAt[0] = block.timestamp;
     }
 
     modifier nonReentrant() {
@@ -61,10 +59,6 @@ contract LocalCosmicGame {
     function roundStats(uint256 roundId) public view returns (CycleMetrics.Metrics memory) {
         if (roundId == roundNum) return _stats[roundId].current(block.timestamp);
         return _stats[roundId];
-    }
-
-    function cycleTimes(uint256 roundId) external view returns (uint256 firstGestureAt, uint256 finalizedAt) {
-        return (_stats[roundId].firstGestureTime, cycleClosedAt[roundId]);
     }
 
     function getNextEthPrice() external view returns (uint256) {
@@ -108,7 +102,6 @@ contract LocalCosmicGame {
         if (lastBidder == address(0) || block.timestamp < mainPrizeTime) revert NotReady();
         if (msg.sender != lastBidder && block.timestamp < mainPrizeTime + CLAIM_TIMEOUT) revert NotReady();
         _stats[roundNum].finish(block.timestamp);
-        cycleClosedAt[roundNum] = block.timestamp;
         emit CycleClosed(roundNum, block.timestamp);
         ++roundNum;
         lastBidder = address(0);

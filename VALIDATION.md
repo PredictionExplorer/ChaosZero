@@ -1,3 +1,121 @@
+# Production V3 preparation — 21 October 2026
+
+This release candidate changes only ChaosZero. No public contract or frontend
+was deployed, no user signing/API credentials were requested, and no Cosmic
+Signature repository was modified. The new market/source frontend addresses stay
+blank until the operator deploys and verifies the new contracts.
+
+## Completed checks
+
+| Check                       | Result                                                                                                                                                                                                                                                                   |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Complete repository gate    | `pnpm check` passed after dependency remediation: formatting, tooling, Hardhat deployment tests, Solidity build/sizes/tests, compiler parity, differential fixtures, mathematical oracle, frontend lint/types/coverage/build, browser flows and audits.                  |
+| Solidity default suite      | 265 passed, zero failed; one optional live-fork setup skipped when no RPC is configured.                                                                                                                                                                                 |
+| Extended fuzz campaign      | 58 properties × 50,000 inputs = **2,900,000 generated cases**, zero failures.                                                                                                                                                                                            |
+| Extended stateful campaigns | Eight invariant properties × 512 campaigns × 256 actions = **1,048,576 calls**, zero handler reverts or invariant failures. This includes retained legacy tests and the independent-market ledger.                                                                       |
+| Actual V3 fork integration  | Two tests passed at Arbitrum block **516865668**, including actual V3 gestures, cycle closure, native results, eight-way funding, settlement, rollover and old winning claims.                                                                                           |
+| Frontend                    | **1,385 tests across 58 files**, with all coverage thresholds unchanged; lint, TypeScript and Next.js 16.3.8 production build passed.                                                                                                                                    |
+| Browser                     | Three Chromium tests passed: full trading/transfer/merge/funding/settlement/rollover lifecycle and desktop/mobile/accessibility navigation. Widths 1440, 390 and 320 have no horizontal overflow or clipped controls.                                                    |
+| Deployment tooling          | 17 tests passed: hidden real-PTY input, safe diagnostics, public-only durable journals, gas reservation validation, implementation pinning, interrupted deployment, verification without a signer and a complete disposable local deployment.                            |
+| Historical baseline         | Nine regression tests passed. Reconstructed **1,257 gestures** from **1,285 events**, **1,253 independently retrieved headers**, **1,258 successful independent-provider receipts**, and **13 wallets'** permanent statistics. No game upgrades occurred during round 2. |
+| Compiler parity             | All four Hardhat deployment runtimes exactly match Foundry-tested executable bytes, excluding validated CBOR metadata. Three regression tests reject executable changes and malformed metadata.                                                                          |
+| Numerical fixtures          | All three generated fixture sets reproduced exactly. Ten oracle regression tests and 631 Solidity logarithm intervals passed independent 170-digit Decimal verification.                                                                                                 |
+| Dependency audits           | Root and frontend audits report **zero known vulnerabilities**. All production severities are checked. No advisory was ignored and no lint rule was disabled.                                                                                                            |
+
+The heavy campaign took 828.68 seconds with seed:
+
+```sh
+FOUNDRY_FUZZ_SEED=0x9c632d7ac054a1a2d0b1ab4c7bdc3d77f0fdfc302cf8d39be862bb41ec9e720a pnpm test:heavy
+```
+
+The opt-in fork run is reproduced with:
+
+```sh
+CHAOSZERO_V3_FORK_RPC_URL=https://arbitrum.drpc.org forge test --match-contract V3OutcomeSourceForkTest -vv
+```
+
+Foundry does not implement ArbOS entropy precompiles. The fork test substitutes
+four entropy reads (`arbBlockNumber`, `arbBlockHash`, `getGasBacklog`,
+`getL1PricingUnitsSinceUpdate`) while executing the real game, token, adapter,
+market and payout code. Local test balances use `deal`. This is not a public
+transaction or a full native ArbOS execution claim.
+
+## Pre-deployment recheck and immediate claims
+
+A further review on 21 October reproduced the historical values without changing
+any baseline data or commitments. Fresh reads matched all 1,285 event records,
+all 13 wallet records and the no-upgrade result. Eight selected receipts and
+headers were refreshed independently, including the first/closing transactions,
+maximum CST payment and both champion episodes. All 644 CST gesture receipts
+contain the matching gross CST burn. Independent direct state-machine and
+record-episode replays agree on both durations and on the distinct winning
+gesture IDs despite identical recipient wallets.
+
+The live deployment preflight, all 17 deployment-secret/recovery tests, dependency
+audits and compiler parity checks passed again. This review found no additional
+confirmed contract or credential-handling defect. The recovery instructions now
+explicitly direct completed deployments to `verify:arbitrum`, which never requests
+a signing key; `deploy:resume` requests a key even when both transactions exist.
+
+A new fork regression proves direct first-claim behavior after the actual V3 game
+closure: without a separate settlement call, the first holder receives 150 CST,
+another holder's 50 CST remains reserved and is then paid, and 7,950 CST remains
+carry. The block number and timestamp do not advance between game closure and
+claims. The countdown alone still rejects claims. All three V3 fork tests passed
+at fresh snapshot **517030312**:
+
+```sh
+CHAOSZERO_V3_FORK_RPC_URL=https://arb1.arbitrum.io/rpc CHAOSZERO_V3_FORK_BLOCK=517030312 forge test --match-contract V3OutcomeSourceForkTest -vv
+```
+
+The four ArbOS entropy-read substitutions described above remain necessary. No
+public transaction occurred, and no production contract code changed in this
+recheck. The original archive endpoint could not serve a newly requested slot at
+the older snapshot; the fresh pinned run avoids relying on that unavailable state.
+A future reproduction needs an RPC that retains the selected block's state.
+
+## Release behavior and artifacts
+
+Every new pool starts at 50/50. Historical prices, checkpoints and game timestamps
+were removed from settlement and initialization. The actual V3 adapter uses a
+fixed, explicitly accepted round-2 bootstrap for the first market cycle (3), then
+native per-cycle V3 statistics. Its runtime checks reject changed game tokens or
+inconsistent states. Normal funding, independent collateral, ERC-1155 positions,
+winning escrow and equal carry allocation remain covered by the financial suites.
+
+The source constructor baseline commitment is:
+
+`0x270bdafae80631bde00ccdad3a78ca455a073a900c3d91fb7ead3d0b870f5891`
+
+The exact published evidence file commitment is:
+
+`0x55447a205cd7c242667d30dcaad22f23bb1fd06e4364362dc779e3044c3c02a9`
+
+[The evidence](deployment/arbitrum-round-2-baseline.json) is imported directly by
+`/baseline` and `/baseline.json`, with byte-equivalence tests. `pnpm verify:baseline`
+reproduces its checks; `--refresh` fetches all public evidence again. This is an
+accepted one-time auditable input, **not an on-chain historical proof verifier**.
+The same wallet earned both historical titles through different gestures; the
+stored same-gesture result is correctly false.
+
+Production runtime sizes are 20,912 bytes for the market (3,664 bytes below
+EIP-170), 3,168 for the V3 source, 10,897 for the read helper and 2,634 for the
+payout vault. The operator deployment script verifies all four through Hardhat's
+Etherscan V2 integration and pins the reviewed game implementation before signing.
+Real Arbiscan verification remains unexecuted because deployment is intentionally
+deferred. Its integration callback and constructor parameters were tested locally.
+
+Dependency remediation updated affected consumers and transitive resolutions.
+The sole unpatched advisory was eliminated by a version-scoped replacement of
+Next's lint-only directory glob implementation with `tinyglobby`, keeping all lint
+rules. Four regression tests cover the actual consumer API and deep nesting. See
+[the frontend dependency rationale](frontend/README.md#dependency-maintenance).
+
+These results describe covered behavior, not a guarantee that no bug exists.
+No external security audit or public deployment has occurred.
+
+---
+
 # Independent local prototype validation — 19 September 2026
 
 This records local checks for eight independent pools, ordinary winning payouts,

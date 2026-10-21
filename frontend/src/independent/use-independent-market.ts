@@ -5,8 +5,14 @@ import type { Address } from "viem";
 import { useConnection, usePublicClient } from "wagmi";
 import { erc20Abi } from "@/lib/abi/erc20";
 import { appConfig } from "@/lib/config";
+import { assertProductionMarket, isMarketChain } from "./deployment";
 import { localGameAbi } from "@/shared/abi";
-import { independentMarketAbi, independentSourceAbi, settlementVaultAbi } from "./abi";
+import {
+  independentMarketAbi,
+  independentSourceAbi,
+  settlementVaultAbi,
+  cosmicGameV3Abi,
+} from "./abi";
 import {
   fixedAmounts,
   heldContributions,
@@ -27,12 +33,14 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
       override?.toString() ?? null,
       address ?? null,
     ],
-    enabled: !!client && appConfig.chain.id === 31337,
+    enabled: !!client && isMarketChain(appConfig.chain.id),
     refetchInterval: 4_000,
     retry: false,
     queryFn: async (): Promise<IndependentSnapshot> => {
-      if (!client || appConfig.chain.id !== 31337)
-        throw new Error("The local market connection is not ready.");
+      if (!client || !isMarketChain(appConfig.chain.id))
+        throw new Error("The market connection is not ready.");
+      if (appConfig.chain.id === 42161 && (await client.getChainId()) !== 42161)
+        throw new Error("The RPC is not Arbitrum One.");
       const block = await client.getBlock();
       const blockNumber = block.number;
       const [token, source, vault, poolCustody, pendingCarry] = await Promise.all([
@@ -95,10 +103,11 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
           blockNumber,
         }),
       ]);
+      assertProductionMarket(appConfig.chain.id, token, source, game);
       if (decimals !== 18) throw new Error("This market requires an 18-decimal CST token.");
       const currentRound = await client.readContract({
         address: game,
-        abi: localGameAbi,
+        abi: cosmicGameV3Abi,
         functionName: "roundNum",
         blockNumber,
       });
@@ -110,7 +119,7 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
         args: [roundId],
         blockNumber,
       });
-      const [states, sourceState, seeds, wallet, local] = await Promise.all([
+      const [states, sourceState, wallet, local, metrics] = await Promise.all([
         client.readContract({
           address: market,
           abi: independentMarketAbi,
@@ -124,15 +133,6 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
               address: source,
               abi: independentSourceAbi,
               functionName: "outcomeState",
-              args: [roundId],
-              blockNumber,
-            }),
-        round.initialized
-          ? null
-          : client.readContract({
-              address: market,
-              abi: independentMarketAbi,
-              functionName: "seedPreview",
               args: [roundId],
               blockNumber,
             }),
@@ -161,42 +161,64 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
               }),
             ])
           : null,
-        Promise.all([
-          client.readContract({
-            address: game,
-            abi: localGameAbi,
-            functionName: "getNextEthPrice",
-            blockNumber,
-          }),
-          client.readContract({
-            address: game,
-            abi: localGameAbi,
-            functionName: "getNextCstPrice",
-            blockNumber,
-          }),
-          client.readContract({
-            address: game,
-            abi: localGameAbi,
-            functionName: "mainPrizeTime",
-            blockNumber,
-          }),
-          client.readContract({
-            address: game,
-            abi: localGameAbi,
-            functionName: "roundStats",
-            args: [roundId],
-            blockNumber,
-          }),
-          roundId > 0n
-            ? client.readContract({
+        appConfig.chain.id === 31337
+          ? Promise.all([
+              client.readContract({
+                address: game,
+                abi: localGameAbi,
+                functionName: "getNextEthPrice",
+                blockNumber,
+              }),
+              client.readContract({
+                address: game,
+                abi: localGameAbi,
+                functionName: "getNextCstPrice",
+                blockNumber,
+              }),
+              client.readContract({
+                address: game,
+                abi: localGameAbi,
+                functionName: "mainPrizeTime",
+                blockNumber,
+              }),
+              client.readContract({
                 address: game,
                 abi: localGameAbi,
                 functionName: "roundStats",
-                args: [roundId - 1n],
+                args: [roundId],
                 blockNumber,
-              })
-            : null,
-        ]),
+              }),
+              roundId > 0n
+                ? client.readContract({
+                    address: game,
+                    abi: localGameAbi,
+                    functionName: "roundStats",
+                    args: [roundId - 1n],
+                    blockNumber,
+                  })
+                : null,
+            ])
+          : null,
+        appConfig.chain.id === 42161
+          ? Promise.all([
+              client.readContract({
+                address: source,
+                abi: independentSourceAbi,
+                functionName: "metrics",
+                args: [roundId],
+                blockNumber,
+              }),
+              roundId > 0n
+                ? client.readContract({
+                    address: source,
+                    abi: independentSourceAbi,
+                    functionName: "metrics",
+                    args: [roundId - 1n],
+                    blockNumber,
+                  })
+                : null,
+            ])
+          : null,
       ]);
       const open = sourceState ? sourceState[0] : false;
       const finalized = sourceState ? sourceState[1] : round.finalized;
@@ -226,8 +248,8 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
       // The preview measures the same saturating surplus at the same block.
       if (funding && funding.unallocated !== held)
         throw new Error("The market's CST custody is inconsistent.");
-      const questions = states.map((state, question) => {
-        const initialYesBps = round.initialized ? state.initialYesBps : seeds![0][question];
+      const questions = states.map((state) => {
+        const initialYesBps = round.initialized ? state.initialYesBps : 5000;
         if (
           initialYesBps < 1 ||
           initialYesBps > 9999 ||
@@ -242,7 +264,6 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
             initialYesBps,
           },
           funded: round.funded,
-          usedHistory: round.initialized ? state.seedUsedHistory : seeds![1][question],
           escrowRemaining: state.escrowRemaining,
         };
       });
@@ -279,13 +300,21 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
                 allowance: wallet[2],
               }
             : null,
-        local: {
-          ethPrice: local[0],
-          cstPrice: local[1],
-          deadline: local[2],
-          current: local[3],
-          previous: local[4],
-        },
+        metrics: metrics
+          ? {
+              current: metrics[0].supported ? metrics[0] : null,
+              previous: metrics[1]?.supported ? metrics[1] : null,
+            }
+          : undefined,
+        local: local
+          ? {
+              ethPrice: local[0],
+              cstPrice: local[1],
+              deadline: local[2],
+              current: local[3],
+              previous: local[4],
+            }
+          : null,
       };
     },
   });
@@ -306,13 +335,15 @@ export function useIndependentFundingPreview(
       amount !== null &&
       amount >= 0n &&
       amount < 1n << 256n &&
-      appConfig.chain.id === 31337,
+      isMarketChain(appConfig.chain.id),
     staleTime: 0,
     retry: false,
     refetchInterval: enabled ? 4_000 : false,
     queryFn: async (): Promise<FundingPreview> => {
-      if (!client || amount === null || amount < 0n || appConfig.chain.id !== 31337)
+      if (!client || amount === null || amount < 0n || !isMarketChain(appConfig.chain.id))
         throw new Error("Funding preview unavailable.");
+      if (appConfig.chain.id === 42161 && (await client.getChainId()) !== 42161)
+        throw new Error("The RPC is not Arbitrum One.");
       const block = await client.getBlock();
       const preview = await client.readContract({
         address: market,
@@ -331,13 +362,16 @@ export function useIndependentRecovery(market: Address, roundId: bigint | null, 
   const { address } = useConnection();
   return useQuery({
     queryKey: ["independent", "recovery", market, roundId?.toString() ?? null, address ?? null],
-    enabled: enabled && !!client && !!address && roundId !== null && appConfig.chain.id === 31337,
+    enabled:
+      enabled && !!client && !!address && roundId !== null && isMarketChain(appConfig.chain.id),
     staleTime: 0,
     retry: false,
     refetchInterval: enabled ? 4_000 : false,
     queryFn: async (): Promise<IndependentRecovery> => {
-      if (!client || !address || roundId === null || appConfig.chain.id !== 31337)
-        throw new Error("Choose a cycle and connect a local wallet first.");
+      if (!client || !address || roundId === null || !isMarketChain(appConfig.chain.id))
+        throw new Error("Choose a cycle and connect your wallet first.");
+      if (appConfig.chain.id === 42161 && (await client.getChainId()) !== 42161)
+        throw new Error("The RPC is not Arbitrum One.");
       const block = await client.getBlock();
       const blockNumber = block.number;
       const [token, vault, round, states, balances] = await Promise.all([
@@ -415,7 +449,6 @@ export function useIndependentRecovery(market: Address, roundId: bigint | null, 
             initialYesBps: state.initialYesBps,
           },
           funded: round.funded,
-          usedHistory: state.seedUsedHistory,
           escrowRemaining: state.escrowRemaining,
         })),
         user: {

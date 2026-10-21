@@ -8,12 +8,10 @@ export const independentMarketAbi = parseAbi([
   "function totalActiveCollateral() view returns (uint256)",
   "function lastFundedRound() view returns (uint256)",
   "function hasFunded() view returns (bool)",
-  "function roundState(uint256 roundId) view returns ((bool initialized,bool funded,bool settled,bool closed,bool finalized,uint8 knownMask,uint8 values,uint64 startedAt,uint64 finalizedAt,uint256 activeCollateral) result)",
-  "function questionState(uint256 roundId,uint8 question) view returns ((uint256 activeCollateral,uint256 yesSupply,uint256 noSupply,uint256 escrowRemaining,uint16 initialYesBps,uint16 currentYesBps,uint256 checkpointCount,bool seedUsedHistory) result)",
-  "function questionStates(uint256 roundId) view returns ((uint256 activeCollateral,uint256 yesSupply,uint256 noSupply,uint256 escrowRemaining,uint16 initialYesBps,uint16 currentYesBps,uint256 checkpointCount,bool seedUsedHistory)[8] result)",
+  "function roundState(uint256 roundId) view returns ((bool initialized,bool funded,bool settled,bool closed,bool finalized,uint8 knownMask,uint8 values,uint256 activeCollateral) result)",
+  "function questionState(uint256 roundId,uint8 question) view returns ((uint256 activeCollateral,uint256 yesSupply,uint256 noSupply,uint256 escrowRemaining,uint16 initialYesBps,uint16 currentYesBps) result)",
+  "function questionStates(uint256 roundId) view returns ((uint256 activeCollateral,uint256 yesSupply,uint256 noSupply,uint256 escrowRemaining,uint16 initialYesBps,uint16 currentYesBps)[8] result)",
   "function fundingPreview(uint256 roundId,uint256 newAmount) view returns ((uint256 availableCarry,uint256 carryUsed,uint256 deferredCarry,uint256 totalFunding,uint256 maxNewAmount,uint256[8] allocations,bool needsSettlement,bool canFund,uint256 unallocated) result)",
-  "function seedPreview(uint256 roundId) view returns (uint16[8] prices,bool[8] usedHistory)",
-  "function initialPrices(uint256 roundId) view returns (uint16[8] prices)",
   "function previewClaim(uint256 roundId,address user) view returns (bool claimable,uint256 total,uint256[8] amounts)",
   "function balancesOf(uint256 roundId,address user) view returns (uint256[8] yes,uint256[8] no)",
   "function fundRound(uint256 roundId,uint256 newAmount)",
@@ -35,11 +33,8 @@ export const independentMarketAbi = parseAbi([
   "function totalSupply(uint256 id) view returns (uint256)",
   "function uri(uint256 id) view returns (string)",
   "function supportsInterface(bytes4 interfaceId) view returns (bool)",
-  "function historyLength(uint256 roundId,uint8 question) view returns (uint256)",
-  "function historyCheckpoint(uint256 roundId,uint8 question,uint256 index) view returns (uint128 cumulative,uint64 timestamp,uint16 price)",
   "event RoundFunded(uint256 indexed roundId,address indexed caller,uint256 donated,uint256 transfersUsed,uint256 carryUsed,uint256[8] allocations)",
   "error InvalidParameters()",
-  "error InvalidTimestamp()",
   "error InvalidSourceState()",
   "error NotInitialized()",
   "error NotFunded()",
@@ -67,11 +62,18 @@ export const independentMarketAbi = parseAbi([
 export const independentSourceAbi = parseAbi([
   "function game() view returns (address)",
   "function outcomeState(uint256 roundId) view returns (bool open,bool finalized,uint8 knownMask,uint8 values)",
-  "function cycleTimes(uint256 roundId) view returns (uint256 firstGestureAt,uint256 finalizedAt)",
+  "function metrics(uint256 roundId) view returns ((uint256 gestureCount,uint256 ethSpent,uint256 cstBurned,uint256 highestCstPaid,uint256 enduranceDuration,uint256 chronoDuration,bool sameGesture,bool finalized,bool supported) result)",
 ]);
 
 export const settlementVaultAbi = parseAbi([
   "function totalEscrowed() view returns (uint256)",
   "function remaining(uint256 roundId,uint8 question) view returns (uint256)",
   "function registered(uint256 roundId) view returns (bool)",
+]);
+
+/** Deployed V3 storage getter; independent of the simulator's differently shaped record. */
+export const cosmicGameV3Abi = parseAbi([
+  "function roundNum() view returns (uint256)",
+  "function token() view returns (address)",
+  "function roundStats(uint256 roundId) view returns ((uint256 numBids,uint256 numCstBids,uint256 totalSpentEthAmount,uint256 totalSpentCstAmount,uint256 maxEthBidPrice,uint256 maxCstBidPrice,uint256 enduranceChampionDuration,uint256 chronoWarriorDuration,uint256 flags) result)",
 ]);

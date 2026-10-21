@@ -14,8 +14,6 @@ const messages: Record<string, string> = {
     "This cycle’s pools have not opened and nothing waiting can open them yet. Add CST to all eight pools to open them.",
   InvalidParameters:
     "Nothing is waiting to enter the pools, or the amount is outside the supported range. Refresh the market.",
-  InvalidTimestamp:
-    "The game’s canonical cycle timestamps could not be verified. Settlement, and opening the next cycle’s pools, are unavailable until valid data returns.",
   InvalidSourceState:
     "The outcome source returned inconsistent answers. Trading, settlement and opening pools are unavailable until valid source data is restored.",
   TransferFailed:

@@ -97,16 +97,27 @@ function tooling() {
     "scripts/checks.test.mjs",
     "scripts/local-runtime.test.mjs",
     "scripts/browser-abi.test.mjs",
+    "scripts/compiler-parity.test.mjs",
   ]);
+  step("Secret-safe Hardhat deployment tooling", () => pnpm(["test:deployment"]));
+  step("Historical baseline replay and evidence guards", () => pnpm(["test:baseline"]));
 }
 
 function contracts() {
   step("Solidity formatting", () => forge(["fmt", "--check"]));
   step("Production compiler build and contract sizes", () => forge(["build", "--sizes"]));
+  step("Foundry/Hardhat production runtime parity", () =>
+    execute(process.execPath, ["scripts/compiler-parity.mjs"]),
+  );
   // CI/local default runs do not depend on an optional RPC or silently become fork runs.
   step("Contract unit, fuzz, invariant and attack suites", () =>
     forge(["test", "-vv"], {
-      env: { ...process.env, ARBITRUM_RPC_URL: "", FOUNDRY_PROFILE: "default" },
+      env: {
+        ...process.env,
+        ARBITRUM_RPC_URL: "",
+        CHAOSZERO_V3_FORK_RPC_URL: "",
+        FOUNDRY_PROFILE: "default",
+      },
     }),
   );
 }
@@ -225,6 +236,7 @@ try {
         FOUNDRY_PROFILE: "heavy",
         FOUNDRY_FUZZ_SEED: seed,
         ARBITRUM_RPC_URL: "",
+        CHAOSZERO_V3_FORK_RPC_URL: "",
       },
     });
   } else {

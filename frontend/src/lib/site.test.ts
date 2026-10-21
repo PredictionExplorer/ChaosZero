@@ -10,7 +10,9 @@ describe("parseSiteUrl", () => {
 
   it("normalizes to the origin, dropping trailing slashes and paths", () => {
     expect(parseSiteUrl("https://chaoszero.com/")).toBe("https://chaoszero.com");
-    expect(parseSiteUrl("https://preview.example.com/some/path")).toBe("https://preview.example.com");
+    expect(parseSiteUrl("https://preview.example.com/some/path")).toBe(
+      "https://preview.example.com",
+    );
   });
 
   it("keeps explicit ports (local previews)", () => {
@@ -45,12 +47,14 @@ describe("absoluteUrl", () => {
 describe("site copy", () => {
   it("leads with the brand and the game it is built on", () => {
     expect(SITE_TITLE).toMatch(/chaos zero/i);
-    expect(SITE_TITLE).toMatch(/cosmic signature/i);
+    expect(SITE_TITLE).toMatch(/Eight questions/i);
   });
 
-  it("describes the actual mechanism: YES/NO on gesture counts", () => {
-    expect(SITE_DESCRIPTION).toMatch(/gestures/i);
-    expect(SITE_DESCRIPTION).toMatch(/YES or NO/);
+  it("describes the eight V3 markets without stale prelaunch copy", () => {
+    expect(SITE_DESCRIPTION).toMatch(/Eight independent/);
+    expect(SITE_DESCRIPTION).toMatch(/Cosmic Signature V3/);
+    expect(SITE_DESCRIPTION).not.toMatch(/launch pending/i);
+    expect(SITE_DESCRIPTION).toMatch(/YES\/NO/);
     // The market is binary; the old "scalar / HIGHER or LOWER" copy was wrong.
     expect(SITE_DESCRIPTION).not.toMatch(/scalar|higher or lower/i);
   });

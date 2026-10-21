@@ -7,10 +7,14 @@ type CardProps = HTMLAttributes<HTMLDivElement> & {
 
 const ACCENTS: Record<NonNullable<CardProps["accent"]>, string> = {
   none: "",
-  signal: "before:bg-gradient-to-r before:from-transparent before:via-signal/70 before:to-transparent",
-  higher: "before:bg-gradient-to-r before:from-transparent before:via-higher/70 before:to-transparent",
-  lower: "before:bg-gradient-to-r before:from-transparent before:via-lower/70 before:to-transparent",
-  ended: "before:bg-gradient-to-r before:from-transparent before:via-ended/70 before:to-transparent",
+  signal:
+    "before:bg-gradient-to-r before:from-transparent before:via-signal/70 before:to-transparent",
+  higher:
+    "before:bg-gradient-to-r before:from-transparent before:via-higher/70 before:to-transparent",
+  lower:
+    "before:bg-gradient-to-r before:from-transparent before:via-lower/70 before:to-transparent",
+  ended:
+    "before:bg-gradient-to-r before:from-transparent before:via-ended/70 before:to-transparent",
 };
 
 /** Glassy cosmic panel — the app's standard surface. */

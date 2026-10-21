@@ -12,22 +12,24 @@
 import { appConfig, COSMIC_CST_ADDRESS, COSMIC_GAME_ADDRESS } from "@/lib/config";
 import { COSMIC_SIGNATURE_URL, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/site";
 import { FAQ_CATEGORIES } from "@/components/faq/faq-data";
+import { independentMarketAddress } from "@/independent/config";
 
 const SUMMARY =
-  `${SITE_NAME} is a fully collateralized YES/NO prediction market on the Cosmic Signature game. ` +
-  "Every game round asks the same question: will this round end with more gestures (bids) than the previous round? " +
-  "Bets are placed in CST (Cosmic Signature Token) on Arbitrum One, and every winning token pays out exactly 1 CST. " +
-  "The whole series runs on one immutable smart contract — zero oracles, zero admin keys, zero custody.";
+  `${SITE_NAME} offers eight YES/NO prediction markets about the Cosmic Signature V3 game. ` +
+  "Questions cover gestures (bids), Endurance and Chrono durations, ETH and CST payments, odd gesture counts, shared titles and maximum CST payments. " +
+  "Each question has its own CST-backed AMM on Arbitrum One and opens at 50% YES and 50% NO. " +
+  "Every winning position pays 1 CST after final settlement.";
 
 const NAME_STORY =
-  'The name: "Chaos" is the thing being bet on — a live gesture count driven by many independent players that nobody controls; ' +
-  '"Zero" is the trust required — zero oracles, zero admin keys, zero custody.';
+  'The name: "Chaos" is the unfolding game; "Zero" marks the fresh 50/50 opening of each question in every cycle.';
 
 /** The deployment facts, reflecting the actual configured chain and contracts. */
 function keyFacts(): string {
   const chainFacts = [
     `Chain: ${appConfig.chain.name} (chain id ${appConfig.chain.id}).`,
-    appConfig.marketAddress && `Market contract: ${appConfig.marketAddress}.`,
+    independentMarketAddress
+      ? `Eight-question market contract: ${independentMarketAddress}.`
+      : "Eight-question market is not configured for trading on this frontend.",
     `Cosmic Signature game proxy: ${COSMIC_GAME_ADDRESS}.`,
     COSMIC_CST_ADDRESS && `CST token: ${COSMIC_CST_ADDRESS}.`,
   ]
@@ -37,12 +39,14 @@ function keyFacts(): string {
   return [
     "Key facts:",
     "",
-    "- One market per Cosmic Signature round, launched automatically, forever. Future rounds are tradable before they start.",
-    '- YES wins if the round\'s final gesture count is STRICTLY greater than the previous round\'s final count (the "threshold"); a tie means NO wins.',
-    "- Gestures are bids in the Cosmic Signature game. The count is public on-chain while a round runs and only ever goes up, so the moment it crosses the threshold, YES is certain: betting halts atomically and the round can be resolved early.",
-    "- Prices come from a constant-product AMM pool (one per round). The implied YES probability is reserveNo / (reserveYes + reserveNo). Liquidity providers vote the trading fee (share-weighted average, capped at 10%).",
-    "- Fully collateralized by construction: 1 CST always mints 1 YES + 1 NO, and a pair always redeems for 1 CST. Resolution is permissionless and read directly from the game contract.",
+    "- Eight independent pools per eligible game cycle, inside one market contract. Only the current cycle can be opened and traded.",
+    "- Every fresh pool starts at 50/50; previous prices and historical timestamps do not set opening odds. Strict-comparison ties resolve NO.",
+    "- Trading remains open until the game actually ends the cycle, even when an answer is known. The countdown reaching zero does not finalize results.",
+    "- Each question uses its own constant-product AMM. There are no trading fees; Arbitrum network fees still apply.",
+    "- Funding is divided equally across all eight pools. Contributions are irreversible and create no LP shares or withdrawal rights. Unused funding carries forward only after winning claims are reserved.",
+    "- 1 CST splits into 1 YES + 1 NO for one question and cycle; a matching pair merges into 1 CST. An immutable adapter reads game outcomes; anyone can settle a finalized cycle.",
     `- ${chainFacts}`,
+    `- The historical launch baseline and its provenance are published at ${absoluteUrl("/baseline")} (machine-readable: ${absoluteUrl("/baseline.json")}). Later comparisons use native V3 records.`,
     "- To bet you need: a wallet on Arbitrum One, CST, and a little ETH for gas.",
   ].join("\n");
 }
@@ -51,7 +55,7 @@ const NOTES = [
   "## Notes",
   "",
   "- Prediction markets involve risk; bet only what you can afford to lose.",
-  "- The market contract is immutable and permissionless: anyone can bet, provide liquidity, resolve, or claim. There is no deadline on claiming winnings.",
+  "- The market contract is immutable and permissionless. The game, result adapter and CST remain dependencies. Claims do not expire, but unresolved positions require valid result data before payout.",
 ].join("\n");
 
 /** The `/llms.txt` index: summary, facts, and links to everything else. */
@@ -67,13 +71,15 @@ export function llmsTxt(): string {
     "",
     "## Pages",
     "",
-    `- [Market](${absoluteUrl("/")}): the live market — current YES probability, gesture count vs threshold race, place YES/NO bets, provide liquidity, resolve rounds, and claim winnings. \`?round=N\` shows any past or future round.`,
-    `- [FAQ](${absoluteUrl("/faq")}): every question answered — the basics, betting mechanics, pricing and fees, liquidity provision and fee voting, resolution and claiming, and the safety model.`,
+    `- [Market](${absoluteUrl("/")}): eight question cards, exact trade quotes, positions, equal pool funding, settlement and claims. Trading requires a configured deployment. \`?round=N\` selects a cycle.`,
+    `- [FAQ](${absoluteUrl("/faq")}): questions, pricing, funding contributions, positions, resolution and risks.`,
+    `- [Historical baseline evidence](${absoluteUrl("/baseline")}): exact launch comparison values, replay checks, transaction references and commitments. This fixed off-chain bootstrap is not an on-chain receipt-proof verifier.`,
+    `- [Baseline JSON](${absoluteUrl("/baseline.json")}): the exact reviewed deployment input and provenance.`,
     `- [Full knowledge base](${absoluteUrl("/llms-full.txt")}): this site's complete FAQ — every question and answer — in one plain-text document.`,
     "",
     "## About Cosmic Signature",
     "",
-    `- [Cosmic Signature](${COSMIC_SIGNATURE_URL}): the on-chain NFT game this market is built on. Players bid ("gesture") each round to win prizes; each round ends with a final gesture count — the number this market bets on. Playing the game earns CST, the market's currency.`,
+    `- [Cosmic Signature](${COSMIC_SIGNATURE_URL}): the on-chain game whose V3 statistics determine the market outcomes. Game gestures and prediction-market trades are separate transactions.`,
     "",
     NOTES,
     "",
@@ -88,7 +94,17 @@ export function llmsFullTxt(): string {
       "",
       category.description,
       "",
-      ...category.items.map((item) => [`### ${item.question}`, "", item.answer.join("\n\n"), ""].join("\n")),
+      ...category.items.map((item) =>
+        [
+          `### ${item.question}`,
+          "",
+          item.answer.join("\n\n"),
+          ...(item.reference
+            ? [`[${item.reference.label}](${absoluteUrl(item.reference.href)})`]
+            : []),
+          "",
+        ].join("\n"),
+      ),
     ].join("\n"),
   );
 

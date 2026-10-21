@@ -38,8 +38,12 @@ describe("robots.txt", () => {
 describe("sitemap.xml", () => {
   const entries = sitemap();
 
-  it("lists exactly the two routes with absolute URLs", () => {
-    expect(entries.map((e) => e.url)).toEqual([SITE_URL, `${SITE_URL}/faq`]);
+  it("lists all public pages with absolute URLs", () => {
+    expect(entries.map((e) => e.url)).toEqual([
+      SITE_URL,
+      `${SITE_URL}/baseline`,
+      `${SITE_URL}/faq`,
+    ]);
     for (const entry of entries) {
       expect(entry.url).toMatch(/^https?:\/\//);
       expect(entry.lastModified).toBeInstanceOf(Date);
@@ -66,7 +70,10 @@ describe("manifest", () => {
     expect(data.icons?.length).toBeGreaterThanOrEqual(3);
     for (const icon of data.icons ?? []) {
       expect(icon.src.startsWith("/")).toBe(true);
-      expect(existsSync(join(PUBLIC_DIR, icon.src)), `${icon.src} missing — run \`pnpm icons\``).toBe(true);
+      expect(
+        existsSync(join(PUBLIC_DIR, icon.src)),
+        `${icon.src} missing — run \`pnpm icons\``,
+      ).toBe(true);
     }
   });
 
@@ -74,4 +81,3 @@ describe("manifest", () => {
     expect(data.icons?.some((icon) => icon.purpose === "maskable")).toBe(true);
   });
 });
-

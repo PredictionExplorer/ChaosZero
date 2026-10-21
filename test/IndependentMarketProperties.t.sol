@@ -93,7 +93,7 @@ contract IndependentMarketPropertiesTest is Test {
         market.fundRound(2, 0);
         assertEq(market.totalActiveCollateral(), expectedCarry);
         assertEq(market.pendingCarry(), 0);
-        // Cached winner claims must work even beyond the history timestamp range.
+        // Cached winner claims have no timestamp limit or expiry.
         vm.warp(futureTimestamp < 200 ? 200 : futureTimestamp);
         uint256 aliceBefore = token.balanceOf(ALICE);
         uint256 bobBefore = token.balanceOf(BOB);

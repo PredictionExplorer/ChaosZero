@@ -22,8 +22,20 @@ contract LocalOutcomeSource is IIndependentOutcomeSource {
         game = game_;
     }
 
-    function cycleTimes(uint256 roundId) external view returns (uint256 firstGestureAt, uint256 finalizedAt) {
-        return game.cycleTimes(roundId);
+    function metrics(uint256 roundId) external view returns (Metrics memory result) {
+        if (roundId > game.roundNum()) return result;
+        CycleMetrics.Metrics memory m = game.roundStats(roundId);
+        return Metrics(
+            m.gestureCount,
+            m.ethSpent,
+            m.cstBurned,
+            m.highestCstPaid,
+            m.enduranceDuration,
+            m.chronoDuration,
+            m.finalized && m.enduranceGesture != 0 && m.enduranceGesture == m.chronoGesture,
+            m.finalized,
+            true
+        );
     }
 
     function outcomeState(uint256 roundId)

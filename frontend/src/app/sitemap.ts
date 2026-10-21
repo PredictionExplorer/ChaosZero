@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 import { absoluteUrl } from "@/lib/site";
 
 /**
- * Both routes, with absolute URLs. The homepage changes every block (live
- * odds); the FAQ only changes with deploys. `?round=` and `?market=` views
+ * Public pages, with absolute URLs. The homepage changes every block (live
+ * odds); the FAQ only changes with deploys. `?round=` views
  * canonicalize to `/`, so they are deliberately absent.
  */
 export default function sitemap(): MetadataRoute.Sitemap {
@@ -14,6 +14,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified,
       changeFrequency: "hourly",
       priority: 1,
+    },
+    {
+      url: absoluteUrl("/baseline"),
+      lastModified,
+      changeFrequency: "yearly",
+      priority: 0.6,
     },
     {
       url: absoluteUrl("/faq"),

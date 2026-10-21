@@ -8,7 +8,6 @@ import type { CycleStats } from "@/shared/question-metrics";
 export interface IndependentQuestion {
   pool: BinaryQuestionPool;
   funded: boolean;
-  usedHistory: boolean;
   escrowRemaining: bigint;
 }
 export interface IndependentWallet {
@@ -44,6 +43,7 @@ export interface IndependentSnapshot {
   /** `fundingPreview(roundId, 0)`: exactly what the next buy, sell or Distribute absorbs. */
   funding: FundingPreview | null;
   user: IndependentWallet | null;
+  metrics?: { current: CycleStats | null; previous: CycleStats | null };
   local: {
     ethPrice: bigint;
     cstPrice: bigint;

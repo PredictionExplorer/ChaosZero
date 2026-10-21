@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 type RedirectRule = Awaited<ReturnType<NonNullable<NextConfig["redirects"]>>>[number];
 
@@ -32,6 +33,9 @@ const nextConfig: NextConfig = {
   // frequent live-data refreshes without hand-written useMemo/useCallback.
   reactCompiler: true,
   poweredByHeader: false,
+  // The public baseline imports the exact reviewed deployment input outside frontend/.
+  turbopack: { root: path.join(__dirname, "..") },
+  outputFileTracingRoot: path.join(__dirname, ".."),
   redirects: async () => DOMAIN_REDIRECTS,
 };
 

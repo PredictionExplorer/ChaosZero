@@ -7,13 +7,12 @@ import {Base64} from "@openzeppelin/contracts/utils/Base64.sol";
 import {IIndependentOutcomeSource} from "./interfaces/IIndependentOutcomeSource.sol";
 import {OutcomeSettlementVault, ISettlementCollateral} from "./OutcomeSettlementVault.sol";
 import {BinaryMarketMath} from "./libraries/BinaryMarketMath.sol";
-import {PriceHistory} from "./libraries/PriceHistory.sol";
 
 /// @dev Smallest held contribution that an implicit trigger (a buy, a sell or a bare
 /// `fundRound(cycle, 0)`) absorbs into an already-funded cycle. Smaller amounts wait
 /// for a later absorption, an explicit gift (which sweeps everything held) or the
 /// next cycle's first funding (which needs only MIN_FUNDING), so dust transfers
-/// cannot force eight pool writes (about 320k gas measured) onto traders at negligible cost.
+/// cannot force eight pool writes onto traders at negligible cost.
 uint256 constant MIN_AUTO_TOP_UP = 1e18;
 
 interface IIndependentCollateral {
@@ -31,19 +30,13 @@ interface IIndependentCollateral {
 /// an immutable vault, and recycles all remaining capital into a later funded
 /// cycle. Sponsorship creates no LP ownership or withdrawal rights.
 contract IndependentOutcomeMarket is ERC1155 {
-    using PriceHistory for PriceHistory.Data;
-
     uint256 public constant QUESTION_COUNT = 8;
+    uint16 public constant INITIAL_YES_BPS = 5000;
     uint256 public constant MAX_COLLATERAL = 1 << 120;
     uint256 public constant MAX_ROUND_COLLATERAL = MAX_COLLATERAL * QUESTION_COUNT;
     uint256 public constant MAX_INITIAL_QUESTION_FUNDING = MAX_COLLATERAL / 2;
     uint256 public constant MIN_FUNDING = 8e12;
     uint256 public constant MAX_ROUND_ID = type(uint256).max >> 4;
-    /// @dev The zero `donated` argument trades pass to `_absorb`. Load-bearing: it is an
-    /// immutable, not a literal or constant, because a literal argument makes the IR
-    /// optimizer clone `_absorb` for that call site (measured +789 bytes, over EIP-170).
-    uint256 private immutable _noDonation = 0;
-
     IIndependentCollateral public immutable cst;
     IIndependentOutcomeSource public immutable source;
     OutcomeSettlementVault public immutable settlementVault;
@@ -59,9 +52,6 @@ contract IndependentOutcomeMarket is ERC1155 {
         uint256 collateral;
         uint256 yes;
         uint256 no;
-        uint16 initialYesBps;
-        bool seedUsedHistory;
-        PriceHistory.Data history;
     }
 
     struct Round {
@@ -72,8 +62,6 @@ contract IndependentOutcomeMarket is ERC1155 {
         bool finalized;
         uint8 knownMask;
         uint8 values;
-        uint64 startedAt;
-        uint64 finalizedAt;
         Question[8] questions;
     }
 
@@ -85,8 +73,6 @@ contract IndependentOutcomeMarket is ERC1155 {
         bool finalized;
         uint8 knownMask;
         uint8 values;
-        uint64 startedAt;
-        uint64 finalizedAt;
         uint256 activeCollateral;
     }
 
@@ -97,8 +83,6 @@ contract IndependentOutcomeMarket is ERC1155 {
         uint256 escrowRemaining;
         uint16 initialYesBps;
         uint16 currentYesBps;
-        uint256 checkpointCount;
-        bool seedUsedHistory;
     }
 
     /// @dev Preview of `fundRound(roundId, newAmount)`. With `newAmount == 0` it is
@@ -126,7 +110,6 @@ contract IndependentOutcomeMarket is ERC1155 {
     mapping(uint256 => Round) private _rounds;
 
     error InvalidParameters();
-    error InvalidTimestamp();
     error InvalidSourceState();
     error NotInitialized();
     error NotFunded();
@@ -141,7 +124,7 @@ contract IndependentOutcomeMarket is ERC1155 {
     /// @dev Bubbled by the immutable verifier; declared for caller ABI decoders.
     error ProductWouldDecrease();
 
-    event RoundInitialized(uint256 indexed roundId, uint16[8] initialYesBps, bool[8] usedHistory);
+    event RoundInitialized(uint256 indexed roundId);
     /// @dev `caller` triggered the absorption (a sponsor, a trader or anyone) and
     /// is never evidence of having given `transfersUsed`. `donated` is the caller's
     /// own pulled CST (zero for trades and bare triggers), `transfersUsed` the held
@@ -186,6 +169,11 @@ contract IndependentOutcomeMarket is ERC1155 {
         _marketViews = new IndependentMarketViews();
     }
 
+    /// @notice Immutable read helper, exposed for deployment verification.
+    function marketViews() external view returns (IndependentMarketViews) {
+        return _marketViews;
+    }
+
     /// @notice Irrevocable eight-way sponsorship of `newAmount` CST, which also sweeps
     /// every held contribution into the pools. With zero it is the permissionless
     /// trigger that starts a cycle from carry or distributes held CST without trading.
@@ -211,12 +199,11 @@ contract IndependentOutcomeMarket is ERC1155 {
         uint256 nextC = p.collateral + cstIn;
         uint256 nextY = p.yes + (yes ? tokensOut : 0);
         uint256 nextN = p.no + (yes ? 0 : tokensOut);
-        _marketViews.verifyProduct(p.collateral, p.yes, p.no, nextC, nextY, nextN, p.initialYesBps);
+        _marketViews.verifyProduct(p.collateral, p.yes, p.no, nextC, nextY, nextN, INITIAL_YES_BPS);
         p.collateral = nextC;
         p.yes = nextY;
         p.no = nextN;
         totalActiveCollateral += cstIn;
-        _observe(p);
         _pull(msg.sender, cstIn);
         _mint(msg.sender, _id(roundId, question, yes), tokensOut, "");
         emit Trade(roundId, msg.sender, question, yes, true, cstIn, tokensOut);
@@ -233,11 +220,10 @@ contract IndependentOutcomeMarket is ERC1155 {
         uint256 nextC = p.collateral - cstOut;
         uint256 nextY = p.yes - (yes ? tokensIn : 0);
         uint256 nextN = p.no - (yes ? 0 : tokensIn);
-        _marketViews.verifyProduct(p.collateral, p.yes, p.no, nextC, nextY, nextN, p.initialYesBps);
+        _marketViews.verifyProduct(p.collateral, p.yes, p.no, nextC, nextY, nextN, INITIAL_YES_BPS);
         p.collateral = nextC;
         p.yes = nextY;
         p.no = nextN;
-        _observe(p);
         _burn(msg.sender, id, tokensIn);
         totalActiveCollateral -= cstOut;
         _push(msg.sender, cstOut);
@@ -338,22 +324,11 @@ contract IndependentOutcomeMarket is ERC1155 {
         emit Claimed(roundId, msg.sender, payments, total);
     }
 
-    /// @notice Cached lifecycle; timestamps are canonical snapshots once settled.
+    /// @notice Cached lifecycle and the sum of all eight active question budgets.
     function roundState(uint256 roundId) external view returns (RoundView memory result) {
         _validRound(roundId);
         Round storage r = _rounds[roundId];
-        result = RoundView(
-            r.initialized,
-            r.funded,
-            r.settled,
-            r.closed,
-            r.finalized,
-            r.knownMask,
-            r.values,
-            r.startedAt,
-            r.finalizedAt,
-            0
-        );
+        result = RoundView(r.initialized, r.funded, r.settled, r.closed, r.finalized, r.knownMask, r.values, 0);
         for (uint8 q; q < QUESTION_COUNT; ++q) {
             result.activeCollateral += r.questions[q].collateral;
         }
@@ -364,17 +339,10 @@ contract IndependentOutcomeMarket is ERC1155 {
         Round storage r = _rounds[roundId];
         Question storage p = r.questions[question];
         result = QuestionView(
-            p.collateral,
-            p.yes,
-            p.no,
-            r.settled ? settlementVault.remaining(roundId, question) : 0,
-            p.initialYesBps,
-            0,
-            p.history.checkpoints.length,
-            p.seedUsedHistory
+            p.collateral, p.yes, p.no, r.settled ? settlementVault.remaining(roundId, question) : 0, INITIAL_YES_BPS, 0
         );
         if (r.funded && !r.settled) {
-            result.currentYesBps = BinaryMarketMath.marginalYesBps(p.collateral, p.yes, p.no, p.initialYesBps);
+            result.currentYesBps = BinaryMarketMath.marginalYesBps(p.collateral, p.yes, p.no, INITIAL_YES_BPS);
         }
     }
 
@@ -392,30 +360,6 @@ contract IndependentOutcomeMarket is ERC1155 {
 
     function previewSettlement(uint256 roundId) external view returns (bool, uint256, uint256) {
         _forwardView(abi.encodeCall(_marketViews.previewSettlement, (this, roundId)));
-    }
-
-    function seedPreview(uint256 roundId) external view returns (uint16[8] memory prices, bool[8] memory usedHistory) {
-        _validRound(roundId);
-        return _seeds(roundId);
-    }
-
-    function initialPrices(uint256 roundId) external view returns (uint16[8] memory) {
-        _forwardView(abi.encodeCall(_marketViews.initialPrices, (this, roundId)));
-    }
-
-    function historyLength(uint256 roundId, uint8 question) external view returns (uint256) {
-        _validQuestion(roundId, question);
-        return _rounds[roundId].questions[question].history.checkpoints.length;
-    }
-
-    function historyCheckpoint(uint256 roundId, uint8 question, uint256 index)
-        external
-        view
-        returns (uint128 cumulative, uint64 timestamp, uint16 price)
-    {
-        _validQuestion(roundId, question);
-        PriceHistory.Checkpoint storage p = _rounds[roundId].questions[question].history.checkpoints[index];
-        return (p.cumulative, p.timestamp, p.price);
     }
 
     function balancesOf(uint256 roundId, address user) external view returns (uint256[8] memory, uint256[8] memory) {
@@ -497,7 +441,6 @@ contract IndependentOutcomeMarket is ERC1155 {
         if (r.settled) return (0, 0);
         _sync(roundId, r);
         if (!r.finalized) revert NotFinalized();
-        (uint64 start, uint64 end) = _finalTimes(roundId, r);
         uint256[8] memory owed;
         for (uint8 q; q < QUESTION_COUNT; ++q) {
             Question storage p = r.questions[q];
@@ -506,8 +449,6 @@ contract IndependentOutcomeMarket is ERC1155 {
             escrowed += owed[q];
             p.collateral = 0;
         }
-        r.startedAt = start;
-        r.finalizedAt = end;
         r.settled = true;
         totalActiveCollateral -= escrowed + carried;
         pendingCarry += carried;
@@ -526,7 +467,7 @@ contract IndependentOutcomeMarket is ERC1155 {
         Round storage r = _rounds[roundId];
         if (!_sync(roundId, r)) revert RoundNotOpen();
         // Held contributions enter before pricing; an unstarted cycle starts here.
-        _absorb(roundId, r, _noDonation);
+        _absorb(roundId, r, 0);
         if (!r.funded) revert NotFunded();
         return r.questions[question];
     }
@@ -575,7 +516,6 @@ contract IndependentOutcomeMarket is ERC1155 {
         for (uint8 q; q < QUESTION_COUNT; ++q) {
             if (allocations[q] == 0) continue;
             r.questions[q].collateral += allocations[q];
-            _observe(r.questions[q]);
         }
         // `fresh >= donated` unless unsupported destruction left a deficit, which the
         // pull restored first; `donated + transfersUsed + carryUsed == placed`.
@@ -583,51 +523,11 @@ contract IndependentOutcomeMarket is ERC1155 {
         emit RoundFunded(roundId, msg.sender, donated, placed - carryUsed - donated, carryUsed, allocations);
     }
 
+    /// @dev Every cycle starts at 50/50, independently of previous prices and outcomes.
     function _initialize(uint256 roundId, Round storage r) private {
         if (r.initialized) return;
-        _now64();
-        (uint16[8] memory prices, bool[8] memory used) = _seeds(roundId);
-        for (uint8 q; q < QUESTION_COUNT; ++q) {
-            r.questions[q].initialYesBps = prices[q];
-            r.questions[q].seedUsedHistory = used[q];
-        }
         r.initialized = true;
-        emit RoundInitialized(roundId, prices, used);
-    }
-
-    function _seeds(uint256 roundId) private view returns (uint16[8] memory prices, bool[8] memory used) {
-        Round storage current = _rounds[roundId];
-        if (current.initialized) {
-            for (uint8 q; q < QUESTION_COUNT; ++q) {
-                prices[q] = current.questions[q].initialYesBps;
-                used[q] = current.questions[q].seedUsedHistory;
-            }
-            return (prices, used);
-        }
-        if (roundId == 0 || !_rounds[roundId - 1].initialized) {
-            for (uint8 q; q < QUESTION_COUNT; ++q) {
-                prices[q] = 5000;
-            }
-            return (prices, used);
-        }
-        Round storage previous = _rounds[roundId - 1];
-        uint64 start;
-        uint64 end;
-        if (previous.settled) {
-            start = previous.startedAt;
-            end = previous.finalizedAt;
-        } else {
-            (bool open, bool finalized, uint8 known, uint8 values) = source.outcomeState(roundId - 1);
-            _checkSource(previous, open, finalized, known, values);
-            if (!finalized) revert NotFinalized();
-            (start, end) = _finalTimes(roundId - 1, previous);
-        }
-        for (uint8 q; q < QUESTION_COUNT; ++q) {
-            Question storage p = previous.questions[q];
-            (uint16 price, bool historyUsed) = p.history.average(start, end, p.initialYesBps);
-            prices[q] = price == 0 ? 1 : (price >= 10_000 ? 9999 : price);
-            used[q] = historyUsed;
-        }
+        emit RoundInitialized(roundId);
     }
 
     /// @dev The source's open flag is the only trading/splitting/funding cutoff; knownMask
@@ -655,22 +555,6 @@ contract IndependentOutcomeMarket is ERC1155 {
         ) revert InvalidSourceState();
     }
 
-    function _finalTimes(uint256 roundId, Round storage r) private view returns (uint64 start, uint64 end) {
-        uint64 now_ = _now64();
-        (uint256 first, uint256 last) = source.cycleTimes(roundId);
-        if (first > last || last > now_) revert InvalidTimestamp();
-        // last<=now_<=uint64.max also bounds first.
-        // forge-lint: disable-next-line(unsafe-typecast)
-        start = uint64(first);
-        // forge-lint: disable-next-line(unsafe-typecast)
-        end = uint64(last);
-        for (uint8 q; q < QUESTION_COUNT; ++q) {
-            PriceHistory.Data storage history = r.questions[q].history;
-            uint256 length = history.checkpoints.length;
-            if (length != 0 && history.checkpoints[length - 1].timestamp > end) revert InvalidTimestamp();
-        }
-    }
-
     function _capacity(Round storage r, bool initial) private view returns (uint256 result) {
         uint256 minimum = type(uint256).max;
         uint256 firstMinimum;
@@ -691,17 +575,6 @@ contract IndependentOutcomeMarket is ERC1155 {
         for (uint8 q; q < QUESTION_COUNT; ++q) {
             amounts[q] = base + (q < remainder ? 1 : 0);
         }
-    }
-
-    function _observe(Question storage p) private {
-        p.history.observe(_now64(), BinaryMarketMath.marginalYesBps(p.collateral, p.yes, p.no, p.initialYesBps));
-    }
-
-    function _now64() private view returns (uint64) {
-        if (block.timestamp > type(uint64).max) revert InvalidTimestamp();
-        // Explicit range check above prevents truncation.
-        // forge-lint: disable-next-line(unsafe-typecast)
-        return uint64(block.timestamp);
     }
 
     /// @dev These external preview wrappers and the immutable helper declare
@@ -772,16 +645,6 @@ contract IndependentMarketViews {
         }
     }
 
-    function initialPrices(IndependentOutcomeMarket market, uint256 roundId)
-        external
-        view
-        returns (uint16[8] memory prices)
-    {
-        for (uint8 q; q < 8; ++q) {
-            prices[q] = market.questionState(roundId, q).initialYesBps;
-        }
-    }
-
     function balancesOf(IndependentOutcomeMarket market, uint256 roundId, address user)
         public
         view
@@ -812,7 +675,6 @@ contract IndependentMarketViews {
         if (!r.settled) {
             (, bool finalized,, uint8 observed) = _source(market, roundId, r);
             if (!finalized) return (false, 0, amounts);
-            _times(market, roundId);
             values = observed;
         }
         (uint256[8] memory y, uint256[8] memory n) = balancesOf(market, roundId, user);
@@ -833,7 +695,6 @@ contract IndependentMarketViews {
         if (r.settled) return (true, 0, 0);
         (, bool finalized,, uint8 values) = _source(market, roundId, r);
         if (!finalized) return (false, 0, 0);
-        _times(market, roundId);
         for (uint8 q; q < 8; ++q) {
             IndependentOutcomeMarket.QuestionView memory p = market.questionState(roundId, q);
             uint256 owed = (values & (uint8(1) << q)) != 0 ? p.yesSupply : p.noSupply;
@@ -854,20 +715,6 @@ contract IndependentMarketViews {
                 || (r.closed && open) || (r.finalized && !finalized)
                 || (finalized && (open || known != type(uint8).max))
         ) revert IndependentOutcomeMarket.InvalidSourceState();
-    }
-
-    function _times(IndependentOutcomeMarket market, uint256 roundId) private view {
-        (uint256 first, uint256 last) = market.source().cycleTimes(roundId);
-        if (first > last || last > block.timestamp || block.timestamp > type(uint64).max) {
-            revert IndependentOutcomeMarket.InvalidTimestamp();
-        }
-        for (uint8 q; q < 8; ++q) {
-            uint256 length = market.historyLength(roundId, q);
-            if (length != 0) {
-                (, uint64 timestamp,) = market.historyCheckpoint(roundId, q, length - 1);
-                if (timestamp > last) revert IndependentOutcomeMarket.InvalidTimestamp();
-            }
-        }
     }
 
     /// @dev Read-only lens; no funds, permissions or configurable addresses.
@@ -893,10 +740,6 @@ contract IndependentMarketViews {
             (bool canSettle,, uint256 carry) = _settlement(market, lastFunded);
             ready = ready && canSettle;
             result.availableCarry += carry;
-        }
-        if (ready) {
-            if (block.timestamp > type(uint64).max) revert IndependentOutcomeMarket.InvalidTimestamp();
-            if (!r.initialized) market.seedPreview(roundId);
         }
         uint256 maxC = market.MAX_COLLATERAL();
         uint256 initialCap = market.MAX_INITIAL_QUESTION_FUNDING();

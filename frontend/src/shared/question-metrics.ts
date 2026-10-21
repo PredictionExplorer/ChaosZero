@@ -10,10 +10,12 @@ export interface CycleStats {
   highestCstPaid: bigint;
   enduranceDuration: bigint;
   chronoDuration: bigint;
-  enduranceGesture: bigint;
-  chronoGesture: bigint;
-  firstGestureTime: bigint;
-  lastGestureTime: bigint;
+  enduranceGesture?: bigint;
+  chronoGesture?: bigint;
+  firstGestureTime?: bigint;
+  lastGestureTime?: bigint;
+  sameGesture?: boolean;
+  supported?: boolean;
   finalized: boolean;
 }
 
@@ -34,7 +36,7 @@ export function formatQuestionMetric(
   question: number,
 ): string {
   const item: QuestionDefinition | undefined = QUESTIONS[question];
-  if (!stats || !item) return "—";
+  if (!stats || !item || stats.supported === false) return "—";
   const metric = item.metric;
   switch (metric) {
     case "gestures":
@@ -50,6 +52,12 @@ export function formatQuestionMetric(
     case "parity":
       return `${stats.gestureCount.toLocaleString()} · ${stats.gestureCount % 2n === 1n ? "odd" : "even"}`;
     case "sameGesture":
+      if (stats.enduranceGesture === undefined)
+        return !stats.finalized
+          ? "Decided at closure"
+          : stats.sameGesture
+            ? "Same gesture"
+            : "Different gestures";
       return stats.gestureCount === 0n
         ? "No gestures yet"
         : `#${stats.enduranceGesture} / #${stats.chronoGesture}`;

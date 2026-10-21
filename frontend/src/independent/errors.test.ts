@@ -16,7 +16,6 @@ describe("independent contract errors", () => {
     "FundingCapacity",
     "NotInitialized",
     "NotFunded",
-    "InvalidTimestamp",
     "NonPositiveReserve",
     "InvalidCollateral",
     "InvalidProbability",

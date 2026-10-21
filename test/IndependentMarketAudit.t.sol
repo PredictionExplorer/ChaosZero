@@ -196,21 +196,18 @@ contract IndependentMarketAuditTest is Test {
         assertEq(keccak256(abi.encode(market.questionStates(1))), before_);
     }
 
-    function test_sourceClosedMergesDoNotExtendTheHistoricalPriceWindow() public {
+    function test_closedCycleMergesRemainAvailableWithoutTheSource() public {
         vm.prank(ALICE);
         market.splitPosition(1, 0, 10e18);
-        uint256 length = market.historyLength(1, 0);
         _close(1, 1100, 1);
         source.setUnavailable(1, true);
         vm.warp(1_000_000);
         vm.prank(ALICE);
         assertEq(market.mergePosition(1, 0, 7e18), 7e18);
-        assertEq(market.historyLength(1, 0), length);
         source.setUnavailable(1, false);
         (uint256 debt, uint256 carried) = market.settleRound(1);
         assertEq(debt, 3e18);
         assertEq(carried, SEED);
-        assertEq(market.roundState(1).finalizedAt, 1100);
     }
 
     function test_settlementSeparatesOneToOneClaimsAllSurplusAndUntrackedDonations() public {
@@ -292,7 +289,7 @@ contract IndependentMarketAuditTest is Test {
         assertEq(token.balanceOf(address(vault)), 0);
     }
 
-    function test_twapUsesCanonicalMiddleTimeAndNotTheLateBookkeepingTime() public {
+    function test_nextCycleStartsAtFiftyFiftyWhenThePreviousSourceIsUnavailableAfterSettlement() public {
         vm.warp(1040);
         vm.prank(ALICE);
         market.buy(1, 0, true, 10e18, 15e18, type(uint256).max);
@@ -310,8 +307,7 @@ contract IndependentMarketAuditTest is Test {
         _open(2, 1_000_001);
         market.fundRound(2, 0);
         IndependentOutcomeMarket.QuestionView memory p = market.questionState(2, 0);
-        assertEq(p.initialYesBps, 5539); // floor((10*5365 + 10*5714)/20)
-        assertTrue(p.seedUsedHistory);
+        assertEq(p.initialYesBps, 5000);
         assertEq(p.currentYesBps, p.initialYesBps);
     }
 

@@ -11,8 +11,8 @@ describe("social share card", () => {
   it("has alt text that names the brand and explains the market", () => {
     expect(OG_ALT).toMatch(/chaos zero/i);
     expect(OG_ALT).toMatch(/cosmic signature/i);
-    expect(OG_ALT).toMatch(/YES or NO/);
-    expect(OG_ALT).toMatch(/gestures/i);
+    expect(OG_ALT).toMatch(/YES\/NO/);
+    expect(OG_ALT).toMatch(/eight independent/i);
   });
 
   it("ships the display font it renders with", () => {

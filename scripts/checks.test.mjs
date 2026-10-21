@@ -119,6 +119,13 @@ test("every checked-in differential fixture, including the logarithm corpus, has
 });
 
 test("shared tooling changes require both application and contract checks", () => {
+  for (const path of [
+    "hardhat.config.js",
+    "remappings.txt",
+    "deployment/arbitrum-round-2-baseline.json",
+  ]) {
+    assert.deepEqual(classifyChanges([path]), { contracts: true, frontend: true, tooling: true });
+  }
   assert.deepEqual(classifyChanges(["scripts/check.mjs"]), {
     contracts: true,
     frontend: true,

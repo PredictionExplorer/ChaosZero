@@ -105,13 +105,17 @@ export function IndependentQuestionCard({
         <div>
           <p className="mb-1 text-ink-faint">{item.currentLabel ?? "This cycle"}</p>
           <p className="font-mono" data-testid={`current-${question}`}>
-            {formatQuestionMetric(snapshot.local?.current, question)}
+            {formatQuestionMetric(snapshot.metrics?.current ?? snapshot.local?.current, question)}
           </p>
         </div>
         <div>
           <p className="mb-1 text-ink-faint">{item.condition ? "Condition" : "Previous cycle"}</p>
           <p className="font-mono">
-            {item.condition ?? formatQuestionMetric(snapshot.local?.previous, question)}
+            {item.condition ??
+              formatQuestionMetric(
+                snapshot.metrics?.previous ?? snapshot.local?.previous,
+                question,
+              )}
           </p>
         </div>
       </div>
@@ -142,11 +146,7 @@ export function IndependentQuestionCard({
             {state.pool.initialYesBps > 0 ? percent(state.pool.initialYesBps) : "—"}
           </span>
         </div>
-        <p data-testid={`question-history-${question}`}>
-          {state.usedHistory
-            ? "Inherited from the previous cycle’s middle-window price average."
-            : "Fallback seed: no covering prior price history."}
-        </p>
+        <p>Every cycle opens at 50% YES / 50% NO.</p>
       </div>
       <div className="mt-auto grid grid-cols-2 gap-2">
         {[true, false].map((yes) => (

@@ -1,123 +1,164 @@
 # Chaos Zero
 
-Eight recurring questions about Cosmic Signature, each with independent CST liquidity, funded together through one market contract.
+Eight recurring YES/NO questions about Cosmic Signature V3 on Arbitrum One. Every
+question has its own CST-backed automated market maker, and every new cycle opens
+at **50% YES / 50% NO**. Previous prices and historical game timestamps do not
+influence the opening odds.
 
-**This branch is a local prototype.** It includes independent question-pool accounting, fake CST, an on-chain game simulator, and a browser interface with extensive financial/property tests. No live eight-question result adapter is shipped. The simulator and its outcome adapter reject deployment on chains other than `31337`; the prototype frontend rejects public-chain use. After the current live round ends, this eight-question engine is intended to replace the single-question market for new rounds. The deployed `GestureSeriesMarket`, its configuration and its interface stay unchanged so current users can exit; see [LEGACY_MARKET.md](LEGACY_MARKET.md).
+The contracts are deployed on Arbitrum One, and this checkout's production frontend
+configuration points to the verified eight-question market. **The frontend has
+not been published as part of this connection step.** The local simulator remains
+separate and uses disposable funds.
 
-## Run the complete local system
+- Market: `0x2BC4759A2b44e1197EAdc4E035Eb8c52299658d2`
+- V3 outcome source: `0x099c29624E05506582655417344A17FB71c9d138`
+- Payout vault: `0x60F79aF7378Dc06F7747827446b32157c796dd3e`
+- Read helper: `0x5E286886fD4073D9ab63829081608aAfB610fD06`
 
-Requirements: Foundry `v1.7.1` (`forge` and `anvil`), pnpm `10.32.0`, and Node 22.23.2 or a supported Node 24 release. CI pins Node 22.23.2.
+## The eight questions
+
+| ID  | Question                                 | Resolution                                                                                 |
+| --- | ---------------------------------------- | ------------------------------------------------------------------------------------------ |
+| 0   | More gestures than the previous cycle?   | Final total of ETH and CST gestures is greater.                                            |
+| 1   | Longer Endurance Champion duration?      | Final longest uninterrupted duration is greater.                                           |
+| 2   | Longer Chrono Warrior duration?          | Final longest tenure of an Endurance record is greater.                                    |
+| 3   | More ETH spent on gestures?              | Actual ETH gesture charges are greater, excluding separate contributions and refunded ETH. |
+| 4   | More CST burned through gestures?        | Gross CST gesture charges are greater, before any CST reward offsets.                      |
+| 5   | Odd final gesture count?                 | An odd total resolves YES; an even total resolves NO.                                      |
+| 6   | Same gesture earns Endurance and Chrono? | The same individual gesture earns both titles. Matching wallets alone is insufficient.     |
+| 7   | Higher maximum CST payment?              | The largest actual CST payment for one gesture is greater.                                 |
+
+Strict-comparison ties resolve NO. The game continues to determine its own cycle
+boundaries. Trading, splitting and funding remain available until the actual
+round-ending transaction advances `roundNum`, even when an answer is already
+known. An elapsed countdown does not finalize a market. All eight settle together
+after closure.
+
+## Production game and launch baseline
+
+The production game proxy is `0x6a714Ae7B5b6eA520F6BCA23d2E609C4Fd5863F2` and CST
+is `0xAD91843e6A58Ba560F577E676986AFb1dba6FBA0` on chain **42161**. The V3
+implementation inspected for this release is
+`0xc1b97E1b0baC86248653B18706dbC5c8898c5c06`.
+
+`V3OutcomeSource` reads all eight results from the game's permanent `roundStats`
+and uses `tryGetCurrentChampions` for live durations. It resolves the dual-title
+question from the game's individual-gesture flag. No historical timestamp getter,
+price oracle, administrator result submission or keeper is required for the
+normal V3 cycle flow.
+
+Round 3's predecessor completed under V2 and lacks five comparative values in
+those new getters. The launch adapter freezes the reconstructed round 2
+baseline at construction; subsequent cycles compare native V3 records. The
+[published evidence](deployment/arbitrum-round-2-baseline.json) cross-checks 1,257
+gestures, 1,253 block headers, 1,258 transaction receipts and 13 wallets. Reproduce
+it with `pnpm verify:baseline` (`--refresh` fetches fresh evidence; `--offline`
+rechecks previously downloaded evidence). This explicitly accepted one-time input
+is **not an on-chain historical proof verifier**. See [the integration notes](GAME_STORAGE_REQUIREMENTS.md) and
+[deployment procedure](DEPLOYMENT.md).
+
+## Equal AMM funding
+
+`fundRound(cycle, amount)` contributes existing CST to all eight pools. Every
+amount is divided equally; indivisible base-unit remainders go to the lowest
+question IDs, with at most one base unit of difference. The market cannot mint
+CST. Contributions are irreversible: **no LP shares, trading fees, refunds or
+sponsor withdrawal rights** are created.
+
+CST transferred directly to the market is also a contribution. A transfer cannot
+execute market code, so the next eligible buy, sell or funding call absorbs it
+before pricing. During an already funded cycle, implicit absorption waits until
+at least **1 CST** is held. Smaller amounts wait for more, any explicit gift, or
+the next cycle's opening. Splits, merges, claims, settlement and position transfers
+do not absorb held funding.
+
+Each question maintains separate collateral and YES/NO liabilities. Its trades
+cannot spend another question's backing. A transaction may first distribute held
+funding to all eight questions, then price its selected question against the
+updated pool.
+
+At settlement, every outstanding winning unit is reserved in
+`OutcomeSettlementVault` and pays exactly one CST. Remaining collateral becomes
+carry for a subsequent cycle, divided equally among its eight pools. Old claims
+have no expiry and cannot become new-cycle liquidity. The first funding or trading
+call of a new cycle settles the last funded cycle before opening the new pools.
+
+## Pricing and positions
+
+The AMM uses reserves `C - YES supply` and `C - NO supply` with equal fixed
+weights. New pools always start at 50/50, regardless of previous trading. Exact
+trade amounts are checked with rigorously enclosed integer logarithms; the
+frontend quotes with BigInt. See [the numerical arguments](src/libraries/LOG_BOUNDS.md).
+
+One CST splits into one YES and one NO unit for the same question and cycle. A
+matching pair merges back into one CST without changing the AMM reserves. Splits
+do not by themselves fund trading liquidity. Pairs from different questions or
+cycles cannot be merged. Source-independent pair merging remains available after
+closure; settled winning claims also no longer require the adapter.
+
+Positions are ERC-1155 tokens. Their current holder receives sale, merge or claim
+proceeds. An operator approval authorizes transfers of all an owner's position
+types until revoked; the interface's direct transfers do not require such an
+approval. The token ID is `(cycle << 4) | (question << 1) | side`, with YES=1,
+NO=0 and 18-decimal amounts.
+
+Quotes have exact input/output amounts and an expiry. A changed pool can make a
+quote revert but cannot cause that transaction to fill worse. Network fees still
+apply. Additional funding can move a pool toward 50/50. Tiny trades can be
+unquotable due to integer bounds; each question's collateral is capped at `2^120`
+base units. Exact-transfer, non-rebasing collateral is required.
+
+## Run locally
+
+Use Node 22.23.2 or supported Node 24, pnpm 10.32.0 and Foundry 1.7.1.
 
 ```sh
 pnpm setup:dev
 pnpm dev:local
 ```
 
-Open <http://127.0.0.1:3000/shared>. Connect a local test wallet and use **Get 1,000 test CST**. Buy or sell positions, split CST into complete YES/NO pairs, merge matching pairs back into CST, or transfer positions to another wallet. You can also make an irreversible gift to all eight pools, send test CST directly to the market and watch the next trade distribute it, place simulated game gestures, advance local time, close a cycle, retrieve winning positions, and start the next cycle with its first trade, which carries unused funding into the new pools. Three disposable test wallets let you exercise transfers and redemption by the recipient.
+Open <http://127.0.0.1:3000/>. The launcher creates a fresh, disposable Anvil chain,
+local CST and game simulator, and an independent market funded with 10,000 test
+CST. It requires no private key. Local controls can obtain test CST, place gestures,
+advance time and close cycles. Those controls are unavailable on Arbitrum.
 
-The launcher starts a fresh Anvil chain, deploys fake CST and the local game, deploys the independent market and its payout vault, contributes 10,000 fake CST divided equally across eight pools, and starts Next.js with the matching addresses. It uses only Anvil's public unlocked accounts; it never needs a private key. Stop it with Ctrl+C. All development funds are disposable.
+Override local ports with `PORT=3100 ANVIL_PORT=8555 pnpm dev:local`. The launcher
+refuses occupied ports. `pnpm local:smoke` checks the actual browser quote solver
+against the running contracts and restores its starting chain snapshot.
 
-The default ports are 3000 for the website and 8545 for Anvil. Override them without editing files:
-
-```sh
-PORT=3100 ANVIL_PORT=8555 pnpm dev:local
-```
-
-The launcher refuses occupied ports instead of attaching to an unrelated process. Deployment details are written to the ignored `.local/shared-deployment.json`. With the local system running, `pnpm local:smoke` executes the real frontend quote code against the deployed contracts, then restores an Anvil snapshot.
-
-## The eight fixed questions
-
-Questions 0–4 and 7 compare against the preceding finalized cycle. Questions 5
-and 6 use only the current cycle: 5 is the parity of its total gesture count, 6
-a same-gesture fact. Both are decided only at closure. Strict-comparison ties
-resolve NO.
-
-| ID  | Question                                         | Result                                                                                                   |
-| --- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
-| 0   | More gestures than the previous cycle?           | Total ETH and CST gesture count is greater.                                                              |
-| 1   | Longer Endurance Champion time?                  | Maximum uninterrupted duration is greater.                                                               |
-| 2   | Longer Chrono Warrior time?                      | Maximum tenure of an Endurance record is greater.                                                        |
-| 3   | More ETH spent on gestures?                      | Actual ETH gesture payments are greater; separate contributions are excluded.                            |
-| 4   | More CST burned through gestures?                | CST gesture payments are greater; unrelated token burns are excluded.                                    |
-| 5   | Odd number of gestures?                          | The final total of ETH and CST gestures is odd; an even total resolves NO.                               |
-| 6   | Does the same gesture earn Endurance and Chrono? | The two winning record episodes originate from the same gesture. Matching wallets alone is insufficient. |
-| 7   | Higher maximum CST payment?                      | The largest CST amount actually paid for one gesture is greater.                                         |
-
-**Markets never end early.** Even when an answer, or all eight, is already known, buying, selling, splitting, funding and automatic distribution continue until the game's round-ending transaction (`claimMainPrize` on the live game, `closeCycle` in the simulator); merging never stops. Neither the countdown reaching zero nor the claim timeout closes a market. Payouts start only after that transaction, and all eight settle together; the interface shows no question as resolved before then. Questions 0–4 and 7 can become permanently YES before closure; that knowledge never ends trading or starts payouts. A known or highly predictable question can consume only its own funding. Anyone can flip question 5 with one more gesture, even a zero-price CST gesture, and every gesture extends the countdown, so its price reflects a contest over the final gesture rather than a forecast. The source still validates monotonic facts.
-
-## Funding, settlement and rollover
-
-`IndependentOutcomeMarket` does not mint CST. Anyone may contribute existing CST by calling `fundRound(cycle, newAmount)` or by sending or minting CST directly to the market address. Contributions are irreversible gifts: no LP shares, fees, refunds, or sponsor withdrawal authority. A mistaken direct transfer is a gift too and cannot be recovered. Each contribution is divided equally across eight questions; indivisible base-unit remainders go to the lowest question IDs, with at most one unit difference.
-
-A plain transfer cannot run market code, so distribution is automatic but not instant. CST held above active collateral and pending carry enters the pools at the next `buy`, `sell` or `fundRound` on an open cycle, before that call prices anything. On a trading cycle, a buy, a sell or the permissionless trigger `fundRound(cycle, 0)` absorbs held CST once it totals at least 1 CST (`MIN_AUTO_TOP_UP`); smaller amounts wait for more, for an explicit gift, or for the next cycle's start. Any `fundRound` with new CST also sweeps everything held. When no cycle is trading, contributions wait and join the next cycle's pools when it starts. Splits, merges, claims, settlement and position transfers never absorb held CST.
-
-Each question keeps its own collateral and YES/NO liabilities. A trade in one question changes none of the other seven pools. All positions remain standard ERC-1155 tokens, and one winning unit pays exactly one CST.
-
-After actual game closure, anyone can call `settleRound`. For each question, the contract reserves all outstanding winning shares in `OutcomeSettlementVault`, zeros its active collateral, and adds the remaining CST to `pendingCarry`. There is no winner bonus. Claimants never need to coordinate or claim first; old claims have no expiry and cannot become another cycle's funding.
-
-The first buy, sell or funding transaction of a new cycle automatically settles the latest previously funded cycle, then combines its surplus with held contributions and any new `fundRound` CST before anything is priced. Carry is divided equally across the new eight pools. `fundRound(cycle, 0)` starts a cycle without trading. Starting needs at least `MIN_FUNDING` in total. The first transaction pays for settlement and startup (about 1.24M gas in the local probe, where an ordinary cold buy used about 209k) and reverts while the previous cycle cannot yet settle. If game cycles pass without funded markets, the credit waits for the next funded cycle without an unbounded catch-up loop.
-
-Carry never arrives later as a price-changing top-up to an already-funded cycle. `fundRound` gifts and held contributions can: they move prices toward the cycle's fixed initial odds. Because they enter before pricing, an exact-amount trade executes as quoted or reverts; a gift can make a stale quote fail, never fill worse. Placement order is carry (first funding only), then the caller's own new CST, then held contributions. Initial funding has a numerical headroom cap and every pool a collateral ceiling. Carry and held CST that do not fit stay explicitly pending for later cycles; new `fundRound` CST that does not fit after carry reverts with `FundingCapacity`. Held amounts under 1 CST can be partly captured by one transaction that pre-positions, sweeps them with a 1-wei `fundRound` gift, and unwinds; see [SECURITY.md](SECURITY.md).
-
-The token, source, payout vault and read-only helper contracts are fixed at deployment. The market has no administrator or upgrade mechanism. Only CST held by the market is distributed; CST sent to the payout vault stays there uncredited.
-
-## Complete sets and transferable positions
-
-One CST splits into one YES unit and one NO unit for **one question in one cycle**. A matching pair merges back into exactly one CST, without a fee or price change. Splitting and merging change collateral and the corresponding liabilities equally, leaving every virtual AMM reserve unchanged. YES from one question cannot be paired with NO from another question or cycle.
-
-Splitting requires an open cycle, even if that question's answer is already known. It works before sponsorship, but does not fund the AMM: a pool containing only split collateral has no trading reserve. Complete sets can still be merged or settled if no sponsor ever funds that cycle. Merging is available after closure and after unused funding rolls forward; settled pairs are paid from their original question’s escrow. It deliberately makes no call to the result source, so matched pairs remain redeemable if that source becomes unavailable. Retrieval burns the caller’s positions after final settlement; those burned units cannot also be merged.
-
-Once the market has settled the cycle, `claimKnown` pays according to the permanently cached answers without another source call. This also covers winning positions transferred after finalization. Before settlement is cached, retrieval requires a fresh, consistent source response and full cycle closure. Recovery operations must use fresh wallet balances and the same network/account guards as ordinary transactions.
-
-Positions implement ERC-1155 using pinned OpenZeppelin Contracts. Standard `balanceOf`, `balanceOfBatch`, safe single/batch transfers, operator approvals, ERC-165 discovery, and on-chain metadata are available. An approved operator can transfer **all** of an owner's position types, including positions acquired later, until approval is revoked. The web interface sends owner-authorized transfers and requires no operator approval. Smart-contract recipients must implement ERC-1155 acceptance callbacks.
-
-The position ID is `(cycle << 4) | (question << 1) | side`, where question IDs are 0–7, YES is 1 and NO is 0. Supported cycle IDs are at most `2^252 - 1`. Position amounts use the same 18-decimal units as CST. `totalSupply(id)` counts issued user positions, excluding virtual pool reserves. Transfers change the holder, never total liabilities or the odds. The current holder receives sale, merge, or settlement proceeds.
-
-`mergePosition` redeems one question's pairs. `mergePositions` takes a fixed array of eight amounts and redeems pairs from several questions atomically. The browser shows each question's mergeable amount and offers a single merge-all transaction. If the game/result source cannot be read, the recovery view can load a specified cycle directly from the market and allow merges and transfers from freshly read holdings.
-
-## Independent pricing and inherited initial odds
-
-Every question uses its own weighted fixed-product curve. Its reserves are `C - YES supply` and `C - NO supply`, with fixed positive weights encoding its initial YES probability. The real liabilities contain only issued tokens. Exact trade amounts are verified by rigorously enclosing logarithm bounds; the browser independently solves quotes using BigInt. See [the numerical and accounting arguments](src/libraries/LOG_BOUNDS.md).
-
-Starting probabilities come from the **time-weighted average of the previous cycle’s recorded quotes over 40–60% of its duration**. These percentages describe a time window, not a restriction on market odds. Canonical game start/closure timestamps define the window; a delayed market settlement cannot move it. Packed cumulative-price checkpoints make each lookup logarithmic in history length, and repeated observations at one timestamp gain no additional weight.
-
-If the window is not covered or has zero duration, the previous initial seed is retained. If the immediately preceding game cycle has no initialized market, the fallback is 50%. Seeds are bounded to 1–9,999 basis points so both outcome weights remain positive. Historical middle prices are a starting heuristic: six questions have different thresholds in the next cycle, and thin-market prices can be influenced.
-
-Each winning share pays one CST. Buying increases custody and issues claims; it does not turn the full deposit into free sponsor capital. The interface separates active collateral, payout escrow, carry, and each question’s remaining reserve. Splitting and merging preserve both reserves and prices.
-
-There are no trading fees. Quotes specify exact amounts and an expiry; changing state can invalidate them, and very small trades can be unavailable because of integer bounds. Collateral is bounded by `2^120` base units per question. Tokens must transfer exact amounts; transfer taxes and rebasing are unsupported.
-
-## Local simulator versus the real game
-
-The local game follows the V2 champion-record algorithm, strict tie behavior, ETH/CST calibration feedback, CST burns, and square-root gesture rewards. Its timers are shorter: a 24-minute opening countdown, one-minute extensions and a two-minute open-claim timeout. `closeCycle` stands in for `claimMainPrize`: it is the only transaction that ends a cycle and its markets, and the timers decide only who may call it and when. Cycle zero is a deterministic replayed fixture, making all comparisons usable immediately.
-
-The simulator simplifies ETH opening prices and rollover settings, and omits NFTs, selection, and ETH allocation tracks. It is an integration test environment, not an economic forecast model. It uses chain time; local time controls call Anvil explicitly. It has no method for supplying arbitrary market answers.
-
-## Checks
+For the production prelaunch homepage without a local chain:
 
 ```sh
-pnpm check:contracts  # compiler, sizes, all Solidity suites, three vector generators
-pnpm check:frontend   # formatting, lint, types, coverage, build, dependency audit
-pnpm test:tooling     # Git gate and fixture-consistency regression tests
-pnpm check:vectors   # reproduce checked-in Solidity/TypeScript differential fixtures
-pnpm test:e2e:install # install the isolated Chromium test browser once
-pnpm test:e2e         # disposable Anvil + deployed contracts + real browser flows
-pnpm check           # complete pre-push gate
-pnpm test:heavy      # 50,000 fuzz cases; 512 campaigns × 256 invariant actions
+pnpm --dir frontend dev
 ```
 
-The normal profile runs 1,000 cases per fuzz property and 64 × 64 actions per invariant campaign. Coverage includes independent question/cycle accounting, trading on known answers until the round-ending transaction, late claims, rollover, weighted pricing boundaries, middle-window history, source contradictions, exact token transfers, receiver callbacks, and compiler/frontend differential execution. The local champion calculator is compared with an independent record-episode model.
+See [frontend configuration](frontend/README.md). The verified market/source
+addresses are configured for production builds. All contract addresses are public configuration;
+private keys and explorer API keys never belong in frontend environment variables.
 
-Nightly CI runs the heavy profile and records a reproducible seed. Failures must be fixed or investigated; passing tests are not a substitute for an independent security audit before real-value deployment.
+## Deploy later
 
-Git hooks are installed by `pnpm setup:dev`. Pre-commit verifies the staged sources, formatting, relevant whole suites, and generated vectors. Pre-push adds production build, coverage, browser tests, and dependency audits. CI independently enforces the gates. See [CONTRIBUTING.md](CONTRIBUTING.md).
+[DEPLOYMENT.md](DEPLOYMENT.md) documents the interactive Hardhat commands for
+Arbitrum deployment and automatic Arbiscan verification. They prompt in a hidden
+terminal for credentials, keep them in memory, suppress sensitive diagnostics,
+and persist only public deployment receipts. A separate verification command
+requires no signing key. Running tests never broadcasts to Arbitrum.
 
-## Before a real-CST pilot
+## Verification
 
-See [the concise game-storage requirements](GAME_STORAGE_REQUIREMENTS.md) for the upgrade path, including reuse of the champion-duration history already present in V3 source.
+```sh
+pnpm check             # full repository gate
+pnpm check:contracts   # compiler, size, unit/fuzz/invariant suites
+pnpm check:frontend    # lint, types, coverage, build, dependency audit
+pnpm check:vectors     # Solidity/browser differential fixtures and math oracle
+pnpm test:deployment   # hidden prompts, secret handling, local deploy/resume/verify
+pnpm test:baseline     # historical replay, strict ties and evidence validation
+pnpm test:e2e          # disposable local chain and real browser lifecycle
+pnpm test:heavy        # 50,000 fuzz inputs per property; 512 x 256 invariant campaigns
+```
 
-The live V2 game does not retain all eight historical statistics. The local source must never be substituted for a production resolver. A future integration must either verify historical game receipts against authenticated Arbitrum block hashes, or use game-provided immutable per-cycle statistics after an upgrade. Neither plain indexer responses nor creator-signed results meet the intended trustless design.
-
-An immutable production adapter, its liveness/recovery plan, gas measurements on Arbitrum, and independent financial review are required before a real-CST launch. This branch does not broadcast a public deployment or change the existing production address.
-
-A future game upgrade can issue a fixed funding budget by transferring or minting CST to the market, which distributes it like any other contribution. That is separate from this version's creator-contributed funding and must not grant the market unlimited minting authority.
+The repository includes adversarial accounting, transfer, source, pricing and
+recovery tests. [VALIDATION.md](VALIDATION.md) records completed runs and their
+limits. Passing tests cannot guarantee absence of bugs or replace an independent
+security audit. [SECURITY.md](SECURITY.md) describes the trust boundary and economic
+limitations. [CONTRIBUTING.md](CONTRIBUTING.md) describes gates and reproducibility.

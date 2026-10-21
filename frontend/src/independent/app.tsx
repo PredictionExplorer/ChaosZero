@@ -13,6 +13,8 @@ import { formatCst, shortAddress } from "@/lib/format";
 import { formatDuration } from "@/shared/question-metrics";
 import { QUESTIONS, type QuestionId } from "@/shared/questions";
 import { independentMarketAddress } from "./config";
+import { PrelaunchMarkets } from "./prelaunch";
+import { isMarketChain } from "./deployment";
 import { LOCAL_DIRECT_TRANSFER, MIN_AUTO_TOP_UP } from "./models";
 import {
   IndependentFundingPanel,
@@ -27,25 +29,8 @@ import { IndependentRecoveryPanel } from "./recovery";
 
 export function IndependentGate() {
   const params = useSearchParams();
-  if (appConfig.chain.id !== 31337)
-    return (
-      <Card accent="ended" className="p-8">
-        <h2 className="font-display text-xl font-semibold">Local prototype only</h2>
-        <p className="mt-3 text-sm text-ink-dim">
-          Independent pools use the local test network. Public-chain transactions remain disabled
-          until a verified live source is integrated.
-        </p>
-      </Card>
-    );
-  if (!independentMarketAddress)
-    return (
-      <Card accent="signal" className="p-8">
-        <h2 className="font-display text-xl font-semibold">Independent market not configured</h2>
-        <p className="mt-3 text-sm text-ink-dim">
-          Start the local workspace to connect its independently funded questions and test CST.
-        </p>
-      </Card>
-    );
+  if (!isMarketChain(appConfig.chain.id)) return <p role="alert">This network is not supported.</p>;
+  if (!independentMarketAddress) return <PrelaunchMarkets />;
   return (
     <IndependentDashboard
       market={independentMarketAddress}
@@ -87,7 +72,7 @@ export function IndependentDashboard({
   const [question, setQuestion] = useState<QuestionId>(0);
   const [yes, setYes] = useState(true);
   const [buy, setBuy] = useState(true);
-  const connected = connection.status === "connected" && chainId === 31337;
+  const connected = connection.status === "connected" && chainId === appConfig.chain.id;
   if (query.error)
     return (
       <div>
@@ -169,7 +154,9 @@ export function IndependentDashboard({
               : snapshot.finalized
                 ? "Cycle closed · settlement ready"
                 : snapshot.open
-                  ? "Local cycle open"
+                  ? appConfig.chain.id === 31337
+                    ? "Local cycle open"
+                    : "Cycle open"
                   : "Waiting"}
           </span>
           <Button
@@ -213,7 +200,7 @@ export function IndependentDashboard({
             ],
           },
           {
-            label: "Your test CST",
+            label: appConfig.chain.id === 31337 ? "Your test CST" : "Your CST",
             value: connected && snapshot.user ? formatCst(snapshot.user.balance) : "Connect wallet",
             id: "independent-wallet",
           },
@@ -284,11 +271,11 @@ export function IndependentDashboard({
             ))}
           </div>
           <p className="mt-4 text-xs leading-5 text-ink-faint">
-            Trading one question never changes another question’s price. Comparisons may become
-            clear early, but trading and claims follow full cycle closure. Starting odds use the
-            previous cycle’s 40–60% time window; missing history uses a fallback seed.
+            Each trade uses its question’s own pool; funding is shared equally. Comparisons may
+            become clear early, but trading and claims follow full cycle closure. Starting odds use
+            the same 50% YES / 50% NO opening price for every new cycle.
           </p>
-          {snapshot.local && (
+          {appConfig.chain.id === 31337 && snapshot.local && (
             <Card accent="ended" className="mt-6 p-5" data-testid="independent-local-controls">
               <h2 className="flex items-center gap-2 font-display text-lg font-semibold">
                 <FlaskConical className="size-4 text-ended" aria-hidden /> Local game controls

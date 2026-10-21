@@ -17,7 +17,7 @@ interface IOutcomeSource {
     /// same transaction, at which point `open` becomes false; a round may never be reported
     /// not-open-and-not-finalized once it has become current. A round may be open only
     /// after every earlier round is finalized (the market settles the previous funded round
-    /// and inherits seeds on first funding). Known answers never change, never close
+    /// on first funding). Known answers never change, never close
     /// trading and never authorize payout; payout waits for `finalized`.
     function outcomeState(uint256 roundId)
         external

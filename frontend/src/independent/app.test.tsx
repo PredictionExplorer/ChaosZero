@@ -4,6 +4,10 @@ import { ONE } from "@/shared/math";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { IndependentDashboard } from "./app";
 import { ACCOUNT, MARKET, noopActions, snapshot } from "./test-fixtures";
+vi.mock("@/lib/config", async (original) => ({
+  ...(await original<typeof import("@/lib/config")>()),
+  appConfig: { chain: { id: 31337 } },
+}));
 const mocks = vi.hoisted(() => ({ market: vi.fn(), recovery: vi.fn(), actions: vi.fn() }));
 vi.mock("./use-independent-market", () => ({
   useIndependentMarket: mocks.market,

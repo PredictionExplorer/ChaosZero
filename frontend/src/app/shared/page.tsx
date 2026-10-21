@@ -4,7 +4,7 @@ import { IndependentPage } from "@/independent/page";
 export const metadata: Metadata = {
   title: "Eight independent markets",
   description:
-    "Explore eight recurring Cosmic Signature questions with separate liquidity, inherited starting odds, and protected claims in the local prototype.",
+    "Explore eight recurring Cosmic Signature questions with separate liquidity, 50/50 opening odds, and protected claims on Arbitrum One.",
   alternates: { canonical: "/shared" },
   robots: { index: false, follow: false },
 };

@@ -125,7 +125,7 @@ contract IndependentAutoDistributionTest is Test, ERC1155Holder {
         assertEq(token.balanceOf(BOB), 1e40);
     }
 
-    // Griefing: dust cannot force eight pool writes or history checkpoints onto traders.
+    // Griefing: dust cannot force eight pool writes onto traders.
     function test_subThresholdTransfersWaitWithoutTouchingOtherPools() public {
         market.fundRound(1, SEED);
         vm.warp(150);
@@ -137,7 +137,6 @@ contract IndependentAutoDistributionTest is Test, ERC1155Holder {
         market.buy(1, 0, true, 1e18, 1e18, MAX);
         for (uint8 q = 1; q < 8; ++q) {
             assertEq(market.questionState(1, q).activeCollateral, before[q]);
-            assertEq(market.historyLength(1, q), 1, "dust wrote price history");
         }
         assertEq(_unallocated(), dust);
         vm.expectRevert(IndependentOutcomeMarket.InvalidParameters.selector);
@@ -157,7 +156,6 @@ contract IndependentAutoDistributionTest is Test, ERC1155Holder {
         IndependentOutcomeMarket.FundingPreview memory p = market.fundingPreview(2, 0);
         assertTrue(p.canFund && p.needsSettlement);
         assertEq(p.totalFunding, SEED + 100e18 - 150e18);
-        (uint16[8] memory seeds,) = market.seedPreview(2);
         vm.expectEmit(true, true, false, true, address(market));
         emit RoundFunded(2, BOB, 0, 0, p.totalFunding, p.allocations); // Carry only; the trader gave nothing.
         vm.prank(BOB);
@@ -169,7 +167,7 @@ contract IndependentAutoDistributionTest is Test, ERC1155Holder {
         for (uint8 q; q < 8; ++q) {
             IndependentOutcomeMarket.QuestionView memory s = market.questionState(2, q);
             assertEq(s.activeCollateral, p.allocations[q] + (q == 4 ? 1e18 : 0));
-            assertEq(s.initialYesBps, seeds[q]);
+            assertEq(s.initialYesBps, 5000);
         }
         vm.prank(ALICE);
         assertEq(market.claimKnown(1), 150e18);
@@ -227,7 +225,6 @@ contract IndependentAutoDistributionTest is Test, ERC1155Holder {
         market.mergePosition(1, 3, 4e18);
         for (uint8 q; q < 8; ++q) {
             assertEq(market.questionState(1, q).activeCollateral, before[q] + (q == 3 ? 6e18 : 0));
-            assertEq(market.historyLength(1, q), 1);
         }
         assertEq(_unallocated(), 50e18);
     }
@@ -569,11 +566,6 @@ contract IndependentAutoDistributionTest is Test, ERC1155Holder {
                 no
             )
         );
-        for (uint8 q; q < 8; ++q) {
-            uint256 length = market.historyLength(round, q);
-            (uint128 cumulative, uint64 timestamp, uint16 price) = market.historyCheckpoint(round, q, length - 1);
-            hash = keccak256(abi.encode(hash, length, cumulative, timestamp, price));
-        }
     }
 
     /// @dev Tightest quote BOB can fill now (state restored): the most units a buy
@@ -657,17 +649,15 @@ contract IndependentAutoDistributionTest is Test, ERC1155Holder {
         vm.warp(200);
         source.set(2, true, false, 0, 0, 200, 0);
         _donate(50e18);
-        bytes4[4] memory errors = [
+        bytes4[3] memory errors = [
             IndependentOutcomeMarket.NotFinalized.selector,
-            IndependentOutcomeMarket.InvalidTimestamp.selector,
             IndependentOutcomeMarket.InvalidSourceState.selector,
             IndependentUnitSource.SourceOffline.selector
         ];
         for (uint256 i; i < errors.length; ++i) {
             uint256 snapshot = vm.snapshotState();
             if (i == 0) source.set(1, false, false, 255, 1, 100, 0); // Closed, not yet final.
-            else if (i == 1) source.set(1, false, true, 255, 1, 100, 201); // Ends in the future.
-            else if (i == 2) source.set(1, false, true, 127, 1, 100, 200); // Final without every answer.
+            else if (i == 1) source.set(1, false, true, 127, 1, 100, 200); // Final without every answer.
             else source.setOffline(1, true);
             try market.fundingPreview(2, 0) returns (IndependentOutcomeMarket.FundingPreview memory p) {
                 assertFalse(p.canFund, "preview promised a start the trade cannot make");
@@ -747,7 +737,7 @@ contract IndependentAutoDistributionTest is Test, ERC1155Holder {
     function test_tradeTriggeredFundingEventsPrecedeTheTradeInOneFixedOrder() public {
         bytes32 answers = keccak256("AnswersObserved(uint256,uint8,uint8)");
         bytes32 settled = keccak256("RoundSettled(uint256,uint8,uint256[8],uint256)");
-        bytes32 initialized = keccak256("RoundInitialized(uint256,uint16[8],bool[8])");
+        bytes32 initialized = keccak256("RoundInitialized(uint256)");
         bytes32 funded = RoundFunded.selector;
         bytes32 single = keccak256("TransferSingle(address,address,address,uint256,uint256)");
         bytes32 traded = keccak256("Trade(uint256,address,uint8,bool,bool,uint256,uint256)");

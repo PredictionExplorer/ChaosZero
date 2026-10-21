@@ -10,15 +10,13 @@
 export const SITE_NAME = "Chaos Zero";
 
 /** The homepage <title> and social card headline. */
-export const SITE_TITLE = "Chaos Zero — the Cosmic Signature prediction market";
+export const SITE_TITLE = "Chaos Zero — Eight questions. Your conviction.";
 
 /** One-line pitch for social cards and the manifest. */
-export const SITE_TAGLINE = "Bet YES or NO on every Cosmic Signature round";
+export const SITE_TAGLINE = "Eight independent markets. One unpredictable game.";
 
 export const SITE_DESCRIPTION =
-  "Will this Cosmic Signature round end with more gestures (bids) than the last one? " +
-  "Bet YES or NO in CST on Chaos Zero — a fully collateralized, trustless prediction market " +
-  "on Arbitrum One with zero oracles, zero admin keys, zero custody.";
+  "Eight independent YES/NO markets on Cosmic Signature V3. Trade with CST on Arbitrum One, with separate question pools, 50/50 opening odds and 1 CST per winning share.";
 
 export const SITE_KEYWORDS = [
   "Chaos Zero",

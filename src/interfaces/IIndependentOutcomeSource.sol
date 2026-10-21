@@ -3,11 +3,18 @@ pragma solidity 0.8.35;
 
 import {IOutcomeSource} from "./IOutcomeSource.sol";
 
-/// @notice Canonical game timestamps for retrospective price sampling.
-/// @dev Times must come from game actions, never the caller's settlement time.
+/// @notice Immutable answers for eight independent binary markets.
+/// @dev Settlement uses finalized answers only; no historical timestamps or prices are required.
 interface IIndependentOutcomeSource is IOutcomeSource {
-    /// @dev `finalizedAt` is the block timestamp of the round-ending transaction
-    /// (`claimMainPrize` on the live game, `closeCycle` locally), never `mainPrizeTime`
-    /// or the time of a later market call. `firstGestureAt` is the canonical first gesture.
-    function cycleTimes(uint256 roundId) external view returns (uint256 firstGestureAt, uint256 finalizedAt);
+    struct Metrics {
+        uint256 gestureCount;
+        uint256 ethSpent;
+        uint256 cstBurned;
+        uint256 highestCstPaid;
+        uint256 enduranceDuration;
+        uint256 chronoDuration;
+        bool sameGesture;
+        bool finalized;
+        bool supported;
+    }
 }

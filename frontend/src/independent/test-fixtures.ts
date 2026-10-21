@@ -41,7 +41,6 @@ export function snapshot(): IndependentSnapshot {
     questions: Array.from({ length: 8 }, () => ({
       pool: { collateral: 1000n * ONE, yes: 0n, no: 0n, initialYesBps: 5000 },
       funded: true,
-      usedHistory: false,
       escrowRemaining: 0n,
     })),
     poolCustody: 8000n * ONE,

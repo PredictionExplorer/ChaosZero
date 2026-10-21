@@ -268,9 +268,8 @@ contract IndependentMarketHandler is Test {
         (_expectTransfers, _expectCarry) = (unallocated - donated, carryUsed);
         if (initial) {
             if (!r.initialized) {
-                (uint16[8] memory seeds,) = market.seedPreview(currentCycle);
                 for (uint8 q; q < 8; ++q) {
-                    r.questions[q].weight = seeds[q];
+                    r.questions[q].weight = 5000;
                 }
                 r.initialized = true;
             }
@@ -609,13 +608,9 @@ contract IndependentMarketHandler is Test {
     function _touch(uint256 id) private {
         ModelRound storage r = _model[id];
         if (r.initialized) return;
-        // A seed is immutable configuration; all balances and cash below are
-        // independently derived from action inputs, never copied from the engine.
-        uint16[8] memory weights = market.initialPrices(id);
+        // Independent model: every new pool starts at exactly 50/50.
         for (uint8 q; q < 8; ++q) {
-            assertGe(weights[q], 1);
-            assertLe(weights[q], 9999);
-            r.questions[q].weight = weights[q];
+            r.questions[q].weight = 5000;
         }
         r.initialized = true;
     }
@@ -726,7 +721,7 @@ contract IndependentMarketInvariantTest is StdInvariant, Test {
                 assertEq(actual[q].yesSupply, p.yes);
                 assertEq(actual[q].noSupply, p.no);
                 assertEq(actual[q].escrowRemaining, p.escrow);
-                assertEq(actual[q].initialYesBps, p.weight);
+                assertEq(actual[q].initialYesBps, 5000);
                 active += p.cash;
                 escrow += p.escrow;
                 if (expected.settled) {

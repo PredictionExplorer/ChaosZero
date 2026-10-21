@@ -44,7 +44,7 @@ test.afterEach(async () => {
   ).toBe(saved.block);
 });
 
-test("independent pools: isolated prices, direct transfers, full closure, protected late claims, history and carry", async ({
+test("independent pools: isolated prices, direct transfers, full closure, protected late claims, 50/50 reset and carry", async ({
   page,
 }) => {
   test.setTimeout(300_000);
@@ -74,7 +74,7 @@ test("independent pools: isolated prices, direct transfers, full closure, protec
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/shared");
-  await expect(page.getByRole("heading", { name: /Eight independent pools/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Eight ways/ })).toBeVisible();
   await expect(page.getByTestId("independent-cycle")).toHaveText("Cycle 1");
   await expect(page.getByTestId("independent-active")).toHaveText("10,000 CST");
   await page.getByRole("button", { name: "Connect wallet", exact: true }).first().click();
@@ -234,7 +234,7 @@ test("independent pools: isolated prices, direct transfers, full closure, protec
   await trade.getByRole("button", { name: "Approve CST to trade" }).click();
   await trade.getByRole("button", { name: "Buy YES", exact: true }).click();
   await expect(trade.getByLabel(/CST to spend/)).toHaveValue("");
-  const middlePrice = (await qs(1n))[0].currentYesBps;
+  expect((await qs(1n))[0].currentYesBps).not.toBe(5000);
   await page.getByRole("button", { name: "Advance 1 hour", exact: true }).click();
   // Markets never end early: the countdown has elapsed and question 0 is known, yet
   // trading stays open until the round-ending transaction closes the cycle.
@@ -302,8 +302,7 @@ test("independent pools: isolated prices, direct transfers, full closure, protec
   await expect(page.getByText("Cycle funding confirmed.", { exact: true }).first()).toBeVisible();
   const second = await qs(2n);
   expect(second.map((q) => q.activeCollateral)).toEqual(preview.allocations);
-  expect(second[0].initialYesBps).toBe(middlePrice);
-  expect(second[0].seedUsedHistory).toBe(true);
+  expect(second.map((q) => q.initialYesBps)).toEqual(Array(8).fill(5000));
   const settledOld = await client.readContract({
     address: market,
     abi: independentMarketAbi,
@@ -373,19 +372,13 @@ test("independent pools: isolated prices, direct transfers, full closure, protec
   });
   expect(carryPreview.canFund).toBe(true);
   expect(carryPreview.needsSettlement).toBe(true);
-  const [seeds] = await client.readContract({
-    address: market,
-    abi: independentMarketAbi,
-    functionName: "seedPreview",
-    args: [3n],
-  });
   await expect(page.getByTestId("question-0")).toContainText("Opens with the first trade");
   await expect(fund.getByRole("button", { name: "Open pools now" })).toBeEnabled();
   await expect(trade.getByTestId("independent-trade-absorption")).toContainText(
     "opens this cycle’s eight pools first, after settling the preceding cycle",
   );
   const firstQuote = quoteIndependentTrade(
-    { collateral: carryPreview.allocations[0], yes: 0n, no: 0n, initialYesBps: seeds[0] },
+    { collateral: carryPreview.allocations[0], yes: 0n, no: 0n, initialYesBps: 5000 },
     true,
     true,
     ONE,
@@ -397,7 +390,7 @@ test("independent pools: isolated prices, direct transfers, full closure, protec
   expect((await qs(3n)).map((q) => q.activeCollateral)).toEqual(
     carryPreview.allocations.map((amount, q) => amount + (q === 0 ? ONE : 0n)),
   );
-  expect((await qs(3n)).map((q) => q.initialYesBps)).toEqual([...seeds]);
+  expect((await qs(3n)).map((q) => q.initialYesBps)).toEqual(Array(8).fill(5000));
   expect((await walletPositions(3n))[0][0]).toBe(firstQuote);
   expect(
     (

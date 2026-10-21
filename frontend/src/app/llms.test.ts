@@ -18,13 +18,18 @@ describe("llms.txt", () => {
     expect(text).toMatch(/cosmic signature/i);
     expect(text).toMatch(/gestures? \(bids\)/i);
     expect(text).toMatch(/YES/);
-    expect(text).toMatch(/zero oracles, zero admin keys, zero custody/i);
+    expect(text).toMatch(/eight YES\/NO prediction markets/i);
+    expect(text).toMatch(/50% YES and 50% NO/);
+    expect(text).toMatch(/contributions are irreversible/i);
+    expect(text).not.toMatch(/zero custody|fee voting|tradable before they start|resolved early/i);
   });
 
   it("links every page with self-consistent absolute URLs", async () => {
     const text = await getLlms().text();
     expect(text).toContain(`](${SITE_URL})`);
     expect(text).toContain(`](${absoluteUrl("/faq")})`);
+    expect(text).toContain(`](${absoluteUrl("/baseline")})`);
+    expect(text).toContain(`](${absoluteUrl("/baseline.json")})`);
     expect(text).toContain(`](${absoluteUrl("/llms-full.txt")})`);
     expect(text).toContain(COSMIC_SIGNATURE_URL);
   });

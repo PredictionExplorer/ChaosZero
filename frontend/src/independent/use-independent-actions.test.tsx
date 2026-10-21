@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   getChainId: vi.fn(),
   getBlock: vi.fn(),
   simulate: vi.fn(),
+  estimate: vi.fn(),
+  read: vi.fn(),
   submit: vi.fn(),
   receipt: vi.fn(),
   createTest: vi.fn(),
@@ -38,6 +40,8 @@ vi.mock("wagmi", () => ({
           getChainId: mocks.getChainId,
           getBlock: mocks.getBlock,
           simulateContract: mocks.simulate,
+          estimateContractGas: mocks.estimate,
+          readContract: mocks.read,
           waitForTransactionReceipt: mocks.receipt,
         }
       : undefined,
@@ -81,6 +85,7 @@ beforeEach(() => {
   mocks.getChainId.mockResolvedValue(31337);
   mocks.getBlock.mockResolvedValue({ timestamp: 1000n });
   mocks.simulate.mockResolvedValue({ request: {} });
+  mocks.estimate.mockResolvedValue(500_000n);
   mocks.submit.mockResolvedValue(`0x${"ab".repeat(32)}`);
   mocks.receipt.mockResolvedValue({ status: "success" });
   mocks.createTest.mockReturnValue({ increaseTime: mocks.increase, mine: mocks.mine });
@@ -169,7 +174,7 @@ describe("independent transaction boundaries", () => {
         functionName: fn,
         args,
         account: ACCOUNT,
-        gas: 4_000_000n,
+        gas: 600_000n,
       }),
     );
     expect(mocks.submit).toHaveBeenCalledWith(
@@ -473,5 +478,85 @@ describe("independent recovery and local controls", () => {
       time.resolve(60);
       await started;
     });
+  });
+});
+
+describe("production execution", () => {
+  function production() {
+    mocks.chain.id = 42161;
+    mocks.walletChain = 42161;
+    mocks.getChainId.mockResolvedValue(42161);
+    vi.stubEnv(
+      "NEXT_PUBLIC_INDEPENDENT_SOURCE_ADDRESS",
+      "0x4444444444444444444444444444444444444444",
+    );
+    mocks.read.mockImplementation(
+      async ({ functionName }) =>
+        ({
+          cst: "0xAD91843e6A58Ba560F577E676986AFb1dba6FBA0",
+          source: "0x4444444444444444444444444444444444444444",
+          game: "0x6a714Ae7B5b6eA520F6BCA23d2E609C4Fd5863F2",
+        })[functionName as "cst" | "source" | "game"],
+    );
+  }
+  afterEach(() => vi.unstubAllEnvs());
+  it("pins real CST/source/game and estimates each production transaction", async () => {
+    production();
+    mocks.estimate.mockResolvedValue(1_250_000n);
+    const { result } = setup();
+    await act(async () => expect(await result.current.fund(ONE)).toBe(true));
+    expect(mocks.read).toHaveBeenCalledTimes(3);
+    expect(mocks.estimate).toHaveBeenCalledWith(
+      expect.objectContaining({ functionName: "fundRound" }),
+    );
+    expect(mocks.simulate).toHaveBeenCalledWith(expect.objectContaining({ gas: 1_500_000n }));
+    expect(mocks.submit).toHaveBeenCalledWith(
+      expect.objectContaining({ chainId: 42161, gas: 1_500_000n }),
+    );
+  });
+  it("keeps already-settled production recovery independent of source reads", async () => {
+    production();
+    const recovery: IndependentRecovery = {
+      market: MARKET,
+      token: TOKEN,
+      vault: VAULT,
+      roundId: 5n,
+      timestamp: 1000n,
+      settled: true,
+      values: 1,
+      questions: snapshot().questions,
+      user: snapshot().user!,
+    };
+    const { result } = setup(undefined, recovery);
+    await act(async () => expect(await result.current.claim()).toBe(true));
+    expect(mocks.read).toHaveBeenCalledTimes(2);
+    expect(mocks.read).not.toHaveBeenCalledWith(expect.objectContaining({ functionName: "game" }));
+  });
+  it("rejects unexpected immutable references before gas estimation or submission", async () => {
+    production();
+    mocks.read.mockResolvedValue(TOKEN);
+    const { result } = setup();
+    await act(async () => expect(await result.current.fund(ONE)).toBe(false));
+    expect(mocks.estimate).not.toHaveBeenCalled();
+    expect(mocks.submit).not.toHaveBeenCalled();
+  });
+  it("does not expose local faucet or simulator writes on production even with stale local data", async () => {
+    production();
+    const { result } = setup();
+    await act(async () => expect(await result.current.local("faucet")).toBe(false));
+    expect(mocks.submit).not.toHaveBeenCalled();
+  });
+  it("blocks unsupported configured chains", async () => {
+    mocks.chain.id = 1;
+    const { result } = setup();
+    await act(async () => expect(await result.current.fund(ONE)).toBe(false));
+    expect(mocks.submit).not.toHaveBeenCalled();
+  });
+  it("surfaces estimation failure without sending a transaction", async () => {
+    mocks.estimate.mockRejectedValue(new Error("NotFinalized"));
+    const { result } = setup();
+    await act(async () => expect(await result.current.fund(ONE)).toBe(false));
+    expect(mocks.simulate).not.toHaveBeenCalled();
+    expect(mocks.submit).not.toHaveBeenCalled();
   });
 });

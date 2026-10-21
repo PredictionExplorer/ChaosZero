@@ -73,6 +73,25 @@ describe("formatQuestionMetric", () => {
     expect(formatQuestionMetric(stats(), question)).toBe("—");
   });
 
+  it("renders verified V3 same-gesture outcomes without inventing gesture IDs", () => {
+    expect(
+      formatQuestionMetric(stats({ enduranceGesture: undefined, sameGesture: false }), 6),
+    ).toBe("Decided at closure");
+    expect(
+      formatQuestionMetric(
+        stats({ enduranceGesture: undefined, sameGesture: true, finalized: true }),
+        6,
+      ),
+    ).toBe("Same gesture");
+    expect(
+      formatQuestionMetric(
+        stats({ enduranceGesture: undefined, sameGesture: false, finalized: true }),
+        6,
+      ),
+    ).toBe("Different gestures");
+    expect(formatQuestionMetric(stats({ supported: false, gestureCount: 0n }), 0)).toBe("—");
+  });
+
   it("gives every question its own handled metric", () => {
     expect(QUESTION_COUNT).toBe(8);
     expect(new Set(QUESTIONS.map((item) => item.metric)).size).toBe(QUESTION_COUNT);

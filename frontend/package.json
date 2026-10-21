@@ -16,10 +16,10 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.2",
-    "@walletconnect/ethereum-provider": "^2.23.10",
+    "@walletconnect/ethereum-provider": "^2.26.0",
     "lucide-react": "^1.23.0",
     "motion": "^12.42.2",
-    "next": "16.3.3",
+    "next": "16.3.8",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sonner": "^2.0.7",
@@ -34,17 +34,23 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitejs/plugin-react": "^6.0.3",
-    "@vitest/coverage-v8": "^4.1.9",
+    "@vitejs/plugin-react": "^6.1.2",
+    "@vitest/coverage-v8": "^4.1.12",
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.3.3",
+    "eslint-config-next": "16.3.8",
     "fast-check": "^4.8.0",
     "jsdom": "^29.1.1",
-    "sharp": "^0.35.3",
+    "sharp": "^0.35.5",
     "tailwindcss": "^4",
     "typescript": "^5",
+    "vite": "8.1.6",
     "vite-tsconfig-paths": "^6.1.1",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.12"
+  },
+  "pnpm": {
+    "overrides": {
+      "@next/eslint-plugin-next@16.3.8>fast-glob": "npm:tinyglobby@0.2.17"
+    }
   }
 }

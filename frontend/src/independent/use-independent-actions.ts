@@ -7,9 +7,11 @@ import { createTestClient, http, type Abi, type Address, type Hash } from "viem"
 import { useConnection, usePublicClient, useWriteContract } from "wagmi";
 import { erc20Abi } from "@/lib/abi/erc20";
 import { appConfig } from "@/lib/config";
+import { COSMIC_GAME_ADDRESS } from "@/lib/contracts";
 import { localGameAbi, localTokenAbi } from "@/shared/abi";
 import { positionId, validateRecipient } from "@/shared/positions";
-import { independentMarketAbi } from "./abi";
+import { independentMarketAbi, independentSourceAbi } from "./abi";
+import { assertProductionMarket, isMarketChain } from "./deployment";
 import { describeIndependentError } from "./errors";
 import {
   LOCAL_DIRECT_TRANSFER,
@@ -18,7 +20,6 @@ import {
   type IndependentSnapshot,
 } from "./models";
 
-const GAS = 4_000_000n;
 export function useIndependentActions(
   market: Address,
   snapshot: IndependentSnapshot | undefined,
@@ -65,14 +66,38 @@ export function useIndependentActions(
     value?: bigint;
   }) => {
     if (!client || !account) throw new Error("Connect your wallet to continue.");
-    if (chainId !== 31337 || (await client.getChainId()) !== 31337)
-      throw new Error("Use the local test network for this prototype.");
-    await client.simulateContract({ ...parameters, account, gas: GAS });
-    return writeContractAsync({ ...parameters, account, chainId: appConfig.chain.id, gas: GAS });
+    if (
+      !isMarketChain(appConfig.chain.id) ||
+      chainId !== appConfig.chain.id ||
+      (await client.getChainId()) !== appConfig.chain.id
+    )
+      throw new Error("Switch your wallet to the configured market network.");
+    if (appConfig.chain.id === 42161) {
+      const [token, source] = await Promise.all([
+        client.readContract({ address: market, abi: independentMarketAbi, functionName: "cst" }),
+        client.readContract({ address: market, abi: independentMarketAbi, functionName: "source" }),
+      ]);
+      // Recovery must not depend on the source responding. Its immutable address
+      // is still checked against the separately pinned production deployment.
+      const game = recovery
+        ? COSMIC_GAME_ADDRESS
+        : await client.readContract({
+            address: source,
+            abi: independentSourceAbi,
+            functionName: "game",
+          });
+      assertProductionMarket(appConfig.chain.id, token, source, game);
+    }
+    // Arbitrum estimates include execution and the L1 data component. Re-estimate
+    // every operation; a new cycle may also settle and start all eight pools.
+    const estimate = await client.estimateContractGas({ ...parameters, account });
+    const gas = (estimate * 120n) / 100n;
+    await client.simulateContract({ ...parameters, account, gas });
+    return writeContractAsync({ ...parameters, account, chainId: Number(appConfig.chain.id), gas });
   };
   const run = async (label: string, action: () => Promise<Hash>): Promise<boolean> => {
-    if (appConfig.chain.id !== 31337) {
-      setMessage("Public-chain transactions are disabled for this prototype.");
+    if (!isMarketChain(appConfig.chain.id)) {
+      setMessage("This network is not supported by the market.");
       return false;
     }
     if (locked.current || !client) return false;
@@ -211,7 +236,8 @@ export function useIndependentActions(
         `Local ${kind === "faucet" ? "CST faucet" : kind === "close" ? "cycle closure" : kind === "direct" ? "direct CST transfer" : `${kind.toUpperCase()} gesture`}`,
         () => {
           const current = sourceSnapshot();
-          if (!current.local) throw new Error("Local game controls are unavailable.");
+          if (appConfig.chain.id !== 31337 || !current.local)
+            throw new Error("Local game controls are unavailable.");
           switch (kind) {
             case "faucet":
               return write({

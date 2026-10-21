@@ -1,17 +1,13 @@
 import type { Address, Chain } from "viem";
 import { getAddress } from "viem";
 import { anvil, arbitrum } from "viem/chains";
+import { ARBITRUM_CST_ADDRESS } from "./contracts";
+export { COSMIC_GAME_ADDRESS } from "./contracts";
 
 /** Chains the app knows how to talk to. Arbitrum One in production, Anvil for local dev. */
 export const SUPPORTED_CHAINS: readonly Chain[] = [arbitrum, anvil];
 
 export const DEFAULT_CHAIN_ID = arbitrum.id;
-
-/** Cosmic Signature game proxy on Arbitrum One (informational; the market stores its own reference). */
-export const COSMIC_GAME_ADDRESS: Address = "0x6a714Ae7B5b6eA520F6BCA23d2E609C4Fd5863F2";
-
-/** CST token on Arbitrum One (public constant, used for explorer links). */
-const ARBITRUM_CST_ADDRESS: Address = "0xAD91843e6A58Ba560F577E676986AFb1dba6FBA0";
 
 /**
  * The CST address knowable without an RPC call: fixed on Arbitrum One, but on
@@ -71,14 +67,18 @@ export function parseAppConfig(raw: RawEnv): AppConfig {
   const chain = SUPPORTED_CHAINS.find((c) => c.id === chainId);
   if (!chain || !Number.isInteger(chainId)) {
     const supported = SUPPORTED_CHAINS.map((c) => `${c.id} (${c.name})`).join(", ");
-    throw new Error(`NEXT_PUBLIC_CHAIN_ID "${chainIdStr}" is not supported. Use one of: ${supported}`);
+    throw new Error(
+      `NEXT_PUBLIC_CHAIN_ID "${chainIdStr}" is not supported. Use one of: ${supported}`,
+    );
   }
 
   const deployBlockStr = clean(raw.deployBlock);
   let deployBlock: bigint | null = null;
   if (deployBlockStr !== null) {
     if (!/^\d+$/.test(deployBlockStr)) {
-      throw new Error(`NEXT_PUBLIC_DEPLOY_BLOCK must be a non-negative integer, got "${deployBlockStr}"`);
+      throw new Error(
+        `NEXT_PUBLIC_DEPLOY_BLOCK must be a non-negative integer, got "${deployBlockStr}"`,
+      );
     }
     deployBlock = BigInt(deployBlockStr);
   }

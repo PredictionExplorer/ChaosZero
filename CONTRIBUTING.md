@@ -24,7 +24,7 @@ starts a disposable chain, deploys the local contracts and starts the frontend.
 `pnpm local:smoke` exercises the locally running stack and compares every browser
 contract signature with the compiled Solidity interface, including tuple fields
 and return values. It verifies independent question pricing, split/merge reserve
-preservation, transfers and operator revocation, middle-window price inheritance,
+preservation, transfers and operator revocation, fixed 50/50 opening prices,
 rollover and late source-independent claims. It also sends CST straight to the
 market and checks that the next buy absorbs it before pricing, that a cycle opens
 with its first buy, and that every absorption matches `fundingPreview` and the
@@ -80,13 +80,11 @@ base or the previous pushed commit.
 
 ## Contract size
 
-`IndependentOutcomeMarket` is 24,393 runtime bytes on the production settings
-in `foundry.toml`, 183 below the 24,576-byte EIP-170 limit; `forge build --sizes`
-in the contract gate fails past it. Never pass a literal or constant argument to
-the private `_absorb`: the IR optimizer then clones it for that call site. Trades
-pass the immutable `_noDonation` instead of `0`; a literal measured 789 bytes
-larger, over the limit. New callers must pass a variable or an immutable.
-Re-measure after every engine change and record the margin in `VALIDATION.md`.
+`IndependentOutcomeMarket` is 20,912 runtime bytes on the production settings
+in `foundry.toml`, 3,664 below the 24,576-byte EIP-170 limit; `forge build --sizes`
+in the contract gate fails past it. The fixed 50/50 implementation removes the
+historical price storage and sampling machinery. Re-measure after every engine
+change and record the margin in `VALIDATION.md`.
 
 ## Differential fixtures
 
@@ -123,8 +121,8 @@ which has no on-chain getter; a frontend test pins the browser's copy of that 1
 CST absorption threshold to the exported value.
 Avoid editing fixtures while this check runs. Ordinary gates clear the optional
 `ARBITRUM_RPC_URL` for deterministic local tests. The opt-in live fork test
-checks the legacy single-question integration only; there is no live independent
-adapter yet. Run that compatibility check separately when relevant:
+checks the legacy single-question integration only; the production V3 integration has its own opt-in fork suite. Run the legacy
+compatibility check separately only when relevant:
 
 ```sh
 ARBITRUM_RPC_URL=<read-only Arbitrum endpoint> forge test --match-contract ForkTest -vv
@@ -146,6 +144,6 @@ libraries as well. Traces, screenshots and an HTML report are retained on failur
 Heavy testing supplements the default per-commit campaign; passing tests are not
 a proof of economic safety or an external security audit. Release review should
 also inspect settlement rules, mint/burn authority, numerical boundaries,
-cross-market isolation, and the upstream game integration. The current independent
-market prototype is for local chains and mock CST; successful local gates do not
-authorize deployment with real CST or use of the mock game adapter on a live chain.
+cross-market isolation, and the upstream game integration. The production adapter targets V3 and a reviewed historical launch baseline.
+Successful local gates do not authorize a public deployment; use the explicit
+operator workflow in DEPLOYMENT.md when a release is approved.
