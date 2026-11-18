@@ -182,6 +182,9 @@ contract GameFundedOutcomeMarketTest is Test, ERC1155Holder {
             address(game), abi.encodeCall(game.chaosZeroFunding, (address(market), 1)), abi.encode(GRANT, cumulative)
         );
         IndependentOutcomeMarket.FundingPreview memory preview = market.fundingPreview(1, 0);
+        // The cumulative issuance includes deferred carry; only placed carry belongs in the opening receipt.
+        vm.expectEmit(true, false, false, true, address(market));
+        emit GameFundedOutcomeMarket.GameFundingSynced(1, GRANT, cumulative, capacity - GRANT, preview.allocations);
         market.syncFunding(1);
         assertEq(preview.totalFunding, capacity);
         assertEq(preview.carryUsed, capacity - GRANT);
