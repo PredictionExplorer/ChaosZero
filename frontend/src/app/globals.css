@@ -11,7 +11,8 @@
 
   --color-ink: #ecf5f9;
   --color-ink-dim: #99b3c1;
-  --color-ink-faint: #61798a;
+  /* Maintain 4.5:1 for small text even on the raised surface-2 background. */
+  --color-ink-faint: #70899b;
 
   --color-signal: #22d3ee; /* brand electric cyan */
   --color-signal-bright: #67e8f9;

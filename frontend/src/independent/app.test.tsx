@@ -24,9 +24,9 @@ vi.mock("./config", () => ({
 vi.mock("wagmi", () => ({
   useConnection: () => ({
     status: "connected",
+    chainId: 31337,
     address: "0x1111111111111111111111111111111111111111",
   }),
-  useChainId: () => 31337,
 }));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/shared",

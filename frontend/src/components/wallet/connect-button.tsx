@@ -2,7 +2,7 @@
 
 import { ChevronDown, LogOut, TriangleAlert, Wallet } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useChainId, useConnection, useDisconnect, useSwitchChain } from "wagmi";
+import { useConnection, useDisconnect, useSwitchChain } from "wagmi";
 import { useMounted } from "@/hooks/use-mounted";
 import { appConfig } from "@/lib/config";
 import { shortAddress } from "@/lib/format";
@@ -16,7 +16,6 @@ import { LazyWalletModal } from "./lazy-wallet-modal";
 export function ConnectButton() {
   const mounted = useMounted();
   const connection = useConnection();
-  const chainId = useChainId();
   const switchChain = useSwitchChain();
   const disconnect = useDisconnect();
   const [modalOpen, setModalOpen] = useState(false);
@@ -24,6 +23,7 @@ export function ConnectButton() {
   const [modalRequested, setModalRequested] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const accountButton = useRef<HTMLButtonElement>(null);
 
   // Close the account menu on any outside click. A fixed-position scrim
   // doesn't work here: the header's backdrop-filter makes it a containing
@@ -67,7 +67,7 @@ export function ConnectButton() {
     );
   }
 
-  if (chainId !== appConfig.chain.id) {
+  if (connection.chainId !== appConfig.chain.id) {
     return (
       <Button
         variant="ended"
@@ -81,8 +81,26 @@ export function ConnectButton() {
   }
 
   return (
-    <div className="relative" ref={menuRef}>
-      <Button variant="outline" onClick={() => setMenuOpen((v) => !v)} aria-expanded={menuOpen}>
+    <div
+      className="relative"
+      ref={menuRef}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setMenuOpen(false);
+      }}
+      onKeyDown={(event) => {
+        if (menuOpen && event.key === "Escape") {
+          event.stopPropagation();
+          setMenuOpen(false);
+          accountButton.current?.focus();
+        }
+      }}
+    >
+      <Button
+        ref={accountButton}
+        variant="outline"
+        onClick={() => setMenuOpen((v) => !v)}
+        aria-expanded={menuOpen}
+      >
         <span className="size-2 rounded-full bg-higher shadow-glow-higher" aria-hidden />
         <span className="font-mono text-xs">{shortAddress(connection.address ?? "")}</span>
         <ChevronDown className="size-3.5 text-ink-dim" aria-hidden />
