@@ -11,6 +11,7 @@ const vite = createRequire(local.resolve("vite"));
 const matcher = vite("picomatch") as {
   (patterns: string | string[], options?: Record<string, unknown>): (path: string) => boolean;
   isMatch(path: string, patterns: string | string[], options?: Record<string, unknown>): boolean;
+  isSupportedPattern(pattern: string, options?: Record<string, unknown>): boolean;
   scan(pattern: string): { base: string; isGlob: boolean; parts: string[]; negated: boolean };
 };
 
@@ -47,6 +48,35 @@ it("shares the bounded tooling matcher with build, discovery, and test coverage"
     isGlob: false,
     negated: true,
   });
+});
+
+it("keeps ordinary brace alternatives, escaped literals and sequential groups available", () => {
+  const filename = "{report}".repeat(70) + ".ts";
+  const escaped = filename.replaceAll("{", "\\{").replaceAll("}", "\\}");
+  expect(matcher.isSupportedPattern(escaped)).toBe(true);
+  expect(matcher(escaped)(filename)).toBe(true);
+  expect(matcher.isSupportedPattern("{a,b}/".repeat(70))).toBe(true);
+  expect(matcher("src/{lib,{ui,test}}/*.{ts,tsx}")("src/ui/card.tsx")).toBe(true);
+});
+
+it("rejects overlong discovery inputs before opening a directory", async () => {
+  type Walker = {
+    globSync(pattern: string, options: object): string[];
+    glob(pattern: string, options: object): Promise<string[]>;
+  };
+  const walker = vite("tinyglobby") as Walker;
+  const tooLong = "a".repeat(64 * 1024 + 1);
+  const fs = {
+    readdirSync() {
+      throw new Error("Unexpected directory walk");
+    },
+    readdir() {
+      throw new Error("Unexpected directory walk");
+    },
+  };
+  expect(walker.globSync(tooLong, { fs })).toEqual([]);
+  expect(await walker.glob("src/**", { ignore: [tooLong], fs })).toEqual([]);
+  expect(() => matcher(tooLong)).toThrow(RangeError);
 });
 
 it("lets Rolldown recognize Vite custom asset globs in a production bundle", async () => {

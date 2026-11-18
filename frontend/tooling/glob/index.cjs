@@ -3,7 +3,33 @@
 // eslint-disable-next-line @typescript-eslint/no-require-imports -- fdir and the ESLint plugin also require this module through CommonJS.
 const { Minimatch } = require("minimatch");
 
+// Match Minimatch's length ceiling. Check brace depth before Minimatch parses
+// alternatives, including for scan(). Brace expansion runs before character
+// class parsing. Escaped braces are literals; adjacent groups do not nest.
+const MAX_PATTERN_LENGTH = 64 * 1024;
+const MAX_BRACE_DEPTH = 64;
+
+function isSupportedPattern(pattern, options = {}) {
+  if (pattern.length > MAX_PATTERN_LENGTH) return false;
+  if (options.nobrace || pattern.length <= MAX_BRACE_DEPTH) return true;
+  let depth = 0;
+  for (let i = 0; i < pattern.length; i++) {
+    const ch = pattern[i];
+    if (ch === "\\") i++;
+    else if (ch === "{") {
+      if (++depth > MAX_BRACE_DEPTH) return false;
+    } else if (ch === "}" && depth > 0) depth--;
+  }
+  return true;
+}
+
+function checkPattern(pattern, options) {
+  if (!isSupportedPattern(pattern, options))
+    throw new RangeError("Tooling glob exceeds pattern limits");
+}
+
 function compiler(pattern, options) {
+  checkPattern(pattern, options);
   return new Minimatch(pattern, {
     ...options,
     noext: options.noextglob ?? options.noext,
@@ -74,7 +100,9 @@ function segments(pattern) {
   return parts;
 }
 
+createMatcher.isSupportedPattern = isSupportedPattern;
 createMatcher.scan = (input, options = {}) => {
+  checkPattern(input, options);
   const negated = !options.nonegate && input.startsWith("!") && !input.startsWith("!(");
   const pattern = (negated ? input.slice(1) : input).replace(/^\.\//, "");
   const parts = segments(pattern);

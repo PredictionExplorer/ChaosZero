@@ -1,0 +1,28 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index c93b23393d316a44a19b6821e69afad47b714101..4375ffe30ef9679eaa9c58ae74f893357d51fe53 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -317,6 +317,9 @@ function getCrawler(globInput, inputOptions = {}) {
+ 	const isModern = isReadonlyArray(globInput) || typeof globInput === "string";
+ 	const patterns = ensureStringArray((_ref = isModern ? globInput : globInput.patterns) !== null && _ref !== void 0 ? _ref : "**/*");
+ 	const options = getOptions(isModern ? inputOptions : globInput);
++	// Reject the entire walk if even an exclusion cannot be evaluated safely.
++	const supported = (pattern) => picomatch.default.isSupportedPattern(pattern);
++	if (!patterns.every(supported) || !options.ignore.every(supported)) return [];
+ 	return patterns.length > 0 ? buildCrawler(options, patterns) : [];
+ }
+ async function glob(globInput, options) {
+diff --git a/dist/index.mjs b/dist/index.mjs
+index f5db1ed7627736963cec8db6d5ec0b3c6f5915ff..41dd9e8d8b49c46a5a4732444a2380203e017aa4 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -293,6 +293,9 @@ function getCrawler(globInput, inputOptions = {}) {
+ 	const isModern = isReadonlyArray(globInput) || typeof globInput === "string";
+ 	const patterns = ensureStringArray((_ref = isModern ? globInput : globInput.patterns) !== null && _ref !== void 0 ? _ref : "**/*");
+ 	const options = getOptions(isModern ? inputOptions : globInput);
++	// Reject the entire walk if even an exclusion cannot be evaluated safely.
++	const supported = (pattern) => picomatch.isSupportedPattern(pattern);
++	if (!patterns.every(supported) || !options.ignore.every(supported)) return [];
+ 	return patterns.length > 0 ? buildCrawler(options, patterns) : [];
+ }
+ async function glob(globInput, options) {

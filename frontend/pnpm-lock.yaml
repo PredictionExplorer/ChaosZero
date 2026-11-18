@@ -31,6 +31,9 @@ patchedDependencies:
   fdir@6.5.0:
     hash: 385f95b421efe57422ec1024389a0f1450c2ab2b8ce2725b765da480d832e54d
     path: patches/fdir@6.5.0.patch
+  tinyglobby@0.2.17:
+    hash: 12492cae847371085399b1394d9a03037ede8f5878da5d7c83fbec5382b78da2
+    path: patches/tinyglobby@0.2.17.patch
   vite@8.1.6:
     hash: d4b401a1230da7f78a141264d19c3197cedc6c4b2d176bc2212591c31d584412
     path: patches/vite@8.1.6.patch
@@ -4513,7 +4516,7 @@ snapshots:
   '@next/eslint-plugin-next@16.4.6(eslint@9.39.5(jiti@2.7.0))':
     dependencies:
       '@eslint-community/eslint-utils': 4.9.1(eslint@9.39.5(jiti@2.7.0))
-      fast-glob: tinyglobby@0.2.17
+      fast-glob: tinyglobby@0.2.17(patch_hash=12492cae847371085399b1394d9a03037ede8f5878da5d7c83fbec5382b78da2)
     transitivePeerDependencies:
       - eslint
 
@@ -5634,7 +5637,7 @@ snapshots:
       debug: 4.4.3
       minimatch: 11.0.9
       semver: 7.8.5
-      tinyglobby: 0.2.17
+      tinyglobby: 0.2.17(patch_hash=12492cae847371085399b1394d9a03037ede8f5878da5d7c83fbec5382b78da2)
       ts-api-utils: 2.5.0(typescript@5.9.3)
       typescript: 5.9.3
     transitivePeerDependencies:
@@ -6917,7 +6920,7 @@ snapshots:
       get-tsconfig: 4.14.3
       is-bun-module: 2.0.0
       stable-hash: 0.0.5
-      tinyglobby: 0.2.17
+      tinyglobby: 0.2.17(patch_hash=12492cae847371085399b1394d9a03037ede8f5878da5d7c83fbec5382b78da2)
       unrs-resolver: 1.12.2
     optionalDependencies:
       eslint-plugin-import: 2.32.0(@typescript-eslint/parser@8.72.0(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3))(eslint-import-resolver-typescript@3.10.1)(eslint@9.39.5(jiti@2.7.0))
@@ -8360,7 +8363,7 @@ snapshots:
 
   tinyexec@1.3.1: {}
 
-  tinyglobby@0.2.17:
+  tinyglobby@0.2.17(patch_hash=12492cae847371085399b1394d9a03037ede8f5878da5d7c83fbec5382b78da2):
     dependencies:
       fdir: 6.5.0(patch_hash=385f95b421efe57422ec1024389a0f1450c2ab2b8ce2725b765da480d832e54d)(@chaos-zero/tooling-glob@file:tooling/glob)
       picomatch: '@chaos-zero/tooling-glob@file:tooling/glob'
@@ -8567,7 +8570,7 @@ snapshots:
       picomatch: '@chaos-zero/tooling-glob@file:tooling/glob'
       postcss: 8.5.31
       rolldown: 1.1.5
-      tinyglobby: 0.2.17
+      tinyglobby: 0.2.17(patch_hash=12492cae847371085399b1394d9a03037ede8f5878da5d7c83fbec5382b78da2)
     optionalDependencies:
       '@types/node': 20.19.43
       fsevents: 2.3.3
@@ -8591,7 +8594,7 @@ snapshots:
       std-env: 4.3.0
       tinybench: 2.9.0
       tinyexec: 1.3.1
-      tinyglobby: 0.2.17
+      tinyglobby: 0.2.17(patch_hash=12492cae847371085399b1394d9a03037ede8f5878da5d7c83fbec5382b78da2)
       tinyrainbow: 3.2.0
       vite: 8.1.6(patch_hash=d4b401a1230da7f78a141264d19c3197cedc6c4b2d176bc2212591c31d584412)(@types/node@20.19.43)(jiti@2.7.0)
       why-is-node-running: 2.3.0
