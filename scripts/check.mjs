@@ -27,6 +27,14 @@ const step = (name, work) => {
   work();
 };
 
+// Keep Git's hook environment for the checks on the caller's index and push refs.
+// After those checks, subprocesses in submodules and test repos need their own index and refs.
+function clearHookGitEnvironment() {
+  for (const key of git(root, ["rev-parse", "--local-env-vars"]).trim().split("\n")) {
+    delete process.env[key];
+  }
+}
+
 function prerequisites({ contracts = true, frontend: needsFrontend = true } = {}) {
   if (Number(process.versions.node.split(".")[0]) < 22) {
     throw new Error(
@@ -175,6 +183,7 @@ try {
       assertStagedMatchesWorktree(root, files);
       execute("git", ["diff", "--cached", "--check"]);
     });
+    clearHookGitEnvironment();
     step("Formatting staged files", () =>
       format(files.filter((file) => existsSync(join(root, file)))),
     );
@@ -193,6 +202,7 @@ try {
     prerequisites();
     step("Working tree whitespace", () => execute("git", ["diff", "--check"]));
     step("Formatting changed files", () => format(changedFiles()));
+    clearHookGitEnvironment();
     step("Developer gate regression tests", tooling);
     contracts();
     vectors();
