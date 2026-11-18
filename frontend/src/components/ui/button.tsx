@@ -45,9 +45,9 @@ export function Button({
       {...rest}
       disabled={disabled || loading}
       className={[
-        "inline-flex items-center justify-center font-medium transition-all duration-150",
+        "inline-flex items-center justify-center font-medium transition-colors duration-150",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal",
-        "disabled:opacity-45 disabled:cursor-not-allowed active:enabled:scale-[0.98]",
+        "disabled:opacity-65 disabled:cursor-not-allowed active:enabled:scale-[0.98]",
         VARIANTS[variant],
         SIZES[size],
         className,
