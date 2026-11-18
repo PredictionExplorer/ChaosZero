@@ -11,6 +11,7 @@ import {
   getCreateAddress,
   hexlify,
   toBeHex,
+  toQuantity,
   zeroPadValue,
 } from "ethers";
 
@@ -172,6 +173,16 @@ export async function requireRuntime(provider, block, address, artifact, binding
   );
 }
 
+/** A fresh JSON-RPC read; ethers can cache getBlock(height) across both ends of a short inspection. */
+export async function requireCanonicalBlock(provider, height, hash) {
+  const quantity = toQuantity(height);
+  const block = await provider.send("eth_getBlockByNumber", [quantity, false]);
+  assert.ok(
+    block?.number?.toLowerCase() === quantity && block?.hash?.toLowerCase() === hash.toLowerCase(),
+    "Creation block is no longer canonical.",
+  );
+}
+
 /** Read only. Tie both RPC responses to the requested CREATE and to a canonical block. */
 export async function creationReceipt(provider, chainId, hash, creation) {
   assert.match(hash, /^0x[0-9a-f]{64}$/i, "Expected a deployment transaction hash.");
@@ -208,10 +219,6 @@ export async function creationReceipt(provider, chainId, hash, creation) {
     true,
     "Creation code or constructor arguments differ from the local production build.",
   );
-  assert.equal(
-    (await provider.getBlock(receipt.blockNumber))?.hash,
-    receipt.blockHash,
-    "Creation block is no longer canonical.",
-  );
+  await requireCanonicalBlock(provider, receipt.blockNumber, receipt.blockHash);
   return receipt;
 }

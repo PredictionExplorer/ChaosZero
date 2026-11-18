@@ -8,6 +8,7 @@ import {
   requireRuntime,
 } from "./bytecode-identity.mjs";
 import { inspectCreation } from "./prepare-game-funded-market.mjs";
+import { inspectHistoricalStack } from "./verify-bytecode.mjs";
 
 const hash = "0x" + "12".repeat(32);
 const blockHash = "0x" + "ab".repeat(32);
@@ -42,7 +43,12 @@ const receipt = {
   blockNumber: 99,
 };
 const provider = {
-  getBlock: async () => ({ hash: blockHash }),
+  send: async (method, params) => {
+    if (method === "eth_chainId") return "0x7a69";
+    assert.equal(method, "eth_getBlockByNumber");
+    assert.deepEqual(params, ["0x63", false]);
+    return { hash: blockHash, number: "0x63" };
+  },
   getTransaction: async () => transaction,
   getTransactionReceipt: async () => receipt,
 };
@@ -144,7 +150,12 @@ test("receipt inspection binds the supplied hash, sender, nonce, chain, input an
     );
   }
   await assert.rejects(
-    creationReceipt({ ...provider, getBlock: async () => ({ hash }) }, 31337, hash, creation),
+    creationReceipt(
+      { ...provider, send: async () => ({ hash, number: "0x63" }) },
+      31337,
+      hash,
+      creation,
+    ),
     /canonical/,
   );
 });
@@ -182,10 +193,6 @@ test("successor inspection checks each constructor-created child's exact runtime
   );
   const chain = {
     ...provider,
-    send: async (method) => {
-      assert.equal(method, "eth_chainId");
-      return "0x7a69";
-    },
     getCode: async (a, b) => {
       assert.equal(b, 99);
       return code[a];
@@ -215,6 +222,30 @@ test("successor inspection checks each constructor-created child's exact runtime
       ),
       /runtime mismatch/,
     );
+  let sawGetter = false;
+  await assert.rejects(
+    inspectCreation(
+      {
+        ...chain,
+        // A cached getBlock would still give the original hash after the getter returns.
+        getBlock: async () => ({ hash: blockHash, number: 99 }),
+        call: async (tx) => {
+          sawGetter = true;
+          return chain.call(tx);
+        },
+        send: async (method, params) => {
+          const result = await provider.send(method, params);
+          return sawGetter && method === "eth_getBlockByNumber" ? { ...result, hash } : result;
+        },
+      },
+      expected,
+      creation,
+      hash,
+      artifacts,
+    ),
+    /no longer canonical/,
+  );
+  assert.ok(sawGetter);
   getters.settlementVault = views;
   await assert.rejects(
     inspectCreation(chain, expected, creation, hash, artifacts),
@@ -226,4 +257,35 @@ test("successor inspection checks each constructor-created child's exact runtime
     inspectCreation(chain, expected, creation, hash, artifacts),
     /Unexpected claim vault/,
   );
+});
+
+test("historical verification rechecks the canonical hash after reading every child's runtime", async () => {
+  const stack = {
+    transaction: { address: market, block: 99, blockHash, transaction: hash },
+    creation,
+    runtimes: [
+      [{ address: market }, "0xaa"],
+      [{ address: vault }, "0xbb"],
+      [{ address: views }, "0xcc"],
+    ],
+  };
+  const reads = [];
+  let blockReads = 0;
+  const chain = {
+    ...provider,
+    getTransaction: async () => ({ ...transaction, chainId: 42161n }),
+    getCode: async (address, height) => {
+      assert.equal(height, 99);
+      reads.push(address);
+      return stack.runtimes.find(([r]) => r.address === address)[1];
+    },
+    send: async (method, params) => {
+      const block = await provider.send(method, params);
+      blockReads++;
+      return reads.length === 3 ? { ...block, hash } : block;
+    },
+  };
+  await assert.rejects(inspectHistoricalStack(chain, stack), /no longer canonical/);
+  assert.deepEqual(reads, [market, vault, views]);
+  assert.equal(blockReads, 2);
 });

@@ -10,6 +10,7 @@ import {
   buildSuccessor,
   childrenOf,
   creationReceipt,
+  requireCanonicalBlock,
   deployedRuntime,
   foundryArtifact,
   hardhatArtifact,
@@ -57,13 +58,40 @@ async function archivedSingleQuestion() {
 const init = async (artifact, args) =>
   (await new ContractFactory(artifact.abi, artifact.creation).getDeployTransaction(...args)).data;
 
+export async function inspectHistoricalStack(provider, { transaction, creation, runtimes }) {
+  const mined = await creationReceipt(
+    provider,
+    ARBITRUM.chainId,
+    transaction.transaction,
+    creation,
+  );
+  assert.equal(getAddress(mined.contractAddress), transaction.address);
+  assert.equal(mined.blockHash, transaction.blockHash);
+  assert.equal(mined.blockNumber, transaction.block);
+  for (const [record, code] of runtimes) {
+    assert.ok(
+      (await provider.getCode(record.address, mined.blockNumber)).toLowerCase() === code,
+      `On-chain runtime mismatch at ${record.address}`,
+    );
+  }
+  await requireCanonicalBlock(provider, mined.blockNumber, mined.blockHash);
+}
+
+let stage = "argument validation";
+
 async function verify(provider) {
+  stage = "historical witness loading";
   const witness = await readJson(join(root, "deployment/arbitrum-bytecode.json"));
   assert.equal(witness.chainId, ARBITRUM.chainId);
-  if (provider) await assertChain(provider, ARBITRUM);
+  if (provider) {
+    stage = "archive RPC chain verification";
+    await assertChain(provider, ARBITRUM);
+  }
 
   // All historical checks compare the complete bytecode, including compiler metadata.
+  stage = "archived single-question build";
   const legacy = await archivedSingleQuestion();
+  stage = "archived single-question transaction and runtime witnesses";
   const broadcast = await readJson(join(root, "broadcast/Deploy.s.sol/42161/run-latest.json"));
   assert.equal(broadcast.chain, ARBITRUM.chainId);
   assert.equal(broadcast.transactions.length, 1);
@@ -99,6 +127,7 @@ async function verify(provider) {
   );
 
   // The original eight-question deployment used Hardhat, with its own metadata/source paths.
+  stage = "original eight-question build";
   execFileSync("pnpm", ["build:deployment"], { cwd: root, stdio: ["ignore", 2, 2] });
   const [source, market, vault, views] = await Promise.all([
     hardhatArtifact("V3OutcomeSource", "V3OutcomeSource"),
@@ -106,6 +135,7 @@ async function verify(provider) {
     hardhatArtifact("OutcomeSettlementVault", "OutcomeSettlementVault", "IndependentOutcomeMarket"),
     hardhatArtifact("IndependentOutcomeMarket", "IndependentMarketViews"),
   ]);
+  stage = "eight-question constructor and immutable witnesses";
   const baseline = await readJson(join(root, "deployment/arbitrum-round-2-baseline.json"));
   assert.equal(baseline.game, ARBITRUM.game);
   assert.equal(baseline.cst, ARBITRUM.cst);
@@ -128,59 +158,73 @@ async function verify(provider) {
   const children = childrenOf(witness.market.address);
   assert.deepEqual(children, { vault: witness.vault.address, views: witness.views.address });
   const historical = [
-    [witness.legacy, legacyRuntime, witness.legacy.block],
-    [
-      witness.source,
-      deployedRuntime(source, {
-        game: ARBITRUM.game,
-        cst: ARBITRUM.cst,
-        firstMarketRound: BigInt(baseline.firstMarketRound),
-        baselineHash: baseline.constructorBaselineHash,
-      }),
-      witness.source.block,
-    ],
-    [
-      witness.market,
-      deployedRuntime(market, {
-        cst: ARBITRUM.cst,
-        source: SOURCE,
-        settlementVault: children.vault,
-        _marketViews: children.views,
-      }),
-      witness.market.block,
-    ],
-    [
-      witness.vault,
-      deployedRuntime(vault, { cst: ARBITRUM.cst, market: witness.market.address }),
-      witness.market.block,
-    ],
-    [witness.views, deployedRuntime(views, {}), witness.market.block],
+    {
+      label: "single-question market",
+      transaction: witness.legacy,
+      creation: legacyInput,
+      runtimes: [[witness.legacy, legacyRuntime]],
+    },
+    {
+      label: "eight-question outcome source",
+      transaction: witness.source,
+      creation: sourceInput,
+      runtimes: [
+        [
+          witness.source,
+          deployedRuntime(source, {
+            game: ARBITRUM.game,
+            cst: ARBITRUM.cst,
+            firstMarketRound: BigInt(baseline.firstMarketRound),
+            baselineHash: baseline.constructorBaselineHash,
+          }),
+        ],
+      ],
+    },
+    {
+      label: "eight-question market and children",
+      transaction: witness.market,
+      creation: marketInput,
+      runtimes: [
+        [
+          witness.market,
+          deployedRuntime(market, {
+            cst: ARBITRUM.cst,
+            source: SOURCE,
+            settlementVault: children.vault,
+            _marketViews: children.views,
+          }),
+        ],
+        [
+          witness.vault,
+          deployedRuntime(vault, { market: witness.market.address, cst: ARBITRUM.cst }),
+        ],
+        [witness.views, deployedRuntime(views, {})],
+      ],
+    },
   ];
-  for (const [record, code] of historical)
-    assert.equal(keccak256(code), record.runtimeHash, `Runtime hash mismatch at ${record.address}`);
+  for (const { runtimes } of historical) {
+    for (const [record, code] of runtimes) {
+      assert.equal(
+        keccak256(code),
+        record.runtimeHash,
+        `Runtime hash mismatch at ${record.address}`,
+      );
+    }
+  }
+  stage = "production frontend identity";
   const env = parseEnv(await readFile(join(root, "frontend/.env.production"), "utf8"));
   assert.equal(env.NEXT_PUBLIC_CHAIN_ID, String(ARBITRUM.chainId));
   assert.equal(getAddress(env.NEXT_PUBLIC_INDEPENDENT_MARKET_ADDRESS), witness.market.address);
   assert.equal(getAddress(env.NEXT_PUBLIC_INDEPENDENT_SOURCE_ADDRESS), SOURCE);
 
+  stage = "V4 build";
   const successor = await buildSuccessor();
+  stage = "V4 candidate fingerprints";
   await reviewedSuccessorCreation(successor, { ...ARBITRUM, source: SOURCE }, witness.successor);
   if (provider) {
-    for (const [record, creation] of [
-      [witness.legacy, legacyInput],
-      [witness.source, sourceInput],
-      [witness.market, marketInput],
-    ]) {
-      const mined = await creationReceipt(provider, ARBITRUM.chainId, record.transaction, creation);
-      assert.equal(getAddress(mined.contractAddress), record.address);
-      assert.equal(mined.blockHash, record.blockHash);
-      assert.equal(mined.blockNumber, record.block);
-    }
-    for (const [record, code, block] of historical) {
-      assert.ok(
-        (await provider.getCode(record.address, block)).toLowerCase() === code,
-        `On-chain runtime mismatch at ${record.address}`,
-      );
+    for (const stack of historical) {
+      stage = "archive RPC verification of " + stack.label;
+      await inspectHistoricalStack(provider, stack);
     }
     console.log(
       "Authenticated three historical creation transactions and five deployed runtimes at their Arbitrum receipt blocks.",
@@ -197,6 +241,7 @@ async function main() {
     !args.length || (args.length === 1 && args[0] === "--rpc"),
     "Use verify:bytecode [--rpc].",
   );
+  stage = "archive RPC setup";
   const provider = args.length
     ? new JsonRpcProvider(process.env.ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc")
     : null;
@@ -210,9 +255,7 @@ async function main() {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch(() => {
     // Provider errors may contain URLs or credentials.
-    console.error(
-      "Bytecode verification failed. Check the production build and witnesses, and the archive RPC when selected.",
-    );
+    console.error(`Bytecode verification failed during ${stage}.`);
     process.exitCode = 1;
   });
 }

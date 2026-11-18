@@ -10,6 +10,7 @@ import {
   readJson,
   reviewedSuccessorCreation,
   requireRuntime,
+  requireCanonicalBlock,
 } from "./bytecode-identity.mjs";
 
 export const SOURCE = "0x099c29624E05506582655417344A17FB71c9d138";
@@ -72,18 +73,18 @@ export async function inspectCreation(provider, expected, creation, hash, artifa
     reserve.cst({ blockTag }),
   ]);
   assert.deepEqual([vaultMarket, vaultToken], [address, expected.cst], "Unexpected claim vault.");
-  assert.equal(
-    (await provider.getBlock(blockTag))?.hash,
-    receipt.blockHash,
-    "Creation block changed during verification.",
-  );
+  await requireCanonicalBlock(provider, blockTag, receipt.blockHash);
   return { market: address, vault, views, transactionHash: hash, blockNumber: receipt.blockNumber };
 }
+
+let stage = "argument validation";
 
 async function main() {
   const args = process.argv.slice(2);
   if (args.length > 1) throw Error("Expected at most one public deployment hash.");
+  stage = "V4 build";
   const artifacts = await buildSuccessor();
+  stage = "chain and outcome-source verification";
   const provider = new JsonRpcProvider(
     process.env.ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc",
   );
@@ -113,7 +114,9 @@ async function main() {
       [expected.game, expected.cst, BASELINE_HASH],
       "The deployed outcome adapter failed validation.",
     );
+    stage = "V4 build fingerprint verification";
     const creation = await reviewedSuccessorCreation(artifacts, expected, witness.successor);
+    stage = "mined receipt, immutable bindings and runtime verification";
     const output = args.length
       ? await inspectCreation(provider, expected, creation, args[0], artifacts)
       : { chainId: expected.chainId, value: "0", data: creation };
@@ -128,9 +131,7 @@ async function main() {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch(() => {
     // RPC errors can embed the endpoint. Keep diagnostics independent of provider input.
-    console.error(
-      "Successor preparation or inspection failed. Check the production build, Arbitrum RPC, deployment hash and pinned contract identities.",
-    );
+    console.error(`Successor preparation or inspection failed during ${stage}.`);
     process.exitCode = 1;
   });
 }
