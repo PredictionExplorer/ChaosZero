@@ -7,7 +7,7 @@ import { BrandMark } from "@/components/layout/brand-mark";
 import { JsonLd } from "@/components/seo/json-ld";
 import { organizationJsonLd, webApplicationJsonLd, webSiteJsonLd } from "@/lib/structured-data";
 import { IndependentGate } from "./app";
-import { independentMarketAddress } from "./config";
+import { gameFundedMarketAddress, independentMarketAddress, previousMarketAddress } from "./config";
 import { appConfig } from "@/lib/config";
 
 function OrbitalMark() {
@@ -233,18 +233,20 @@ export function IndependentPage() {
           </section>
           <section className="observatory-funding">
             <div>
-              <p className="observatory-kicker">FUEL THE POSSIBILITIES</p>
+              <p className="observatory-kicker">
+                {gameFundedMarketAddress ? "CYCLE FUNDING" : "FUEL THE POSSIBILITIES"}
+              </p>
               <h2>
-                One contribution.
+                {gameFundedMarketAddress ? "One cycle." : "One contribution."}
                 <br />
                 <span>Eight deeper markets.</span>
               </h2>
             </div>
             <div>
               <p>
-                Contributions are divided equally across the eight pools. There are no trading fees
-                and no redeemable LP shares. Funding is an irreversible gift; unused pool funds
-                carry into future cycles.
+                {gameFundedMarketAddress
+                  ? "Cosmic Signature issues CST for each cycle and divides it equally across the eight pools. Only the game supplies fresh liquidity. It receives no fees, shares or repayment. Unused collateral carries forward after winning claims are reserved."
+                  : "Contributions are divided equally across the eight pools. There are no trading fees and no redeemable LP shares. Funding is an irreversible gift; unused pool funds carry into future cycles."}
               </p>
               <Link href="/faq">
                 Read the mechanics <ArrowUpRight size={16} aria-hidden />
@@ -261,6 +263,9 @@ export function IndependentPage() {
           <nav aria-label="Footer navigation">
             <Link href="/faq">FAQ</Link>
             <Link href="/baseline">Baseline evidence</Link>
+            {gameFundedMarketAddress && previousMarketAddress && (
+              <Link href="/previous">Previous market positions</Link>
+            )}
             <a
               href="https://arbiscan.io/address/0x6a714Ae7B5b6eA520F6BCA23d2E609C4Fd5863F2"
               target="_blank"

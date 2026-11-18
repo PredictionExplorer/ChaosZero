@@ -39,7 +39,7 @@ export function assertContractDependencies(repoRoot) {
 
 export function classifyChanges(files) {
   const tooling = files.some((file) =>
-    /^(?:scripts\/|deployment\/|hardhat\.config\.|remappings\.txt$|\.githooks\/|\.github\/|playwright\.config\.|package\.json$|pnpm-lock\.yaml$|\.node-version$|\.prettier)/.test(
+    /^(?:scripts\/|deployment\/|patches\/|pnpm-workspace\.yaml$|hardhat\.config\.|remappings\.txt$|\.githooks\/|\.github\/|playwright\.config\.|package\.json$|pnpm-lock\.yaml$|\.node-version$|\.prettier)/.test(
       file,
     ),
   );

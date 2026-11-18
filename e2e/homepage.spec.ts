@@ -7,12 +7,12 @@ async function expectLiveLocalMarkets(page: Page) {
   await expect(page.getByText("LOCAL TEST NETWORK", { exact: true })).toBeVisible();
   await expect(page.getByText("TEST FUNDS ONLY", { exact: true })).toBeVisible();
   await expect(page.getByTestId("independent-cycle")).toHaveText("Cycle 1");
-  await expect(page.getByTestId("independent-active")).toHaveText("10,000 CST");
+  await expect(page.getByTestId("independent-active")).toHaveText("8,000 CST");
   await expect(page.getByTestId(/^question-\d$/)).toHaveCount(8);
   for (let question = 0; question < 8; question++) {
     const card = page.getByTestId(`question-${question}`);
     await expect(card).toBeVisible();
-    await expect(card.getByTestId(`question-collateral-${question}`)).toHaveText("1,250 CST");
+    await expect(card.getByTestId(`question-collateral-${question}`)).toHaveText("1,000 CST");
     await expect(card.getByRole("button", { name: /^Buy YES:/ })).toBeEnabled();
     await expect(card.getByRole("button", { name: /^Buy NO:/ })).toBeEnabled();
     await expect(card.getByTestId(`question-seed-${question}`)).toHaveText("50%");

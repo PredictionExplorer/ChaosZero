@@ -1,3 +1,13 @@
+# V4 game-funded successor, 17 November 2026
+
+The production compiler profile produced a 20,839-byte market runtime and 33,046 bytes of initcode including constructor arguments. Foundry and Hardhat agreed on the six checked runtime bodies. The full Foundry run passed 276 tests including three V3 archive-fork tests. A separate heavy run passed 50,000 fuzz inputs and 131,072 stateful actions (512 runs of depth 256, zero reverts) for the successor. It checks the authenticated ledger, raw transfers, trading, quiet cycles, escrow and late claims.
+
+Reproduce the focused campaign with `FOUNDRY_PROFILE=heavy forge test --match-path 'test/GameFunded*.t.sol' --fuzz-seed 0xd381fad492b9b44a04606d491a6f267cbb07d43cecd65c52c8bdea540d426678`. Set `CHAOSZERO_V3_FORK_RPC_URL` to an archive-capable Arbitrum One endpoint to include the deployed source tests in `forge test`.
+
+On disposable Anvil, four browser scenarios exercised both the successor and the previous-market recovery route. The frontend passed 1,397 unit tests. The combined Cosmic Signature fork rehearsal at Arbitrum block 517222845 upgraded the actual V3 proxy locally, transferred 16,000 CST across cycles 4 and 5, checked the independent read helper, reserved and paid eight CST in outstanding positions, and excluded one unsolicited CST. The game repository records the artifact hashes and the fork limitations in `docs/v4-art-auction-verification.json` under `chaosZeroFunding`.
+
+The 18 November V4 release check used Next.js 16.4.6 and the updated dependency lockfiles. A clean frozen frontend install reported zero findings in both full and production-only dependency audits. The root tooling audit also reported zero. The frontend passed 1,409 tests across 62 suites, with the existing coverage thresholds, and the Chromium suite again passed all four real-chain browser scenarios. The three archive outcome tests and the focused heavy game-funded market campaign passed. The combined V3-to-V4 check in the game repository exercises the game, market, deployed outcome source and auction together on a local fork. No transaction was submitted to a public chain.
+
 # Production V3 preparation — 21 October 2026
 
 This release candidate changes only ChaosZero. No public contract or frontend

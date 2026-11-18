@@ -1,0 +1,93 @@
+diff --git a/dist/esm/src/W3mFrameSchema.js b/dist/esm/src/W3mFrameSchema.js
+index fd31ff1f1cb8294ef338c4e48118ac61adbe70f6..c43f722a1afa195c305feb7e71fb3d1e2a9fddc5 100644
+--- a/dist/esm/src/W3mFrameSchema.js
++++ b/dist/esm/src/W3mFrameSchema.js
+@@ -1,4 +1,4 @@
+-import { z } from 'zod';
++import { z } from 'zod/v4';
+ import { W3mFrameConstants, W3mFrameRpcConstants } from './W3mFrameConstants.js';
+ const zError = z.object({ message: z.string() });
+ function zType(key) {
+@@ -364,11 +364,11 @@ export const WalletGrantPermissionsRequest = z.object({
+ });
+ export const WalletRevokePermissionsRequest = z.object({
+     method: z.literal('wallet_revokePermissions'),
+-    params: z.any()
++    params: z.any().optional()
+ });
+ export const WalletGetAssetsRequest = z.object({
+     method: z.literal('wallet_getAssets'),
+-    params: z.any()
++    params: z.any().optional()
+ });
+ export const FrameSession = z.object({
+     token: z.string()
+@@ -548,7 +548,7 @@ export const W3mFrameSchema = {
+         payload: FrameGetChainIdResponse
+     }))
+         .or(EventSchema.extend({ type: zType('FRAME_RPC_REQUEST_ERROR'), payload: zError }))
+-        .or(EventSchema.extend({ type: zType('FRAME_RPC_REQUEST_SUCCESS'), payload: RpcResponse }))
++        .or(EventSchema.extend({ type: zType('FRAME_RPC_REQUEST_SUCCESS'), payload: RpcResponse.optional() }))
+         .or(EventSchema.extend({ type: zType('FRAME_SESSION_UPDATE'), payload: FrameSession }))
+         .or(EventSchema.extend({ type: zType('FRAME_UPDATE_EMAIL_ERROR'), payload: zError }))
+         .or(EventSchema.extend({
+diff --git a/dist/esm/src/W3mFrameTypes.js b/dist/esm/src/W3mFrameTypes.js
+index 9567f26ec552f4bf4cf2cef0ede07600911a2f81..919bc7036d59c0edbe9c11d2a6bad689099e0268 100644
+--- a/dist/esm/src/W3mFrameTypes.js
++++ b/dist/esm/src/W3mFrameTypes.js
+@@ -1,3 +1,3 @@
+-import { z } from 'zod';
++import { z } from 'zod/v4';
+ import { AppConnectEmailRequest, AppConnectOtpRequest, AppConnectSocialRequest, AppGetSocialRedirectUriRequest, AppGetUserRequest, AppSetPreferredAccountRequest, AppSwitchNetworkRequest, AppSyncDappDataRequest, AppSyncThemeRequest, AppUpdateEmailPrimaryOtpRequest, AppUpdateEmailRequest, AppUpdateEmailSecondaryOtpRequest, FrameConnectEmailResponse, FrameConnectFarcasterResponse, FrameConnectSocialResponse, FrameGetChainIdResponse, FrameGetFarcasterUriResponse, FrameGetSmartAccountEnabledNetworksResponse, FrameGetSocialRedirectUriResponse, FrameGetUserResponse, FrameIsConnectedResponse, FrameReadyResponse, FrameSession, FrameSetPreferredAccountResponse, FrameSwitchNetworkResponse, FrameUpdateEmailResponse, FrameUpdateEmailSecondaryOtpResponse, RcpEthGetBlockTransactionCountByHash, RcpEthGetBlockTransactionCountByNumber, RpcEthAccountsRequest, RpcEthBlockNumber, RpcEthCall, RpcEthChainId, RpcEthEstimateGas, RpcEthFeeHistory, RpcEthGasPrice, RpcEthGetAccount, RpcEthGetBalance, RpcEthGetBlockByNumber, RpcEthGetBlockReceipts, RpcEthGetBlockyByHash, RpcEthGetCode, RpcEthGetFilter, RpcEthGetFilterLogs, RpcEthGetLogs, RpcEthGetProof, RpcEthGetStorageAt, RpcEthGetTransactionByBlockHashAndIndex, RpcEthGetTransactionByBlockNumberAndIndex, RpcEthGetTransactionByHash, RpcEthGetTransactionCount, RpcEthGetTransactionReceipt, RpcEthGetUncleCountByBlockHash, RpcEthGetUncleCountByBlockNumber, RpcEthMaxPriorityFeePerGas, RpcEthNewBlockFilter, RpcEthNewFilter, RpcEthNewPendingTransactionFilter, RpcEthSendRawTransaction, RpcEthSendTransactionRequest, RpcEthSignTypedDataV4, RpcEthSyncing, RpcPersonalSignRequest, RpcResponse, RpcSolanaSignAllTransactionsRequest, RpcSolanaSignAndSendTransactionRequest, RpcSolanaSignMessageRequest, RpcSolanaSignTransactionRequest, RpcUnistallFilter, W3mFrameSchema, WalletGetAssetsRequest, WalletGetCallsReceiptRequest, WalletGetCapabilitiesRequest, WalletGrantPermissionsRequest, WalletRevokePermissionsRequest, WalletSendCallsRequest } from './W3mFrameSchema.js';
+ //# sourceMappingURL=W3mFrameTypes.js.map
+\ No newline at end of file
+diff --git a/dist/types/exports/index.d.ts b/dist/types/exports/index.d.ts
+index 18d29c5894d5c84b0e284ce49a9759181bd0f2a3..7a55011dcb40807d367e4b56357d18087b40e917 100644
+--- a/dist/types/exports/index.d.ts
++++ b/dist/types/exports/index.d.ts
+@@ -3,7 +3,7 @@ export { W3mFrame } from '../src/W3mFrame.js';
+ export { W3mFrameHelpers } from '../src/W3mFrameHelpers.js';
+ export { W3mFrameProvider } from '../src/W3mFrameProvider.js';
+ export type { W3mFrameProviderMethods } from '../src/W3mFrameProvider.js';
+-export { W3mFrameSchema } from '../src/W3mFrameSchema.js';
++export { W3mFrameSchema } from '../src/W3mFrameValidators.js';
+ export { W3mFrameConstants, type W3mFrameConstantValue } from '../src/W3mFrameConstants.js';
+ export { W3mFrameStorage } from '../src/W3mFrameStorage.js';
+ export type { W3mFrameTypes } from '../src/W3mFrameTypes.js';
+diff --git a/dist/types/src/W3mFrameSchema.d.ts b/dist/types/src/W3mFrameSchema.d.ts
+index 1a7d29f75ece04bff190a7e610ad2e67bf162224..c2ea29cb5aafab3c0b7335acf4ec0d5f1c14f412 100644
+--- a/dist/types/src/W3mFrameSchema.d.ts
++++ b/dist/types/src/W3mFrameSchema.d.ts
+@@ -1,4 +1,4 @@
+-import { z } from 'zod';
++import type { z } from 'zod/v3';
+ import type { AdapterType, AppKitSdkVersion, SdkFramework } from '@reown/appkit-common';
+ export type SdkType = 'w3m' | 'appkit';
+ export type SdkVersion = `${SdkFramework}-${AdapterType}-${string}` | AppKitSdkVersion | undefined;
+diff --git a/dist/types/src/W3mFrameTypes.d.ts b/dist/types/src/W3mFrameTypes.d.ts
+index 46a8d8af4be4823f4ad8c33a46547b031a062906..83be15fe24a8cf5b5f8f4bab045709e5131a70d9 100644
+--- a/dist/types/src/W3mFrameTypes.d.ts
++++ b/dist/types/src/W3mFrameTypes.d.ts
+@@ -1,4 +1,4 @@
+-import { z } from 'zod';
++import type { z } from 'zod/v3';
+ import type { CaipNetworkId, ChainNamespace } from '@reown/appkit-common';
+ import type { W3mFrameRpcConstants } from './W3mFrameConstants.js';
+ import { AppConnectEmailRequest, AppConnectOtpRequest, AppConnectSocialRequest, AppGetSocialRedirectUriRequest, AppGetUserRequest, AppSetPreferredAccountRequest, AppSwitchNetworkRequest, AppSyncDappDataRequest, AppSyncThemeRequest, AppUpdateEmailPrimaryOtpRequest, AppUpdateEmailRequest, AppUpdateEmailSecondaryOtpRequest, FrameConnectEmailResponse, FrameConnectFarcasterResponse, FrameConnectSocialResponse, FrameGetChainIdResponse, FrameGetFarcasterUriResponse, FrameGetSmartAccountEnabledNetworksResponse, FrameGetSocialRedirectUriResponse, FrameGetUserResponse, FrameIsConnectedResponse, FrameReadyResponse, FrameSession, FrameSetPreferredAccountResponse, FrameSwitchNetworkResponse, FrameUpdateEmailResponse, FrameUpdateEmailSecondaryOtpResponse, RcpEthGetBlockTransactionCountByHash, RcpEthGetBlockTransactionCountByNumber, RpcEthAccountsRequest, RpcEthBlockNumber, RpcEthCall, RpcEthChainId, RpcEthEstimateGas, RpcEthFeeHistory, RpcEthGasPrice, RpcEthGetAccount, RpcEthGetBalance, RpcEthGetBlockByNumber, RpcEthGetBlockReceipts, RpcEthGetBlockyByHash, RpcEthGetCode, RpcEthGetFilter, RpcEthGetFilterLogs, RpcEthGetLogs, RpcEthGetProof, RpcEthGetStorageAt, RpcEthGetTransactionByBlockHashAndIndex, RpcEthGetTransactionByBlockNumberAndIndex, RpcEthGetTransactionByHash, RpcEthGetTransactionCount, RpcEthGetTransactionReceipt, RpcEthGetUncleCountByBlockHash, RpcEthGetUncleCountByBlockNumber, RpcEthMaxPriorityFeePerGas, RpcEthNewBlockFilter, RpcEthNewFilter, RpcEthNewPendingTransactionFilter, RpcEthSendRawTransaction, RpcEthSendTransactionRequest, RpcEthSignTypedDataV4, RpcEthSyncing, RpcPersonalSignRequest, RpcResponse, RpcSolanaSignAllTransactionsRequest, RpcSolanaSignAndSendTransactionRequest, RpcSolanaSignMessageRequest, RpcSolanaSignTransactionRequest, RpcUnistallFilter, W3mFrameSchema, WalletGetAssetsRequest, WalletGetCallsReceiptRequest, WalletGetCapabilitiesRequest, WalletGrantPermissionsRequest, WalletRevokePermissionsRequest, WalletSendCallsRequest } from './W3mFrameSchema.js';
+diff --git a/dist/types/src/W3mFrameValidators.d.ts b/dist/types/src/W3mFrameValidators.d.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..63055d6f77764a2518c4bd5833852477edff20e1
+--- /dev/null
++++ b/dist/types/src/W3mFrameValidators.d.ts
+@@ -0,0 +1,11 @@
++import type { z as legacy } from 'zod/v3';
++import type { z } from 'zod/v4';
++import type { W3mFrameSchema as MessageShapes } from './W3mFrameSchema.js';
++
++// Keep the published message payload shapes while exposing the native v4 methods.
++// Only TypeScript reads the legacy declarations; the actual validators run on v4.
++type FrameValidator<S extends legacy.ZodTypeAny> =
++  z.ZodType<legacy.output<S>, legacy.input<S>> & Pick<z.ZodUnion, 'options'>;
++export declare const W3mFrameSchema: {
++  [K in keyof typeof MessageShapes]: FrameValidator<(typeof MessageShapes)[K]>;
++};

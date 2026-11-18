@@ -57,7 +57,15 @@ rechecks previously downloaded evidence). This explicitly accepted one-time inpu
 is **not an on-chain historical proof verifier**. See [the integration notes](GAME_STORAGE_REQUIREMENTS.md) and
 [deployment procedure](DEPLOYMENT.md).
 
-## Equal AMM funding
+## Game-funded V4 market
+
+`GameFundedOutcomeMarket` is the successor for the Cosmic Signature V4 upgrade. Public Arbitrum addresses above refer to the existing eight-question deployment. The successor uses the same outcome source, questions, CST and 50/50 opening prices. V4 sends 8,000 new CST to the market per cycle, including its first cycle at initialization. The market authenticates each grant against the game proxy's cycle record. Each question receives 1,000 fresh CST and an equal share of available carry (subject to base-unit rounding). No provider receives shares, fees or repayment. Only the game can issue new principal. An unsolicited transfer remains outside the pool and cannot be recovered.
+
+Any address may synchronize the current grant. The first buy, sell or split also synchronizes. Quotes include the grant in advance. For quiet cycles the market consumes all previously unconsumed grants from the game’s cumulative record, without iterating through skipped cycles. Before rolling surplus into the new cycle it reserves every outstanding winning claim from the last used cycle. Settled holders can retrieve their positions later.
+
+After cutover the previous eight-question deployment remains accessible via `/previous`. Its positions, backing, and claims stay in the original market and vault. The single-question legacy deployment retains its separate access path. See [deployment instructions](DEPLOYMENT.md).
+
+## Equal AMM funding on the previous eight-question market
 
 `fundRound(cycle, amount)` contributes existing CST to all eight pools. Every
 amount is divided equally; indivisible base-unit remainders go to the lowest
@@ -118,8 +126,7 @@ pnpm dev:local
 ```
 
 Open <http://127.0.0.1:3000/>. The launcher creates a fresh, disposable Anvil chain,
-local CST and game simulator, and an independent market funded with 10,000 test
-CST. It requires no private key. Local controls can obtain test CST, place gestures,
+local CST and game simulator, a game-funded market seeded with 8,000 test CST, and a separate previous market for exercising historical access. It requires no private key. Local controls can obtain test CST, place gestures,
 advance time and close cycles. Those controls are unavailable on Arbitrum.
 
 Override local ports with `PORT=3100 ANVIL_PORT=8555 pnpm dev:local`. The launcher

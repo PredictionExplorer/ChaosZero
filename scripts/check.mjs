@@ -92,13 +92,7 @@ function format(files) {
 }
 
 function tooling() {
-  execute(process.execPath, [
-    "--test",
-    "scripts/checks.test.mjs",
-    "scripts/local-runtime.test.mjs",
-    "scripts/browser-abi.test.mjs",
-    "scripts/compiler-parity.test.mjs",
-  ]);
+  pnpm(["test:tooling"]);
   step("Secret-safe Hardhat deployment tooling", () => pnpm(["test:deployment"]));
   step("Historical baseline replay and evidence guards", () => pnpm(["test:baseline"]));
 }

@@ -77,3 +77,16 @@ export const cosmicGameV3Abi = parseAbi([
   "function token() view returns (address)",
   "function roundStats(uint256 roundId) view returns ((uint256 numBids,uint256 numCstBids,uint256 totalSpentEthAmount,uint256 totalSpentCstAmount,uint256 maxEthBidPrice,uint256 maxCstBidPrice,uint256 enduranceChampionDuration,uint256 chronoWarriorDuration,uint256 flags) result)",
 ]);
+
+/** Additional selectors implemented only by the game-funded successor. */
+export const gameFundedMarketAbi = parseAbi([
+  "function game() view returns (address)",
+  "function syncFunding(uint256 roundId)",
+  "function consumedGameFunding() view returns (uint256)",
+  "event GameFundingSynced(uint256 indexed roundId,uint256 cycleAmount,uint256 accumulatedFunding,uint256 carryUsed,uint256[8] allocations)",
+]);
+
+export const gameFundingAbi = parseAbi([
+  "function chaosZeroMarket() view returns (address)",
+  "function chaosZeroFunding(address market,uint256 roundId) view returns (uint256 amount,uint256 cumulativeAmount)",
+]);

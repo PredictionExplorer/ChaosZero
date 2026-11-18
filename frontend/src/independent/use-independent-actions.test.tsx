@@ -482,7 +482,7 @@ describe("independent recovery and local controls", () => {
 });
 
 describe("production execution", () => {
-  function production() {
+  function production(selectedMarket = MARKET as string) {
     mocks.chain.id = 42161;
     mocks.walletChain = 42161;
     mocks.getChainId.mockResolvedValue(42161);
@@ -495,11 +495,25 @@ describe("production execution", () => {
         ({
           cst: "0xAD91843e6A58Ba560F577E676986AFb1dba6FBA0",
           source: "0x4444444444444444444444444444444444444444",
+          chaosZeroMarket: selectedMarket,
           game: "0x6a714Ae7B5b6eA520F6BCA23d2E609C4Fd5863F2",
         })[functionName as "cst" | "source" | "game"],
     );
   }
   afterEach(() => vi.unstubAllEnvs());
+  it.each([
+    [MARKET, true],
+    [TOKEN, false],
+  ] as const)("rechecks the selected V4 market before submission", async (selected, ok) => {
+    production(selected);
+    const state = snapshot();
+    state.gameFunding = { cycle: 8000n * ONE, awaitingSync: 8000n * ONE };
+    const { result } = setup(state);
+    await act(async () => {
+      expect(await result.current.distribute()).toBe(ok);
+    });
+    expect(mocks.submit).toHaveBeenCalledTimes(ok ? 1 : 0);
+  });
   it("pins real CST/source/game and estimates each production transaction", async () => {
     production();
     mocks.estimate.mockResolvedValue(1_250_000n);
@@ -559,4 +573,21 @@ describe("production execution", () => {
     expect(mocks.simulate).not.toHaveBeenCalled();
     expect(mocks.submit).not.toHaveBeenCalled();
   });
+});
+
+it("synchronizes recorded game funding without pulling from or approving a wallet", async () => {
+  const state = snapshot();
+  state.gameFunding = { cycle: 8000n * ONE, awaitingSync: 8000n * ONE };
+  const { result } = setup(state);
+  await act(async () => {
+    expect(await result.current.fund(ONE)).toBe(false);
+  });
+  expect(mocks.submit).not.toHaveBeenCalled();
+  await act(async () => {
+    expect(await result.current.distribute()).toBe(true);
+  });
+  expect(mocks.submit).toHaveBeenCalledTimes(1);
+  expect(mocks.submit).toHaveBeenCalledWith(
+    expect.objectContaining({ address: MARKET, functionName: "syncFunding", args: [1n] }),
+  );
 });

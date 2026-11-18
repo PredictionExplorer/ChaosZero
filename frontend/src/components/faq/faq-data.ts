@@ -1,3 +1,4 @@
+import { gameFundedMarketAddress } from "@/independent/config";
 import type { LucideIcon } from "lucide-react";
 import { Droplets, ShieldCheck, Sparkles, Target, Timer } from "lucide-react";
 
@@ -31,7 +32,7 @@ export const FAQ_CATEGORIES: readonly FaqCategory[] = [
         question: "What is Chaos Zero?",
         answer: [
           "Chaos Zero is a set of eight recurring YES/NO prediction markets about Cosmic Signature. Each question has its own automated market maker and CST collateral. One winning position pays exactly 1 CST after final settlement.",
-          "The market reads results through an immutable adapter connected to the Cosmic Signature V3 game on Arbitrum One.",
+          "The market reads results through an immutable adapter connected to the Cosmic Signature game on Arbitrum One.",
         ],
       },
       {
@@ -66,7 +67,7 @@ export const FAQ_CATEGORIES: readonly FaqCategory[] = [
         id: "eight-markets",
         question: "Do all eight questions share one pool?",
         answer: [
-          "Each question keeps separate collateral and YES/NO liabilities inside one market contract. Trades are priced against that question’s own pool. Contributions enter all eight pools in equal amounts, with any indivisible remainder assigned to the lowest question IDs.",
+          "Each question keeps separate collateral and YES/NO liabilities inside one market contract. Trades are priced against that question’s own pool. Funding enters all eight pools in equal amounts, with any indivisible remainder assigned to the lowest question IDs.",
         ],
       },
     ],
@@ -95,7 +96,7 @@ export const FAQ_CATEGORIES: readonly FaqCategory[] = [
         id: "fees",
         question: "What fees do I pay?",
         answer: [
-          "The market charges no trading fee. Arbitrum network fees still apply to transactions, including transactions that revert. Opening a new cycle or distributing held funding can use more gas than an ordinary trade.",
+          "The market charges no trading fee. Arbitrum network fees still apply to transactions, including transactions that revert. Opening a new cycle or applying available funding can use more gas than an ordinary trade.",
         ],
       },
       {
@@ -140,7 +141,7 @@ export const FAQ_CATEGORIES: readonly FaqCategory[] = [
         id: "who-resolves",
         question: "Who can resolve the markets?",
         answer: [
-          "Anyone can submit settlement after the game’s round-ending transaction. The result adapter reads the V3 game’s stored statistics. No market administrator chooses the answers. The game remains an upstream dependency.",
+          "Anyone can submit settlement after the game’s round-ending transaction. The result adapter reads the game’s stored statistics. No market administrator chooses the answers. The game remains an upstream dependency.",
         ],
       },
       {
@@ -168,7 +169,7 @@ export const FAQ_CATEGORIES: readonly FaqCategory[] = [
         id: "future-rounds-bet",
         question: "Can I trade future cycles?",
         answer: [
-          "Only the current eligible game cycle can be opened and traded. The first funding or trading transaction can start its eight pools from available contributions and carry after settling the previously funded cycle.",
+          "Only the current eligible game cycle can be opened and traded. The first funding or trading transaction can start its eight pools from available funding and carry after settling the previously funded cycle.",
         ],
       },
       {
@@ -183,28 +184,36 @@ export const FAQ_CATEGORIES: readonly FaqCategory[] = [
   {
     id: "liquidity",
     title: "Funding the markets",
-    description: "One contribution deepens eight independent pools.",
+    description: gameFundedMarketAddress
+      ? "How the game supplies liquidity each cycle."
+      : "One contribution deepens eight independent pools.",
     icon: Droplets,
     items: [
       {
         id: "what-is-funding",
         question: "What does funding AMM liquidity do?",
         answer: [
-          "Funding adds CST collateral that traders can use through the eight AMMs. Every contribution is divided equally among all eight questions. One pool cannot spend the collateral backing another question.",
+          gameFundedMarketAddress
+            ? "Only the Cosmic Signature game supplies new liquidity. It issues CST for each cycle, shared equally by all eight questions. Only unused collateral carries forward after outstanding claims are reserved."
+            : "Funding adds CST collateral that traders can use through the eight AMMs. Every contribution is divided equally among all eight questions. One pool cannot spend the collateral backing another question.",
         ],
       },
       {
         id: "funding-withdraw",
         question: "Can I withdraw a funding contribution?",
         answer: [
-          "No. Funding is an irreversible contribution. It creates no LP shares, withdrawal rights or fee income. Review the amount carefully before confirming; CST sent directly to the market is also a contribution.",
+          gameFundedMarketAddress
+            ? "The game has no withdrawal rights and receives no shares or fees. Wallets can take positions or redeem their claims."
+            : "No. Funding is an irreversible contribution. It creates no LP shares, withdrawal rights or fee income. Review the amount carefully before confirming; CST sent directly to the market is also a contribution.",
         ],
       },
       {
         id: "direct-funding",
         question: "Can I send CST directly to the market?",
         answer: [
-          "Yes. A plain transfer cannot execute market code, so the next eligible buy, sell or funding call distributes it before pricing. Held amounts below 1 CST wait for more, an explicit contribution, or the next cycle’s opening.",
+          gameFundedMarketAddress
+            ? "Only cycle funding recorded by the game enters these pools. Direct transfers from wallets stay outside market accounting and cannot be retrieved."
+            : "Yes. A plain transfer cannot execute market code, so the next eligible buy, sell or funding call distributes it before pricing. Held amounts below 1 CST wait for more, an explicit contribution, or the next cycle’s opening.",
         ],
       },
       {
@@ -218,7 +227,9 @@ export const FAQ_CATEGORIES: readonly FaqCategory[] = [
         id: "funding-prices",
         question: "Can additional funding move prices?",
         answer: [
-          "Yes. New collateral deepens each pool and moves its price toward the fixed 50/50 opening balance. The next trade accounts for funding absorption before its exact amounts are checked. A changed quote can revert.",
+          gameFundedMarketAddress
+            ? "Each cycle opens at 50/50 with game funding and carry. During the cycle, prices respond to trades. A wallet transfer cannot affect prices."
+            : "Yes. New collateral deepens each pool and moves its price toward the fixed 50/50 opening balance. The next trade accounts for funding absorption before its exact amounts are checked. A changed quote can revert.",
         ],
       },
     ],

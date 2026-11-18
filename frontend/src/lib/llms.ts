@@ -12,10 +12,10 @@
 import { appConfig, COSMIC_CST_ADDRESS, COSMIC_GAME_ADDRESS } from "@/lib/config";
 import { COSMIC_SIGNATURE_URL, SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/site";
 import { FAQ_CATEGORIES } from "@/components/faq/faq-data";
-import { independentMarketAddress } from "@/independent/config";
+import { gameFundedMarketAddress, independentMarketAddress } from "@/independent/config";
 
 const SUMMARY =
-  `${SITE_NAME} offers eight YES/NO prediction markets about the Cosmic Signature V3 game. ` +
+  `${SITE_NAME} offers eight YES/NO prediction markets about the Cosmic Signature game. ` +
   "Questions cover gestures (bids), Endurance and Chrono durations, ETH and CST payments, odd gesture counts, shared titles and maximum CST payments. " +
   "Each question has its own CST-backed AMM on Arbitrum One and opens at 50% YES and 50% NO. " +
   "Every winning position pays 1 CST after final settlement.";
@@ -43,7 +43,9 @@ function keyFacts(): string {
     "- Every fresh pool starts at 50/50; previous prices and historical timestamps do not set opening odds. Strict-comparison ties resolve NO.",
     "- Trading remains open until the game actually ends the cycle, even when an answer is known. The countdown reaching zero does not finalize results.",
     "- Each question uses its own constant-product AMM. There are no trading fees; Arbitrum network fees still apply.",
-    "- Funding is divided equally across all eight pools. Contributions are irreversible and create no LP shares or withdrawal rights. Unused funding carries forward only after winning claims are reserved.",
+    gameFundedMarketAddress
+      ? "- Cosmic Signature issues cycle funding for all eight pools. Only game funding is accepted. The game receives no shares, fees or repayment. Direct CST transfers stay outside liquidity."
+      : "- Funding is divided equally across all eight pools. Contributions are irreversible and create no LP shares or withdrawal rights. Unused funding carries forward only after winning claims are reserved.",
     "- 1 CST splits into 1 YES + 1 NO for one question and cycle; a matching pair merges into 1 CST. An immutable adapter reads game outcomes; anyone can settle a finalized cycle.",
     `- ${chainFacts}`,
     `- The historical launch baseline and its provenance are published at ${absoluteUrl("/baseline")} (machine-readable: ${absoluteUrl("/baseline.json")}). Later comparisons use native V3 records.`,
@@ -73,6 +75,11 @@ export function llmsTxt(): string {
     "",
     `- [Market](${absoluteUrl("/")}): eight question cards, exact trade quotes, positions, equal pool funding, settlement and claims. Trading requires a configured deployment. \`?round=N\` selects a cycle.`,
     `- [FAQ](${absoluteUrl("/faq")}): questions, pricing, funding contributions, positions, resolution and risks.`,
+    ...(gameFundedMarketAddress
+      ? [
+          `- [Previous market positions](${absoluteUrl("/previous")}): settle, merge pairs or retrieve claims on the original eight-pool market.`,
+        ]
+      : []),
     `- [Historical baseline evidence](${absoluteUrl("/baseline")}): exact launch comparison values, replay checks, transaction references and commitments. This fixed off-chain bootstrap is not an on-chain receipt-proof verifier.`,
     `- [Baseline JSON](${absoluteUrl("/baseline.json")}): the exact reviewed deployment input and provenance.`,
     `- [Full knowledge base](${absoluteUrl("/llms-full.txt")}): this site's complete FAQ — every question and answer — in one plain-text document.`,

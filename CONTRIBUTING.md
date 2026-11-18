@@ -13,6 +13,13 @@ pnpm setup:dev
 pnpm test:e2e:install
 ```
 
+The root Hardhat toolchain uses native Zod 4 for configuration, verification-plugin and
+RPC validation. Version-scoped patches under `patches/` adapt Hardhat's string-keyed
+configuration records and its validation helper's error handling and public types.
+Retire these patches when upstream supports Zod 4. Changes must pass `pnpm test:tooling`,
+both compilers' runtime parity check, the deployment tests, and the audit. Keep the root
+workspace separate from `frontend/`, which owns its own lockfile.
+
 Setup initializes the pinned `forge-std` and OpenZeppelin Contracts submodules, installs both lockfiles, and
 sets this clone's `core.hooksPath` to `.githooks`. It does not change global Git
 configuration. After cloning elsewhere, run setup there too. The hook scripts

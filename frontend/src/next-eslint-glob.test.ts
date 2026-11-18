@@ -30,7 +30,7 @@ function javascriptFiles(directory: string): string[] {
 describe("Next ESLint's narrowly replaced directory glob dependency", () => {
   it("pins the inspected consumer and verifies that globSync is its only fast-glob API", () => {
     const pkg = JSON.parse(readFileSync(join(distribution, "../package.json"), "utf8"));
-    expect(pkg.version).toBe("16.3.8");
+    expect(pkg.version).toBe("16.4.6");
     const imports = javascriptFiles(distribution).filter((path) =>
       readFileSync(path, "utf8").includes('require("fast-glob")'),
     );

@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { ContractFactory, JsonRpcProvider, getAddress } from "ethers";
+import { inspectCreation } from "./prepare-game-funded-market.mjs";
 import { createRequire } from "node:module";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -24,8 +26,8 @@ const deployment = JSON.parse(
 localRpc(deployment);
 assert.equal(
   deployment.marketKind,
-  "independent",
-  "Restart dev:local for the independent deployment",
+  "game-funded",
+  "Restart dev:local for the game-funded deployment",
 );
 const transport = http(deployment.rpcUrl);
 const client = createPublicClient({ chain: anvil, transport, pollingInterval: 100 });
@@ -50,6 +52,7 @@ for (const [file, name, compiled] of [
   ["frontend/src/independent/abi.ts", "independentSourceAbi", sourceAbi],
   ["frontend/src/independent/abi.ts", "settlementVaultAbi", vaultAbi],
   ["frontend/src/shared/abi.ts", "localGameAbi", gameAbi],
+  ["frontend/src/independent/abi.ts", "gameFundingAbi", gameAbi],
   ["frontend/src/shared/abi.ts", "localTokenAbi", tokenAbi],
   ["frontend/src/independent/abi.ts", "cosmicGameV3Abi", productionGameAbi],
 ]) {
@@ -60,14 +63,65 @@ for (const [file, name, compiled] of [
     verifierAbi,
   ]);
 }
-const market = deployment.marketAddress;
+// Keep the original lifecycle and claim guarantees covered against the previous instance.
+const market = deployment.previousMarketAddress;
+const successorAbi = await abi("GameFundedOutcomeMarket");
+const browserSuccessorAbi = await readBrowserAbi(
+  root,
+  "frontend/src/independent/abi.ts",
+  "gameFundedMarketAbi",
+);
+assertAbiSubset("GameFundedOutcomeMarket", browserSuccessorAbi, successorAbi);
+const sharedAbi = (
+  await readBrowserAbi(root, "frontend/src/independent/abi.ts", "independentMarketAbi")
+).filter((entry) => !["fundRound", "RoundFunded", "FundingCapacity"].includes(entry.name));
+assertAbiSubset("GameFundedOutcomeMarket", sharedAbi, successorAbi, [tokenAbi, verifierAbi]);
 const game = deployment.gameAddress;
 const source = deployment.sourceAddress;
 const read = (address, abi_, functionName, args = []) =>
   client.readContract({ address, abi: abi_, functionName, args });
 const token = await read(market, marketAbi, "cst");
 const vault = await read(market, marketAbi, "settlementVault");
-assert.equal(vault.toLowerCase(), deployment.vaultAddress.toLowerCase());
+assert.equal(
+  (await read(deployment.marketAddress, successorAbi, "settlementVault")).toLowerCase(),
+  deployment.vaultAddress.toLowerCase(),
+);
+assert.notEqual(vault.toLowerCase(), deployment.vaultAddress.toLowerCase());
+const successorBuild = JSON.parse(
+  await readFile(
+    path.join(root, "out/GameFundedOutcomeMarket.sol/GameFundedOutcomeMarket.json"),
+    "utf8",
+  ),
+);
+const creation = (
+  await new ContractFactory(successorAbi, successorBuild.bytecode.object).getDeployTransaction(
+    token,
+    source,
+    game,
+  )
+).data;
+const inspectionProvider = new JsonRpcProvider(deployment.rpcUrl);
+try {
+  const expected = {
+    chainId: 31337,
+    game: getAddress(game),
+    cst: token,
+    source: getAddress(source),
+  };
+  const info = await inspectCreation(
+    inspectionProvider,
+    expected,
+    creation,
+    deployment.marketCreationHash,
+  );
+  assert.equal(info.market, getAddress(deployment.marketAddress));
+  await assert.rejects(
+    inspectCreation(inspectionProvider, expected, "0x", deployment.marketCreationHash),
+    /Creation code/,
+  );
+} finally {
+  inspectionProvider.destroy();
+}
 assert.equal(await read(token, tokenAbi, "name"), "Local Cosmic Signature Token");
 assert.equal(await read(game, gameAbi, "TIME_INCREMENT"), 60n);
 const sendAs = async (wallet, address, abi_, functionName, args = [], value = 0n) => {
@@ -220,6 +274,14 @@ try {
     (await read(game, gameAbi, "roundStats", [round])).gestureCount,
     0n,
     "Start a fresh local stack before smoke testing",
+  );
+  const successor = deployment.marketAddress;
+  const views = await read(successor, successorAbi, "marketViews");
+  const viewsAbi = await abi("GameFundedMarketViews");
+  assert.deepEqual(
+    await read(views, viewsAbi, "fundingPreview", [successor, round, 0n]),
+    await read(successor, successorAbi, "fundingPreview", [round, 0n]),
+    "Direct and helper calls must use the same game-issued funding ledger",
   );
   const initial = await states(round);
   for (const q of initial) {

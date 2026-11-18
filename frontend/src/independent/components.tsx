@@ -267,8 +267,9 @@ export function IndependentTradePanel({
         <p className="text-sm text-ink-dim">Trading is unavailable for this cycle.</p>
       ) : !access.tradeable ? (
         <p className="text-sm text-ink-dim" data-testid="independent-trade-unfunded">
-          This cycle’s eight pools have not opened. An “Add CST” gift opens them; so does the first
-          trade once carried or held CST is waiting.
+          {snapshot.gameFunding
+            ? "Trading opens when the game records funding for this cycle."
+            : "This cycle’s eight pools have not opened. An “Add CST” gift opens them; so does the first trade once carried or held CST is waiting."}
         </p>
       ) : (
         <>
@@ -278,7 +279,7 @@ export function IndependentTradePanel({
               data-testid="independent-trade-absorption"
             >
               {access.opensPools
-                ? `This trade opens this cycle’s eight pools first${access.settlesPrevious ? ", after settling the preceding cycle and reserving its winning claims" : ""}. It places ${formatCst(access.absorbed)} CST of carried and held funds across them before pricing, so it costs a higher network fee than a normal trade.`
+                ? `This trade opens this cycle’s eight pools first${access.settlesPrevious ? ", after settling the preceding cycle and reserving its winning claims" : ""}. It places ${formatCst(access.absorbed)} CST of ${snapshot.gameFunding ? "game funding and carry" : "carried and held funds"} across them before pricing, so it costs a higher network fee than a normal trade.`
                 : `This trade first distributes ${formatCst(access.absorbed)} CST of held contributions across all eight pools, then prices against the deeper pool. The network fee is higher than a normal trade.`}{" "}
               The quote below already includes this.
             </p>
@@ -802,7 +803,7 @@ export function IndependentPortfolio({
 }: {
   snapshot: IndependentSnapshot;
   actions: IndependentActions;
-  onSell: (question: QuestionId, yes: boolean) => void;
+  onSell?: (question: QuestionId, yes: boolean) => void;
 }) {
   const [transfer, setTransfer] = useState<{ question: QuestionId; yes: boolean } | null>(null);
   const user = snapshot.user;
@@ -843,7 +844,7 @@ export function IndependentPortfolio({
                 </p>
               </div>
               <div className="flex flex-col items-end gap-1">
-                {!snapshot.finalized && (
+                {!snapshot.finalized && onSell && (
                   <Button
                     variant="ghost"
                     size="sm"

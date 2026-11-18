@@ -50,9 +50,9 @@ describe("site copy", () => {
     expect(SITE_TITLE).toMatch(/Eight questions/i);
   });
 
-  it("describes the eight V3 markets without stale prelaunch copy", () => {
+  it("describes the eight markets across the contract upgrade", () => {
     expect(SITE_DESCRIPTION).toMatch(/Eight independent/);
-    expect(SITE_DESCRIPTION).toMatch(/Cosmic Signature V3/);
+    expect(SITE_DESCRIPTION).toMatch(/Cosmic Signature/);
     expect(SITE_DESCRIPTION).not.toMatch(/launch pending/i);
     expect(SITE_DESCRIPTION).toMatch(/YES\/NO/);
     // The market is binary; the old "scalar / HIGHER or LOWER" copy was wrong.

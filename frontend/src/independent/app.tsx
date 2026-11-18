@@ -12,7 +12,7 @@ import { appConfig, resolveRoundOverride } from "@/lib/config";
 import { formatCst, shortAddress } from "@/lib/format";
 import { formatDuration } from "@/shared/question-metrics";
 import { QUESTIONS, type QuestionId } from "@/shared/questions";
-import { independentMarketAddress } from "./config";
+import { independentMarketAddress, previousMarketAddress } from "./config";
 import { PrelaunchMarkets } from "./prelaunch";
 import { isMarketChain } from "./deployment";
 import { LOCAL_DIRECT_TRANSFER, MIN_AUTO_TOP_UP } from "./models";
@@ -27,13 +27,15 @@ import { useIndependentActions } from "./use-independent-actions";
 import { useIndependentMarket, useIndependentRecovery } from "./use-independent-market";
 import { IndependentRecoveryPanel } from "./recovery";
 
-export function IndependentGate() {
+export function IndependentGate({ previous = false }: { previous?: boolean } = {}) {
   const params = useSearchParams();
   if (!isMarketChain(appConfig.chain.id)) return <p role="alert">This network is not supported.</p>;
-  if (!independentMarketAddress) return <PrelaunchMarkets />;
+  const market = previous ? previousMarketAddress : independentMarketAddress;
+  if (!market) return previous ? <p>No previous market is configured.</p> : <PrelaunchMarkets />;
   return (
     <IndependentDashboard
-      market={independentMarketAddress}
+      market={market}
+      previous={previous}
       override={resolveRoundOverride(params.get("round"))}
     />
   );
@@ -42,11 +44,13 @@ export function IndependentGate() {
 export function IndependentDashboard({
   market,
   override,
+  previous = false,
 }: {
+  previous?: boolean;
   market: Address;
   override: bigint | null;
 }) {
-  const query = useIndependentMarket(market, override);
+  const query = useIndependentMarket(market, override, previous);
   const snapshot = query.data;
   const connection = useConnection();
   const chainId = useChainId();
@@ -103,6 +107,62 @@ export function IndependentDashboard({
         </p>
       </Card>
     );
+  if (
+    !previous &&
+    snapshot.gameFunding?.cycle === 0n &&
+    snapshot.roundId < snapshot.currentRound &&
+    previousMarketAddress
+  ) {
+    return (
+      <Card className="space-y-3 p-5">
+        <p>Cycle {snapshot.roundId.toString()} predates the game-funded market.</p>
+        <Link href={`/previous?round=${snapshot.roundId}`} className="text-signal-bright">
+          View positions on the previous market
+        </Link>
+      </Card>
+    );
+  }
+  if (previous) {
+    return (
+      <section className="space-y-4" aria-label="Previous market positions">
+        <h2 className="font-display text-xl" data-testid="independent-cycle">
+          Cycle {snapshot.roundId.toString()}
+        </h2>
+        {connected ? (
+          <>
+            <IndependentPortfolio
+              key={`positions-${snapshot.roundId}-${connection.address}`}
+              snapshot={snapshot}
+              actions={actions}
+            />
+            <IndependentSetsPanel
+              key={`sets-${snapshot.roundId}-${connection.address}`}
+              roundId={snapshot.roundId}
+              user={snapshot.user}
+              collaterals={snapshot.questions.map((q) => q.pool.collateral)}
+              open={snapshot.open}
+              finalized={snapshot.finalized}
+              connected={connected}
+              actions={actions}
+              recovery
+            />
+            {snapshot.finalized && !snapshot.settled && (
+              <Button
+                variant="outline"
+                disabled={!!actions.pending}
+                onClick={() => void actions.settle()}
+              >
+                Settle this cycle
+              </Button>
+            )}
+          </>
+        ) : (
+          <p>Connect your wallet to see positions for this cycle.</p>
+        )}
+        {actions.message && <p role="status">{actions.message}</p>}
+      </section>
+    );
+  }
   const select = (q: QuestionId, side: boolean, mode: boolean) => {
     setQuestion(q);
     setYes(side);
@@ -118,6 +178,11 @@ export function IndependentDashboard({
   };
   return (
     <div className="space-y-6">
+      {snapshot.gameFunding && previousMarketAddress && (
+        <Link href={`/previous?round=${snapshot.roundId}`} className="text-sm text-signal-bright">
+          View positions on the previous market
+        </Link>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <nav aria-label="Cycle navigation" className="flex items-center gap-3">
           {snapshot.roundId > 1n && (
@@ -184,7 +249,7 @@ export function IndependentDashboard({
           },
           {
             label: "Waiting to enter pools",
-            value: `${formatCst(snapshot.pendingCarry + snapshot.heldContributions)} CST`,
+            value: `${formatCst(snapshot.pendingCarry + (snapshot.gameFunding?.awaitingSync ?? snapshot.heldContributions))} CST`,
             id: "independent-waiting",
             detail: [
               {
@@ -193,8 +258,8 @@ export function IndependentDashboard({
                 id: "independent-carry",
               },
               {
-                label: "Held contributions",
-                value: snapshot.heldContributions,
+                label: snapshot.gameFunding ? "Game funding awaiting sync" : "Held contributions",
+                value: snapshot.gameFunding?.awaitingSync ?? snapshot.heldContributions,
                 id: "independent-held",
               },
             ],
@@ -282,8 +347,10 @@ export function IndependentDashboard({
               </h2>
               <p className="mt-2 text-xs leading-5 text-ink-dim">
                 Test CST and shortened cycle durations let you explore independent prices, carry,
-                and later claims. A direct transfer is a plain ERC-20 send with no market call, so
-                it stays held until a trade or a Distribute absorbs it.
+                and later claims.{" "}
+                {snapshot.gameFunding
+                  ? "Only the simulated game funds these pools."
+                  : "A direct transfer stays held until a trade or a Distribute absorbs it."}
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <Button
@@ -314,18 +381,20 @@ export function IndependentDashboard({
                 >
                   CST gesture · {formatCst(snapshot.local.cstPrice)} CST
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={
-                    !connected ||
-                    !!actions.pending ||
-                    (snapshot.user?.balance ?? 0n) < LOCAL_DIRECT_TRANSFER
-                  }
-                  onClick={() => void actions.local("direct")}
-                >
-                  Send {formatCst(LOCAL_DIRECT_TRANSFER)} test CST directly to the market
-                </Button>
+                {!snapshot.gameFunding && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={
+                      !connected ||
+                      !!actions.pending ||
+                      (snapshot.user?.balance ?? 0n) < LOCAL_DIRECT_TRANSFER
+                    }
+                    onClick={() => void actions.local("direct")}
+                  >
+                    Send {formatCst(LOCAL_DIRECT_TRANSFER)} test CST directly to the market
+                  </Button>
+                )}
                 <Button
                   size="sm"
                   variant="outline"
@@ -405,12 +474,33 @@ export function IndependentDashboard({
             connected={connected}
             actions={actions}
           />
-          <IndependentFundingPanel
-            key={`fund-${snapshot.roundId}-${connection.address}`}
-            snapshot={snapshot}
-            connected={connected}
-            actions={actions}
-          />
+          {snapshot.gameFunding ? (
+            <Card className="p-5" data-testid="game-funding-panel">
+              <h2 className="font-display text-lg font-semibold">Game funding</h2>
+              <p className="mt-2 text-sm text-ink-dim">
+                The game issued {formatCst(snapshot.gameFunding.cycle)} CST for this cycle. Its
+                funding is shared equally across eight pools and earns no fees or shares. Direct
+                transfers stay outside the pools.
+              </p>
+              {snapshot.open && snapshot.funding?.canFund && (
+                <Button
+                  className="mt-3"
+                  variant="outline"
+                  disabled={!connected || !!actions.pending}
+                  onClick={() => void actions.distribute()}
+                >
+                  Sync game funding
+                </Button>
+              )}
+            </Card>
+          ) : (
+            <IndependentFundingPanel
+              key={`fund-${snapshot.roundId}-${connection.address}`}
+              snapshot={snapshot}
+              connected={connected}
+              actions={actions}
+            />
+          )}
           {actions.message && (
             <p
               role="status"

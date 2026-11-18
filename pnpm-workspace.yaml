@@ -1,0 +1,14 @@
+# The web client has its own workspace and lockfile under frontend/.
+packages:
+  - "."
+
+# These three matching versions validate Hardhat config and RPC parameters.
+# Keep their Zod instances aligned while upstream requires Zod 3.
+overrides:
+  "@nomicfoundation/hardhat-verify@3.1.3>zod": 4.6.7
+  "@nomicfoundation/hardhat-zod-utils@3.0.8>zod": 4.6.7
+  "hardhat@3.20.0>zod": 4.6.7
+
+patchedDependencies:
+  "@nomicfoundation/hardhat-zod-utils@3.0.8": patches/@nomicfoundation__hardhat-zod-utils@3.0.8.patch
+  "hardhat@3.20.0": patches/hardhat@3.20.0.patch

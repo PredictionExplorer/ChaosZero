@@ -1,0 +1,93 @@
+diff --git a/_cjs/policies/evmSchema.js b/_cjs/policies/evmSchema.js
+index fee0384019f98f80b8deba488876e85c1f631ca9..6947fa9960a832a3eb1ee5bcb488b52ad25ac3c5 100644
+--- a/_cjs/policies/evmSchema.js
++++ b/_cjs/policies/evmSchema.js
+@@ -211,7 +211,7 @@ exports.SignEvmTypedDataFieldCriterionSchema = zod_2.z.object({
+         /**
+          * EIP-712 compliant map of model names to model definitions.
+          */
+-        types: zod_2.z.record(zod_2.z.array(zod_2.z.object({
++        types: zod_2.z.record(zod_2.z.string(), zod_2.z.array(zod_2.z.object({
+             name: zod_2.z.string(),
+             type: zod_2.z.string(),
+         }))),
+diff --git a/_esm/policies/evmSchema.js b/_esm/policies/evmSchema.js
+index 877a9ba75d698416b86cbe902755267a1f5b9bca..81930875b7b7573557fe0fe12c9eafc805d32862 100644
+--- a/_esm/policies/evmSchema.js
++++ b/_esm/policies/evmSchema.js
+@@ -207,7 +207,7 @@ export const SignEvmTypedDataFieldCriterionSchema = z.object({
+         /**
+          * EIP-712 compliant map of model names to model definitions.
+          */
+-        types: z.record(z.array(z.object({
++        types: z.record(z.string(), z.array(z.object({
+             name: z.string(),
+             type: z.string(),
+         }))),
+diff --git a/_types/client/policies/policies.d.ts b/_types/client/policies/policies.d.ts
+index d3879f73445c4c4ebc2559663319271ca837a8eb..52a7eb48519f42d64f9981cb7a4681edb49871db 100644
+--- a/_types/client/policies/policies.d.ts
++++ b/_types/client/policies/policies.d.ts
+@@ -2,7 +2,7 @@
+  * @module Client
+  */
+ import { PoliciesClientInterface, CreatePolicyOptions, ListPoliciesOptions, ListPoliciesResult, GetPolicyByIdOptions, DeletePolicyOptions, UpdatePolicyOptions } from "./policies.types.js";
+-import { Policy } from "../../policies/types.js";
++import { Policy } from "../../../src/policies/types.js";
+ /**
+  * The namespace containing all Policy methods.
+  */
+diff --git a/_types/client/policies/policies.types.d.ts b/_types/client/policies/policies.types.d.ts
+index e63fce78daa2ee06375ee584487ee87e0cf0b83c..ef4f5bf7b41b8a6d2875e9dfc362f5de5a902203 100644
+--- a/_types/client/policies/policies.types.d.ts
++++ b/_types/client/policies/policies.types.d.ts
+@@ -2,7 +2,7 @@
+  * @module Types
+  */
+ import { OpenApiPoliciesMethods } from "../../openapi-client/index.js";
+-import { CreatePolicyBody, Policy, PolicyScope, UpdatePolicyBody } from "../../policies/types.js";
++import { CreatePolicyBody, Policy, PolicyScope, UpdatePolicyBody } from "../../../src/policies/types.js";
+ /**
+  * The PoliciesClient type, where all OpenApiPoliciesMethods methods are wrapped.
+  */
+diff --git a/_types/index.d.ts b/_types/index.d.ts
+index 63566ec48f95289d1af52dbbd5646707a82ece82..b36a209cb41d52b7e3c6652d19d9548e9320fcdb 100644
+--- a/_types/index.d.ts
++++ b/_types/index.d.ts
+@@ -2,8 +2,8 @@ export { CdpClient } from "./client/cdp.js";
+ export { toEvmDelegatedAccount } from "./accounts/evm/toEvmDelegatedAccount.js";
+ export type { EvmServerAccount, EvmSmartAccount } from "./accounts/evm/types.js";
+ export type { CreateEvmEip7702DelegationResult, WaitForEvmEip7702DelegationOperationStatusOptions, } from "./client/evm/evm.types.js";
+-export type { Policy } from "./policies/types.js";
+-export { CreatePolicyBodySchema, UpdatePolicyBodySchema, type CreatePolicyBody, type UpdatePolicyBody, } from "./policies/types.js";
++export type { Policy } from "../src/policies/types.js";
++export { CreatePolicyBodySchema, UpdatePolicyBodySchema, type CreatePolicyBody, type UpdatePolicyBody, } from "../src/policies/types.js";
+ export { NetworkError } from "./openapi-client/errors.js";
+ export type { SpendPermission, SpendPermissionInput } from "./spend-permissions/types.js";
+ export type { SpendPermissionNetwork, ListEndUsers200, EndUser } from "./openapi-client/index.js";
+diff --git a/src/policies/evmSchema.ts b/src/policies/evmSchema.ts
+index 2896f503045ae6ce1988c71dbe81666e10dc3e84..8332dc7803e22b80fb339501c5185728291b00cd 100644
+--- a/src/policies/evmSchema.ts
++++ b/src/policies/evmSchema.ts
+@@ -1,6 +1,12 @@
+-import { Abi, Address } from "abitype/zod";
++import type { Abi as EvmAbi, Address as EvmAddress } from "abitype";
++import { Abi as abiSchema, Address as addressSchema } from "abitype/zod";
+ import { z } from "zod";
+ 
++// ABIType builds these parsers with the caller's native Zod. Its emitted
++// declarations still use v3 generics; retain their documented output shapes.
++const Abi = abiSchema as unknown as z.ZodType<EvmAbi, EvmAbi>;
++const Address = addressSchema as unknown as z.ZodType<EvmAddress, string>;
++
+ /**
+  * Enum for EthValueOperator values
+  */
+@@ -262,6 +268,7 @@ export const SignEvmTypedDataFieldCriterionSchema = z.object({
+      * EIP-712 compliant map of model names to model definitions.
+      */
+     types: z.record(
++      z.string(),
+       z.array(
+         z.object({
+           name: z.string(),

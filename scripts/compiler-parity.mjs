@@ -25,12 +25,15 @@ export function compareRuntimeBytecode(foundry, hardhat, contract = "contract") 
 
 async function main() {
   const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-  for (const [source, contract] of [
+  const targets = [
+    ["GameFundedOutcomeMarket", "GameFundedOutcomeMarket"],
+    ["GameFundedMarketViews", "GameFundedMarketViews"],
     ["IndependentOutcomeMarket", "IndependentOutcomeMarket"],
     ["IndependentOutcomeMarket", "IndependentMarketViews"],
     ["OutcomeSettlementVault", "OutcomeSettlementVault"],
     ["V3OutcomeSource", "V3OutcomeSource"],
-  ]) {
+  ];
+  for (const [source, contract] of targets) {
     const [foundry, hardhat] = await Promise.all(
       [
         `out/${source}.sol/${contract}.json`,
@@ -38,8 +41,18 @@ async function main() {
       ].map(async (file) => JSON.parse(await readFile(path.join(root, file), "utf8"))),
     );
     compareRuntimeBytecode(foundry.deployedBytecode?.object, hardhat.deployedBytecode, contract);
+    // Include metadata in the deployed code size and the successor’s three constructor words in initcode.
+    if ((hardhat.deployedBytecode.length - 2) / 2 > 24576)
+      throw new Error(`Runtime exceeds EIP-170 size limit: ${contract}`);
+    if (
+      contract === "GameFundedOutcomeMarket" &&
+      (hardhat.bytecode.length - 2) / 2 + 3 * 32 > 49152
+    )
+      throw new Error("Successor creation exceeds EIP-3860 initcode limit.");
   }
-  console.log("Compiler parity passed for all 4 runtimes, excluding validated CBOR metadata.");
+  console.log(
+    `Compiler parity passed for all ${targets.length} runtimes, excluding validated CBOR metadata.`,
+  );
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url))

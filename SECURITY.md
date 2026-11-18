@@ -4,7 +4,17 @@ The independent eight-question system includes a production V3 adapter and an in
 
 Report suspected financial or authorization vulnerabilities privately to the project maintainers before publishing exploit details. Reproductions should use fake assets on a local chain.
 
-## Security boundaries
+## V4 game-funded market
+
+`GameFundedOutcomeMarket` binds the Cosmic Signature proxy, CST token and the eight-question outcome source at construction. New backing comes from the proxy's cycle-specific funding records. The market checks ERC-20 custody before recognizing the authenticated cumulative increment. A raw transfer never creates a credit. Trades exchange assets for positions in one question; their collateral is accounted separately from the eight-way grant. A cycle rollover requires only CST issuance and transfer from the game. Any later market settlement error affects market access without preventing the game from closing its cycle.
+
+The existing sponsor-funded deployment retains its original rules at its own address. Its holder liabilities and surplus are independent of the V4 market. Recovery stays available on the previous-market route. Both deployments trust the same game statistics and outcome adapter. The game proxy's upgrade authority remains part of the trust model for outcomes and new grant records.
+
+### V4 static review
+
+The branch review ran Slither 0.11.6 on the game-funded market and its read helper with the production Solidity settings. The four high-severity balance warnings concern the before/after checks that enforce exact CST transfers. The five reentrancy warnings concern transitions protected by the market’s lock. The review checked those paths against the deployed CST’s transfer behavior, the immutable vault and read helper, and the order of ERC-1155 balance updates and receiver callbacks. The other four medium findings concern zero-initialized locals and a settlement preview that intentionally uses only part of a return tuple. No actionable defect was identified in those findings. The fork rehearsal checks actual CST movement and escrow redemption; independent security review remains separate.
+
+## Security boundaries of the original independent market
 
 - `IndependentOutcomeMarket` has immutable token, outcome-source, payout-vault and read-only helper references. It has no administrator, upgrade mechanism, CST minting authority, or sponsor withdrawal privilege.
 - The outcome source is trusted to describe the game truthfully and monotonically. The market rejects contradictions it has already observed, but this does not make an arbitrary source trustworthy. V3 results come from permanent game records. The first comparison uses a frozen historical baseline reconstructed from V2 events and independently cross-checked. That one-time input is not verified by an on-chain proof; review its published provenance and reproducible verification before release.

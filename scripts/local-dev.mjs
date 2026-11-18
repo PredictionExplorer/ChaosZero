@@ -143,13 +143,14 @@ try {
     if (!/^0x[\da-fA-F]{40}$/.test(address ?? "")) throw new Error(`No ${name} deployment found.`);
     return address;
   };
-  const marketAddress = deployed("IndependentOutcomeMarket");
+  const marketAddress = deployed("GameFundedOutcomeMarket");
+  const previousMarketAddress = deployed("IndependentOutcomeMarket");
   if ((await rpc(rpcUrl, "eth_getCode", [marketAddress, "latest"])) === "0x")
     throw new Error("Market deployment has no bytecode.");
   const firstBlock = BigInt(broadcast.receipts[0].blockNumber).toString();
   const artifact = JSON.parse(
     await readFile(
-      path.join(root, "out/IndependentOutcomeMarket.sol/IndependentOutcomeMarket.json"),
+      path.join(root, "out/GameFundedOutcomeMarket.sol/GameFundedOutcomeMarket.json"),
       "utf8",
     ),
   );
@@ -166,7 +167,11 @@ try {
   if ((await rpc(rpcUrl, "eth_getCode", [vaultAddress, "latest"])) === "0x")
     throw new Error("Settlement vault has no bytecode.");
   const deployment = {
-    marketKind: "independent",
+    marketKind: "game-funded",
+    previousMarketAddress,
+    marketCreationHash: broadcast.transactions.find(
+      (tx) => tx.transactionType === "CREATE" && tx.contractName === "GameFundedOutcomeMarket",
+    ).hash,
     chainId: 31337,
     rpcUrl,
     marketAddress,
@@ -201,7 +206,8 @@ try {
         NEXT_PUBLIC_CHAIN_ID: "31337",
         NEXT_PUBLIC_RPC_URL: rpcUrl,
         NEXT_PUBLIC_MARKET_ADDRESS: "",
-        NEXT_PUBLIC_INDEPENDENT_MARKET_ADDRESS: marketAddress,
+        NEXT_PUBLIC_INDEPENDENT_MARKET_ADDRESS: previousMarketAddress,
+        NEXT_PUBLIC_GAME_FUNDED_MARKET_ADDRESS: marketAddress,
         NEXT_PUBLIC_LOCAL_SIMULATOR: "1",
         NEXT_TELEMETRY_DISABLED: "1",
       },

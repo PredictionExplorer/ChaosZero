@@ -1,5 +1,14 @@
 # Arbitrum deployment
 
+## Preparing the V4 successor
+
+The existing addresses and V3 launch instructions below describe the original eight-question market. Keep its source, deployment manifest and claim vault intact. The successor binds a new market and vault to the existing game proxy, CST and `V3OutcomeSource`.
+
+1. Build the production artifact with `forge build src/GameFundedOutcomeMarket.sol`. Run `pnpm prepare:game-funded` to check the chain, V3 implementation and adapter, and produce unsigned creation data.
+2. After a separately authorized deployment, use `pnpm prepare:game-funded <creation-transaction-hash>` to compare the creation input with the local build and confirm the game, token, adapter, vault, read helper and cycle amount.
+3. The game upgrade takes both companion addresses in the same owner transaction during an inactive interval. Its initializer issues the first 8,000 CST. Check the cycle record on the game and `fundingPreview(cycle, 0)` on the new market for eight equal fresh allocations before changing the UI.
+4. Set `NEXT_PUBLIC_GAME_FUNDED_MARKET_ADDRESS` only when the new deployment is active. Keep `NEXT_PUBLIC_INDEPENDENT_MARKET_ADDRESS` pointing to the original eight-question market so holders can use `/previous`. Without the successor setting the public site continues using the existing market.
+
 The deployment commands are prepared for an operator to run later. Developing or
 testing these commands does not authorize a public deployment. The automated
 integration test uses an in-process chain with ID 31337 and never broadcasts to

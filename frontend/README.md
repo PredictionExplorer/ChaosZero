@@ -34,8 +34,7 @@ pnpm dev:local
 
 This starts disposable Anvil infrastructure and the frontend with the matching
 local market address. The homepage and `/shared` render the same eight markets.
-Anvil wallets, faucet, simulator gestures, cycle closure, direct test transfers
-and clock controls are enabled only on chain **31337**. No real wallet key is
+Anvil wallets, faucet, simulator gestures, cycle closure and clock controls are enabled only on chain **31337**. No real wallet key is
 needed. Local funding is disposable fake CST.
 
 For the prelaunch frontend alone:
@@ -52,7 +51,8 @@ the prelaunch board without enabling writes.
 | Variable                                 | Purpose                                                                        |
 | ---------------------------------------- | ------------------------------------------------------------------------------ |
 | `NEXT_PUBLIC_CHAIN_ID`                   | `42161` for Arbitrum One; `31337` for the local simulator.                     |
-| `NEXT_PUBLIC_INDEPENDENT_MARKET_ADDRESS` | The newly deployed `IndependentOutcomeMarket`. Blank means prelaunch.          |
+| `NEXT_PUBLIC_INDEPENDENT_MARKET_ADDRESS` | Original eight-question market. Keep this address for old positions.           |
+| `NEXT_PUBLIC_GAME_FUNDED_MARKET_ADDRESS` | Verified V4 successor. Set only after the game has configured and funded it.   |
 | `NEXT_PUBLIC_INDEPENDENT_SOURCE_ADDRESS` | Separately pinned production `V3OutcomeSource`; required for real-CST trading. |
 | `NEXT_PUBLIC_RPC_URL`                    | Optional RPC endpoint for the selected chain.                                  |
 | `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`   | Optional WalletConnect project for mobile wallets.                             |
@@ -75,6 +75,8 @@ pnpm --dir frontend start --hostname 127.0.0.1 --port 3000
 This preview uses real Arbitrum contracts and CST, not simulator balances.
 `pnpm dev:local` continues to start the separate disposable simulator.
 
+After V4 cutover the homepage follows the game-funded market. The `/previous?round=N` route uses the original independent market for its positions, merges and claims. CST sent directly to the successor stays outside its pools. The first trade, complete-set split or optional sync applies the game grant and any carry.
+
 Production reads and writes validate the market's CST, source and game references
 against the deployment configuration and the known Arbitrum addresses. The wallet
 and RPC must agree with the configured network. Transaction gas is estimated for
@@ -93,8 +95,7 @@ by the contract. Changes in state may invalidate a quote and require a refresh.
 
 The interface supports buys/sells, ERC-1155 position transfers, complete-set
 splits/merges, settlement, winning claims, and funding. Winning shares pay exactly
-1 CST. Contributions are irreversible gifts with no LP shares or withdrawal
-rights, and are allocated equally across the eight pools. Unpaid claims remain
+1 CST. In V3, wallets can make irreversible pool contributions. The V4 successor accepts only game funding and issues no LP shares, fees or repayment. Both markets allocate new funds equally across their eight pools. Unpaid claims remain
 in a separate vault while unused pool funds carry forward.
 
 Markets remain open until the game round-ending transaction. Known answers and
@@ -133,17 +134,10 @@ mechanism and the actual configured launch state.
 
 ## Dependency maintenance
 
-The October 2026 security refresh updates Next.js and its lint configuration to
-16.3.8, sharp to 0.35.5, source-map-js to 1.2.2, and follow-redirects to 1.16.1.
-Vite is declared explicitly at 8.1.6 so its automatically installed peer cannot
-remain on the vulnerable 8.1.3 resolution. WalletConnect 2.26.0, the React Vite
-plugin 6.1.2, and Vitest/coverage 4.1.12 resolve within their existing major ranges.
-Other declared ranges were refreshed without forcing peer compatibility.
+Use the frontend lockfile, `pnpm-workspace.yaml`, `patches/` and `tooling/glob/` together when installing. The frontend production and development dependency graphs were audited with `pnpm audit --prod` and `pnpm audit`. Both reported zero findings on 18 November 2026.
 
-| Scoped override                                                       | Reason and verification                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `@next/eslint-plugin-next@16.3.8>fast-glob` → `npm:tinyglobby@0.2.17` | The pinned Next lint plugin requires fast-glob 3.3.1, which brings in unpatched braces 3.0.3 ([GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)). Newer stable and canary consumers still use that dependency. The inspected consumer makes only `globSync(pattern, { onlyDirectories: true })` calls. [tinyglobby](https://github.com/SuperchupuDev/tinyglobby) provides that API using fdir and picomatch, eliminating the vulnerable braces code rather than suppressing its advisory. `src/next-eslint-glob.test.ts` pins the consumer and replacement, guards the API surface, and exercises real plugin root discovery, ordinary nested patterns and the deep-nesting attack. All Next lint rules remain enabled. |
+- Next.js and its lint configuration are pinned to 16.4.6. The Next lint plugin's directory enumeration uses tinyglobby's `globSync`. Its version and call sites are checked in `src/next-eslint-glob.test.ts`.
+- WalletConnect retains its original filesystem and browser-compatible storage format. Its filesystem filter runs the patched Minimatch engine. Reown's frame messages and the Coinbase CDP policy schemas use native Zod 4.6.7. Scoped patches preserve optional fields, ABI and EIP-712 field types, and both Coinbase module formats. The Base connector uses browser-buildable CDP 1.51.2 with Axios 1.21.1. The wallet schema and storage compatibility tests resolve the installed packages through the real connector.
+- The development tools use the private `@chaos-zero/tooling-glob` module because picomatch has no released fix for [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf). It implements the file filters and path scanning used by Vite, Vitest, tinyglobby, and fdir with Minimatch 11.0.9. The fdir patch identifies this matcher explicitly in both module formats. The Vite patch passes its custom asset patterns directly to Rolldown's native filter, as its load hook already does. The compatibility suite exercises discovery, coverage exclusions, asset loading, and the Next directory lookup. No upstream vulnerable parser is included through these dependencies.
 
-Review the override when upgrading the Next lint plugin. The version-scoped
-selector and regression guard deliberately require another compatibility review;
-there is no audit ignore, fake patched braces version, or relaxed lint rule.
+When upgrading the affected consumers, remove the corresponding patch or override once their stock dependencies pass the same audits, compatibility tests, production build, coverage checks and local market rehearsal.

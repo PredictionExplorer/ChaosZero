@@ -13,6 +13,7 @@ import {CycleMetrics} from "./CycleMetrics.sol";
 /// flips `open` to false and `finalized` to true atomically.
 contract LocalOutcomeSource is IIndependentOutcomeSource {
     LocalCosmicGame public immutable game;
+    address public immutable cst;
     error LocalChainOnly();
     error InvalidGame();
 
@@ -20,6 +21,7 @@ contract LocalOutcomeSource is IIndependentOutcomeSource {
         if (block.chainid != 31337) revert LocalChainOnly();
         if (address(game_).code.length == 0) revert InvalidGame();
         game = game_;
+        cst = address(game_.token());
     }
 
     function metrics(uint256 roundId) external view returns (Metrics memory result) {

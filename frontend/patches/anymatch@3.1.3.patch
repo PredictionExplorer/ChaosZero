@@ -1,0 +1,45 @@
+diff --git a/index.js b/index.js
+index 8eb73e9c9a61d2c642d3c5f44a2fe4cd6cd04615..e9ce2301baa68e4a73f76e8f49fde9cc1438034b 100644
+--- a/index.js
++++ b/index.js
+@@ -2,7 +2,7 @@
+ 
+ Object.defineProperty(exports, "__esModule", { value: true });
+ 
+-const picomatch = require('picomatch');
++const { Minimatch } = require('minimatch');
+ const normalizePath = require('normalize-path');
+ 
+ /**
+@@ -14,6 +14,13 @@ const BANG = '!';
+ const DEFAULT_OPTIONS = {returnIndex: false};
+ const arrify = (item) => Array.isArray(item) ? item : [item];
+ 
++const createGlob = (pattern, options) => {
++  const glob = new Minimatch(pattern, { ...options, nocomment: true, platform: 'linux' });
++  // A trailing globstar also matches the directory itself in anymatch.
++  const includesDirectory = pattern.endsWith('/**');
++  return path => glob.match(path) || (includesDirectory && glob.match(path + '/'));
++};
++
+ /**
+  * @param {AnymatchPattern} matcher
+  * @param {object} options
+@@ -24,7 +31,7 @@ const createPattern = (matcher, options) => {
+     return matcher;
+   }
+   if (typeof matcher === 'string') {
+-    const glob = picomatch(matcher, options);
++    const glob = createGlob(matcher, options);
+     return (string) => matcher === string || glob(string);
+   }
+   if (matcher instanceof RegExp) {
+@@ -85,7 +92,7 @@ const anymatch = (matchers, testString, options = DEFAULT_OPTIONS) => {
+   const negatedGlobs = mtchers
+     .filter(item => typeof item === 'string' && item.charAt(0) === BANG)
+     .map(item => item.slice(1))
+-    .map(item => picomatch(item, opts));
++    .map(item => createGlob(item, opts));
+   const patterns = mtchers
+     .filter(item => typeof item !== 'string' || (typeof item === 'string' && item.charAt(0) !== BANG))
+     .map(matcher => createPattern(matcher, opts));

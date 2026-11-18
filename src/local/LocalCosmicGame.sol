@@ -4,6 +4,11 @@ pragma solidity 0.8.35;
 import {LocalCst} from "./LocalCst.sol";
 import {CycleMetrics} from "./CycleMetrics.sol";
 
+interface ILocalGameMarket {
+    function game() external view returns (address);
+    function cst() external view returns (address);
+}
+
 /// @notice Local-only game simulator: V2 payment feedback, champion timing, and cycle closure.
 /// @dev Time is the chain clock. Use Anvil's increaseTime/mine controls; no caller can invent results.
 /// Durations are shortened for development. ETH allocations, NFTs and selection are out of scope.
@@ -11,6 +16,10 @@ contract LocalCosmicGame {
     using CycleMetrics for CycleMetrics.Metrics;
 
     LocalCst public immutable token;
+    address private immutable _deployer = msg.sender;
+    address public chaosZeroMarket;
+    uint256 public constant CHAOS_ZERO_CYCLE_FUNDING = 8000 ether;
+    uint256 public firstChaosZeroCycle;
     uint256 public roundNum = 1;
     uint256 public mainPrizeTime;
     uint256 public constant INITIAL_DURATION = 24 minutes;
@@ -26,10 +35,12 @@ contract LocalCosmicGame {
 
     error LocalChainOnly();
     error InvalidPayment();
+    error InvalidMarket();
     error FirstGestureMustBeEth();
     error NotReady();
     error ReentrantCall();
     event Gesture(uint256 indexed roundId, uint256 indexed gestureId, address indexed user, bool withCst, uint256 paid);
+    event ChaosZeroCycleFunded(address indexed market, uint256 indexed cycle, uint256 amount, uint256 cumulativeAmount);
     event CycleClosed(uint256 indexed roundId, uint256 closedAt);
 
     constructor() {
@@ -54,6 +65,37 @@ contract LocalCosmicGame {
         _lock = 2;
         _;
         _lock = 1;
+    }
+
+    /// @notice Wire the local game once; later cycle transitions require no market transaction.
+    function setChaosZeroMarket(address market) external {
+        if (
+            msg.sender != _deployer || chaosZeroMarket != address(0) || market.code.length == 0
+                || ILocalGameMarket(market).game() != address(this) || ILocalGameMarket(market).cst() != address(token)
+        ) revert InvalidMarket();
+        chaosZeroMarket = market;
+        firstChaosZeroCycle = roundNum;
+        _issueChaosZeroGrant();
+    }
+
+    function chaosZeroFunding(address market, uint256 cycle)
+        public
+        view
+        returns (uint256 amount, uint256 cumulativeAmount)
+    {
+        if (market == address(0) || market != chaosZeroMarket || cycle < firstChaosZeroCycle || cycle > roundNum) {
+            return (0, 0);
+        }
+        return (CHAOS_ZERO_CYCLE_FUNDING, (cycle - firstChaosZeroCycle + 1) * CHAOS_ZERO_CYCLE_FUNDING);
+    }
+
+    function _issueChaosZeroGrant() private {
+        address market = chaosZeroMarket;
+        if (market == address(0)) return;
+        (uint256 amount, uint256 cumulativeAmount) = chaosZeroFunding(market, roundNum);
+        token.mint(address(this), amount);
+        token.transfer(market, amount);
+        emit ChaosZeroCycleFunded(market, roundNum, amount, cumulativeAmount);
     }
 
     function roundStats(uint256 roundId) public view returns (CycleMetrics.Metrics memory) {
@@ -104,6 +146,7 @@ contract LocalCosmicGame {
         _stats[roundNum].finish(block.timestamp);
         emit CycleClosed(roundNum, block.timestamp);
         ++roundNum;
+        _issueChaosZeroGrant();
         lastBidder = address(0);
         mainPrizeTime = 0;
         nextEthPrice = 0.01 ether;

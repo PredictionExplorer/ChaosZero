@@ -1,0 +1,13 @@
+diff --git a/dist/node/chunks/node.js b/dist/node/chunks/node.js
+index fc784880465f9330182e7af582e00047497c3d2c..2fbb5167ebb041aa71e0ed85870217ace0defeb7 100644
+--- a/dist/node/chunks/node.js
++++ b/dist/node/chunks/node.js
+@@ -21008,7 +21008,7 @@ function assetPlugin(config) {
+ 			filter: { id: [
+ 				urlRE$1,
+ 				DEFAULT_ASSETS_RE,
+-				...makeIdFiltersToMatchWithQuery(config.rawAssetsInclude).map((v) => typeof v === "string" ? pm.makeRe(v, { dot: true }) : v)
++				...makeIdFiltersToMatchWithQuery(config.rawAssetsInclude)
+ 			] },
+ 			handler(id) {
+ 				if (!config.assetsInclude(cleanUrl(id)) && !urlRE$1.test(id)) return;

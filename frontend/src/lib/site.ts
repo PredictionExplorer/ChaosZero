@@ -16,7 +16,7 @@ export const SITE_TITLE = "Chaos Zero — Eight questions. Your conviction.";
 export const SITE_TAGLINE = "Eight independent markets. One unpredictable game.";
 
 export const SITE_DESCRIPTION =
-  "Eight independent YES/NO markets on Cosmic Signature V3. Trade with CST on Arbitrum One, with separate question pools, 50/50 opening odds and 1 CST per winning share.";
+  "Eight independent YES/NO markets on Cosmic Signature. Trade with CST on Arbitrum One, with separate question pools, 50/50 opening odds and 1 CST per winning share.";
 
 export const SITE_KEYWORDS = [
   "Chaos Zero",

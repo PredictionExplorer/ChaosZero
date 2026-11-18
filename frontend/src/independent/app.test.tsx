@@ -15,6 +15,12 @@ vi.mock("./use-independent-market", () => ({
   useIndependentFundingPreview: vi.fn(),
 }));
 vi.mock("./use-independent-actions", () => ({ useIndependentActions: mocks.actions }));
+vi.mock("./config", () => ({
+  previousMarketAddress: "0x7777777777777777777777777777777777777777",
+  get independentMarketAddress() {
+    return MARKET;
+  },
+}));
 vi.mock("wagmi", () => ({
   useConnection: () => ({
     status: "connected",
@@ -92,6 +98,19 @@ describe("independent dashboard failure boundaries", () => {
     rerender(<IndependentDashboard market={MARKET} override={null} />);
     expect(mocks.actions).toHaveBeenLastCalledWith(MARKET, undefined, data);
   });
+});
+
+it("routes historical cycle links to the original contract before cutover", () => {
+  const state = snapshot();
+  state.currentRound = 4n;
+  state.roundId = 3n;
+  state.gameFunding = { cycle: 0n, awaitingSync: 0n };
+  mocks.market.mockReturnValue({ data: state, error: null, refetch: vi.fn() });
+  render(<IndependentDashboard market={MARKET} override={3n} />);
+  expect(
+    screen.getByRole("link", { name: "View positions on the previous market" }),
+  ).toHaveAttribute("href", "/previous?round=3");
+  expect(screen.queryByTestId("independent-trade-panel")).not.toBeInTheDocument();
 });
 
 describe("independent dashboard contributions", () => {

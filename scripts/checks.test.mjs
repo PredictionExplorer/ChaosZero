@@ -121,6 +121,8 @@ test("every checked-in differential fixture, including the logarithm corpus, has
 test("shared tooling changes require both application and contract checks", () => {
   for (const path of [
     "hardhat.config.js",
+    "pnpm-workspace.yaml",
+    "patches/hardhat@3.20.0.patch",
     "remappings.txt",
     "deployment/arbitrum-round-2-baseline.json",
   ]) {

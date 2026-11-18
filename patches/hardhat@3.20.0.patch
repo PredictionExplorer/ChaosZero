@@ -1,0 +1,105 @@
+diff --git a/dist/src/internal/builtin-plugins/network-manager/type-validation.js b/dist/src/internal/builtin-plugins/network-manager/type-validation.js
+index 51cdac8cec6e2f368eb35b8b31173f47813ea327..d8cec7b2b1331d57503d1b8a5a1b992d2b59e940 100644
+--- a/dist/src/internal/builtin-plugins/network-manager/type-validation.js
++++ b/dist/src/internal/builtin-plugins/network-manager/type-validation.js
+@@ -15,7 +15,7 @@ const chainTypeUserConfigSchema = unionType([
+     z.literal(OPTIMISM_CHAIN_TYPE),
+     z.literal(GENERIC_CHAIN_TYPE),
+ ], `Expected '${L1_CHAIN_TYPE}', '${OPTIMISM_CHAIN_TYPE}', or '${GENERIC_CHAIN_TYPE}'`);
+-const hardforkHistoryUserConfigSchema = z.record(conditionalUnionType([
++const hardforkHistoryUserConfigSchema = z.record(z.string(), conditionalUnionType([
+     [
+         (data) => isObject(data) && typeof data.blockNumber === "number",
+         z.strictObject({
+@@ -144,7 +144,7 @@ const httpNetworkUserConfigSchema = z.object({
+     gasPrice: z.optional(gasUserConfigSchema),
+     // HTTP network specific
+     url: sensitiveUrlSchema,
+-    httpHeaders: z.optional(z.record(z.string())),
++    httpHeaders: z.optional(z.record(z.string(), z.string())),
+     timeout: z.optional(nonnegativeNumberSchema),
+ });
+ const accountBalanceUserConfigSchema = unionType([z.string(), nonnegativeBigIntSchema], "Expected a string or a positive bigint");
+@@ -168,7 +168,7 @@ const edrNetworkForkingUserConfigSchema = z.object({
+     enabled: z.optional(z.boolean()),
+     url: sensitiveUrlSchema,
+     blockNumber: z.optional(forkingBlockNumberSchema),
+-    httpHeaders: z.optional(z.record(z.string())),
++    httpHeaders: z.optional(z.record(z.string(), z.string())),
+ });
+ const edrNetworkMempoolUserConfigSchema = z.object({
+     order: z.optional(unionType([z.literal("fifo"), z.literal("priority")], "Expected 'fifo' or 'priority'")),
+@@ -225,7 +225,7 @@ const userConfigSchema = z
+     .object({
+     chainDescriptors: z.optional(chainDescriptorsUserConfigSchema),
+     defaultChainType: z.optional(chainTypeUserConfigSchema),
+-    networks: z.optional(z.record(networkUserConfigSchema)),
++    networks: z.optional(z.record(z.string(), networkUserConfigSchema)),
+ })
+     // The superRefine is used to perform additional validation of correlated
+     // fields of the edr network that are not possible to express with Zod's
+diff --git a/dist/src/internal/builtin-plugins/solidity-test/config.js b/dist/src/internal/builtin-plugins/solidity-test/config.js
+index 5e7b070d0ed5e78d8298b1e4cf43111b96b24e00..9163874c01ccc3aca1e291971bc7545cf2290a3f 100644
+--- a/dist/src/internal/builtin-plugins/solidity-test/config.js
++++ b/dist/src/internal/builtin-plugins/solidity-test/config.js
+@@ -58,7 +58,7 @@ const solidityTestProfileUserConfigType = z.object({
+         .object({
+         url: z.optional(sensitiveUrlSchema),
+         blockNumber: z.optional(unionType([z.number().int().nonnegative().safe(), z.bigint().nonnegative()], "Expected a nonnegative safe int or a nonnegative bigint")),
+-        rpcEndpoints: z.record(sensitiveStringSchema).optional(),
++        rpcEndpoints: z.record(z.string(), sensitiveStringSchema).optional(),
+     })
+         .optional(),
+     invariant: z
+diff --git a/src/internal/builtin-plugins/network-manager/type-validation.ts b/src/internal/builtin-plugins/network-manager/type-validation.ts
+index 50d26d5a5b1c07e2fc8617fd5bbb9d8bcb98e498..d74f5ff9517c13e8236cd48e33d28d375f6e3a21 100644
+--- a/src/internal/builtin-plugins/network-manager/type-validation.ts
++++ b/src/internal/builtin-plugins/network-manager/type-validation.ts
+@@ -65,6 +65,7 @@ const hardforkHistoryUserConfigSchema: z.ZodRecord<
+   | z.ZodType<ActivationBlockNumberUserConfig>
+   | z.ZodType<ActivationTimestampUserConfig>
+ > = z.record(
++  z.string(),
+   conditionalUnionType(
+     [
+       [
+@@ -242,7 +243,7 @@ const httpNetworkUserConfigSchema = z.object({
+ 
+   // HTTP network specific
+   url: sensitiveUrlSchema,
+-  httpHeaders: z.optional(z.record(z.string())),
++  httpHeaders: z.optional(z.record(z.string(), z.string())),
+   timeout: z.optional(nonnegativeNumberSchema),
+ });
+ 
+@@ -277,7 +278,7 @@ const edrNetworkForkingUserConfigSchema = z.object({
+   enabled: z.optional(z.boolean()),
+   url: sensitiveUrlSchema,
+   blockNumber: z.optional(forkingBlockNumberSchema),
+-  httpHeaders: z.optional(z.record(z.string())),
++  httpHeaders: z.optional(z.record(z.string(), z.string())),
+ });
+ 
+ const edrNetworkMempoolUserConfigSchema = z.object({
+@@ -361,7 +362,7 @@ const userConfigSchema = z
+   .object({
+     chainDescriptors: z.optional(chainDescriptorsUserConfigSchema),
+     defaultChainType: z.optional(chainTypeUserConfigSchema),
+-    networks: z.optional(z.record(networkUserConfigSchema)),
++    networks: z.optional(z.record(z.string(), networkUserConfigSchema)),
+   })
+   // The superRefine is used to perform additional validation of correlated
+   // fields of the edr network that are not possible to express with Zod's
+diff --git a/src/internal/builtin-plugins/solidity-test/config.ts b/src/internal/builtin-plugins/solidity-test/config.ts
+index 3d435f7d964fb4192d7d0c099112848cdbfdee30..92ef796580d8be4b0df43239423e4d0bc41f5a34 100644
+--- a/src/internal/builtin-plugins/solidity-test/config.ts
++++ b/src/internal/builtin-plugins/solidity-test/config.ts
+@@ -100,7 +100,7 @@ const solidityTestProfileUserConfigType = z.object({
+           "Expected a nonnegative safe int or a nonnegative bigint",
+         ),
+       ),
+-      rpcEndpoints: z.record(sensitiveStringSchema).optional(),
++      rpcEndpoints: z.record(z.string(), sensitiveStringSchema).optional(),
+     })
+     .optional(),
+   invariant: z

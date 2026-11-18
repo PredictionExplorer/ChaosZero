@@ -6,8 +6,11 @@ import { useConnection, usePublicClient } from "wagmi";
 import { erc20Abi } from "@/lib/abi/erc20";
 import { appConfig } from "@/lib/config";
 import { assertProductionMarket, isMarketChain } from "./deployment";
+import { gameFundedMarketAddress } from "./config";
 import { localGameAbi } from "@/shared/abi";
 import {
+  gameFundedMarketAbi,
+  gameFundingAbi,
   independentMarketAbi,
   independentSourceAbi,
   settlementVaultAbi,
@@ -21,7 +24,7 @@ import {
   type IndependentSnapshot,
 } from "./models";
 
-export function useIndependentMarket(market: Address, override: bigint | null) {
+export function useIndependentMarket(market: Address, override: bigint | null, previous = false) {
   const client = usePublicClient();
   const { address } = useConnection();
   return useQuery({
@@ -30,6 +33,7 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
       "market",
       appConfig.chain.id,
       market,
+      previous,
       override?.toString() ?? null,
       address ?? null,
     ],
@@ -94,14 +98,16 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
           functionName: "totalEscrowed",
           blockNumber,
         }),
-        // Same block as the custody reads, so held CST is exact rather than racy.
-        client.readContract({
-          address: token,
-          abi: erc20Abi,
-          functionName: "balanceOf",
-          args: [market],
-          blockNumber,
-        }),
+        // Only the previous contract treats raw wallet transfers as contributions.
+        market === gameFundedMarketAddress
+          ? 0n
+          : client.readContract({
+              address: token,
+              abi: erc20Abi,
+              functionName: "balanceOf",
+              args: [market],
+              blockNumber,
+            }),
       ]);
       assertProductionMarket(appConfig.chain.id, token, source, game);
       if (decimals !== 18) throw new Error("This market requires an 18-decimal CST token.");
@@ -111,7 +117,16 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
         functionName: "roundNum",
         blockNumber,
       });
-      const roundId = override ?? currentRound;
+      const lastFundedRound =
+        previous && override === null
+          ? await client.readContract({
+              address: market,
+              abi: independentMarketAbi,
+              functionName: "lastFundedRound",
+              blockNumber,
+            })
+          : 0n;
+      const roundId = override ?? (lastFundedRound > 0n ? lastFundedRound : currentRound);
       const round = await client.readContract({
         address: market,
         abi: independentMarketAbi,
@@ -244,7 +259,46 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
               blockNumber,
             })
           : null;
-      const held = heldContributions(marketBalance, poolCustody, pendingCarry);
+      let gameFunding: IndependentSnapshot["gameFunding"];
+      if (market === gameFundedMarketAddress) {
+        const [boundGame, configuredMarket, grant, consumed] = await Promise.all([
+          client.readContract({
+            address: market,
+            abi: gameFundedMarketAbi,
+            functionName: "game",
+            blockNumber,
+          }),
+          client.readContract({
+            address: game,
+            abi: gameFundingAbi,
+            functionName: "chaosZeroMarket",
+            blockNumber,
+          }),
+          client.readContract({
+            address: game,
+            abi: gameFundingAbi,
+            functionName: "chaosZeroFunding",
+            args: [market, roundId],
+            blockNumber,
+          }),
+          client.readContract({
+            address: market,
+            abi: gameFundedMarketAbi,
+            functionName: "consumedGameFunding",
+            blockNumber,
+          }),
+        ]);
+        if (
+          boundGame.toLowerCase() !== game.toLowerCase() ||
+          configuredMarket.toLowerCase() !== market.toLowerCase()
+        )
+          throw new Error("The market funding ledger belongs to another game.");
+        gameFunding = {
+          cycle: grant[0],
+          awaitingSync: grant[1] > consumed ? grant[1] - consumed : 0n,
+        };
+      }
+      const held = gameFunding ? 0n : heldContributions(marketBalance, poolCustody, pendingCarry);
       // The preview measures the same saturating surplus at the same block.
       if (funding && funding.unallocated !== held)
         throw new Error("The market's CST custody is inconsistent.");
@@ -289,6 +343,7 @@ export function useIndependentMarket(market: Address, override: bigint | null) {
         pendingCarry,
         availableCarry: funding?.availableCarry ?? pendingCarry,
         heldContributions: held,
+        gameFunding,
         funding: funding ? { ...funding, allocations: fixedAmounts(funding.allocations) } : null,
         user:
           wallet && address

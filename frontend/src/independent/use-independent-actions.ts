@@ -10,7 +10,12 @@ import { appConfig } from "@/lib/config";
 import { COSMIC_GAME_ADDRESS } from "@/lib/contracts";
 import { localGameAbi, localTokenAbi } from "@/shared/abi";
 import { positionId, validateRecipient } from "@/shared/positions";
-import { independentMarketAbi, independentSourceAbi } from "./abi";
+import {
+  gameFundingAbi,
+  gameFundedMarketAbi,
+  independentMarketAbi,
+  independentSourceAbi,
+} from "./abi";
 import { assertProductionMarket, isMarketChain } from "./deployment";
 import { describeIndependentError } from "./errors";
 import {
@@ -87,6 +92,15 @@ export function useIndependentActions(
             functionName: "game",
           });
       assertProductionMarket(appConfig.chain.id, token, source, game);
+      if (!recovery && snapshot?.gameFunding) {
+        const selected = await client.readContract({
+          address: game,
+          abi: gameFundingAbi,
+          functionName: "chaosZeroMarket",
+        });
+        if (selected.toLowerCase() !== market.toLowerCase())
+          throw new Error("The game no longer selects this market. Refresh before continuing.");
+      }
     }
     // Arbitrum estimates include execution and the L1 data component. Re-estimate
     // every operation; a new cycle may also settle and start all eight pools.
@@ -139,6 +153,8 @@ export function useIndependentActions(
     fund: (amount) =>
       run("Cycle funding", () => {
         const current = sourceSnapshot();
+        if (current.gameFunding)
+          throw new Error("Only the Cosmic Signature game funds these pools.");
         // A zero-amount call is the separate Distribute trigger, never a gift.
         if (amount <= 0n) throw new Error("Enter a CST amount greater than zero.");
         return write({
@@ -149,14 +165,22 @@ export function useIndependentActions(
         });
       }),
     distribute: () =>
-      run("Pool distribution", () =>
-        write({
+      run("Pool distribution", () => {
+        const current = sourceSnapshot();
+        if (current.gameFunding)
+          return write({
+            address: market,
+            abi: gameFundedMarketAbi,
+            functionName: "syncFunding",
+            args: [current.roundId],
+          });
+        return write({
           address: market,
           abi: independentMarketAbi,
           functionName: "fundRound",
-          args: [sourceSnapshot().roundId, 0n],
-        }),
-      ),
+          args: [current.roundId, 0n],
+        });
+      }),
     trade: (question, yes, buy, input, output) =>
       run(buy ? "Position purchase" : "Position sale", async () => {
         const current = sourceSnapshot();

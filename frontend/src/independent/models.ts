@@ -40,6 +40,8 @@ export interface IndependentSnapshot {
   availableCarry: bigint;
   /** CST the market holds beyond its pools and carry: direct transfers and mints. */
   heldContributions: bigint;
+  /** Present only when this market accepts recorded game grants. */
+  gameFunding?: { cycle: bigint; awaitingSync: bigint };
   /** `fundingPreview(roundId, 0)`: exactly what the next buy, sell or Distribute absorbs. */
   funding: FundingPreview | null;
   user: IndependentWallet | null;

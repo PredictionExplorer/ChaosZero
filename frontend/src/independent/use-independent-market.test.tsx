@@ -11,12 +11,18 @@ import { ACCOUNT, GAME, MARKET, SOURCE, TOKEN, VAULT, snapshot, zero } from "./t
 import { ONE } from "@/shared/math";
 
 const mocks = vi.hoisted(() => ({
+  successor: false,
   available: true,
   account: "0x1111111111111111111111111111111111111111" as `0x${string}` | undefined,
   config: { chain: { id: 31337 } },
   getBlock: vi.fn(),
   getChainId: vi.fn(),
   read: vi.fn(),
+}));
+vi.mock("./config", () => ({
+  get gameFundedMarketAddress() {
+    return mocks.successor ? MARKET : null;
+  },
 }));
 vi.mock("wagmi", () => ({
   usePublicClient: () =>
@@ -25,7 +31,10 @@ vi.mock("wagmi", () => ({
       : undefined,
   useConnection: () => ({ address: mocks.account }),
 }));
-vi.mock("@/lib/config", () => ({ appConfig: mocks.config }));
+vi.mock("@/lib/config", async (original) => ({
+  ...(await original<typeof import("@/lib/config")>()),
+  appConfig: mocks.config,
+}));
 const clients: QueryClient[] = [];
 function wrapper() {
   const query = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
@@ -37,6 +46,7 @@ function wrapper() {
 let data: Record<string, unknown>;
 beforeEach(() => {
   vi.resetAllMocks();
+  mocks.successor = false;
   mocks.available = true;
   mocks.account = ACCOUNT;
   mocks.config.chain.id = 31337;
@@ -46,6 +56,7 @@ beforeEach(() => {
   data = {
     cst: TOKEN,
     source: SOURCE,
+    lastFundedRound: 1n,
     settlementVault: VAULT,
     totalActiveCollateral: state.poolCustody,
     pendingCarry: 77n,
@@ -547,5 +558,50 @@ describe("production V3 reads", () => {
     await waitFor(() => expect(preview.result.current.isError).toBe(true));
     await waitFor(() => expect(recovery.result.current.isError).toBe(true));
     expect(mocks.read).not.toHaveBeenCalled();
+  });
+});
+
+describe("game-issued funding and historical reads", () => {
+  it.each([
+    [0n, 16000n],
+    [16000n, 0n],
+  ])("counts grants awaiting sync with a %s CST cursor", async (consumed, waiting) => {
+    mocks.successor = true;
+    data.chaosZeroMarket = MARKET;
+    data.chaosZeroFunding = [8000n * ONE, 16000n * ONE];
+    data.consumedGameFunding = consumed * ONE;
+    data.fundingPreview = { ...snapshot().funding!, unallocated: 0n };
+    const { result } = renderHook(() => ({ ...useIndependentMarket(MARKET, 2n) }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+    expect(result.current.data!.gameFunding).toEqual({
+      cycle: 8000n * ONE,
+      awaitingSync: waiting * ONE,
+    });
+    expect(result.current.data!.heldContributions).toBe(0n);
+    expect(mocks.read).not.toHaveBeenCalledWith(
+      expect.objectContaining({ address: TOKEN, functionName: "balanceOf", args: [MARKET] }),
+    );
+  });
+  it("rejects a configured market that the game has not selected", async () => {
+    mocks.successor = true;
+    data.chaosZeroMarket = TOKEN;
+    data.chaosZeroFunding = [0n, 0n];
+    data.consumedGameFunding = 0n;
+    const { result } = renderHook(() => ({ ...useIndependentMarket(MARKET, null) }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.error?.message).toMatch(/funding ledger/));
+  });
+  it.each([
+    [1n, 1n],
+    [0n, 2n],
+  ])("opens archives with last funded round %s", async (last, selected) => {
+    data.lastFundedRound = last;
+    const { result } = renderHook(() => ({ ...useIndependentMarket(MARKET, null, true) }), {
+      wrapper: wrapper(),
+    });
+    await waitFor(() => expect(result.current.data?.roundId).toEqual(selected));
   });
 });

@@ -1,0 +1,10 @@
+{
+  "name": "@chaos-zero/tooling-glob",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimatch-backed glob filters for Vite, Vitest and their filesystem walkers",
+  "main": "index.cjs",
+  "dependencies": {
+    "minimatch": "11.0.9"
+  }
+}

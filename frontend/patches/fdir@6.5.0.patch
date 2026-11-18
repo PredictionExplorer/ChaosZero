@@ -1,0 +1,30 @@
+diff --git a/dist/index.cjs b/dist/index.cjs
+index 4868ffba35d991e03831204695d11e703a78c2d3..be31e2e68e7950af3bb988dd1a428af87331dfc2 100644
+--- a/dist/index.cjs
++++ b/dist/index.cjs
+@@ -458,8 +458,8 @@ var APIBuilder = class {
+ let pm = null;
+ /* c8 ignore next 6 */
+ try {
+-	require.resolve("picomatch");
+-	pm = require("picomatch");
++	require.resolve("@chaos-zero/tooling-glob");
++	pm = require("@chaos-zero/tooling-glob");
+ } catch {}
+ var Builder = class {
+ 	globCache = {};
+diff --git a/dist/index.mjs b/dist/index.mjs
+index 5c37e092b507dccc97d1b5a815cecceb94445698..dd905d0787af54fe20f7f7a420a4a76f5f8fe80e 100644
+--- a/dist/index.mjs
++++ b/dist/index.mjs
+@@ -440,8 +440,8 @@ var APIBuilder = class {
+ let pm = null;
+ /* c8 ignore next 6 */
+ try {
+-	__require.resolve("picomatch");
+-	pm = __require("picomatch");
++	__require.resolve("@chaos-zero/tooling-glob");
++	pm = __require("@chaos-zero/tooling-glob");
+ } catch {}
+ var Builder = class {
+ 	globCache = {};

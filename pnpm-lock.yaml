@@ -4,13 +4,26 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@nomicfoundation/hardhat-verify@3.1.3>zod': 4.6.7
+  '@nomicfoundation/hardhat-zod-utils@3.0.8>zod': 4.6.7
+  hardhat@3.20.0>zod: 4.6.7
+
+patchedDependencies:
+  '@nomicfoundation/hardhat-zod-utils@3.0.8':
+    hash: 37519ea549c65f14f08a337d6409e4d91ac4df7a00f6c8ab60df42179d72822d
+    path: patches/@nomicfoundation__hardhat-zod-utils@3.0.8.patch
+  hardhat@3.20.0:
+    hash: 96d2bb53889d1199b2f37e66500519611d5dd7905b4acab9dd2d91f999724cb0
+    path: patches/hardhat@3.20.0.patch
+
 importers:
 
   .:
     devDependencies:
       '@nomicfoundation/hardhat-verify':
         specifier: 3.1.3
-        version: 3.1.3(hardhat@3.20.0)
+        version: 3.1.3(hardhat@3.20.0(patch_hash=96d2bb53889d1199b2f37e66500519611d5dd7905b4acab9dd2d91f999724cb0))
       '@playwright/test':
         specifier: 1.63.0
         version: 1.63.0
@@ -19,7 +32,7 @@ importers:
         version: 6.17.0
       hardhat:
         specifier: 3.20.0
-        version: 3.20.0
+        version: 3.20.0(patch_hash=96d2bb53889d1199b2f37e66500519611d5dd7905b4acab9dd2d91f999724cb0)
       prettier:
         specifier: 3.9.8
         version: 3.9.8
@@ -287,7 +300,7 @@ packages:
   '@nomicfoundation/hardhat-zod-utils@3.0.8':
     resolution: {integrity: sha512-BMg06ZY7HxfOW1FoUKlSs1QmYmqxPHRsihxl3DeRSiFO0UUDVPrVoVhlWRKUB99LGSVLDF+97wGfIlI49tKTYg==}
     peerDependencies:
-      zod: ^3.23.8
+      zod: 4.6.7
 
   '@nomicfoundation/solidity-analyzer-darwin-arm64@0.1.2':
     resolution: {integrity: sha512-JaqcWPDZENCvm++lFFGjrDd8mxtf+CtLd2MiXvMNTBD33dContTZ9TWETwNFwg7JTJT5Q9HEecH7FA+HTSsIUw==}
@@ -502,8 +515,8 @@ packages:
       utf-8-validate:
         optional: true
 
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
 snapshots:
 
@@ -659,20 +672,20 @@ snapshots:
 
   '@nomicfoundation/hardhat-vendored@3.0.4': {}
 
-  '@nomicfoundation/hardhat-verify@3.1.3(hardhat@3.20.0)':
+  '@nomicfoundation/hardhat-verify@3.1.3(hardhat@3.20.0(patch_hash=96d2bb53889d1199b2f37e66500519611d5dd7905b4acab9dd2d91f999724cb0))':
     dependencies:
       '@nomicfoundation/hardhat-errors': 3.1.3
       '@nomicfoundation/hardhat-utils': 5.0.0
-      '@nomicfoundation/hardhat-zod-utils': 3.0.8(zod@3.25.76)
+      '@nomicfoundation/hardhat-zod-utils': 3.0.8(patch_hash=37519ea549c65f14f08a337d6409e4d91ac4df7a00f6c8ab60df42179d72822d)(zod@4.6.7)
       cbor2: 2.4.0
-      hardhat: 3.20.0
-      zod: 3.25.76
+      hardhat: 3.20.0(patch_hash=96d2bb53889d1199b2f37e66500519611d5dd7905b4acab9dd2d91f999724cb0)
+      zod: 4.6.7
 
-  '@nomicfoundation/hardhat-zod-utils@3.0.8(zod@3.25.76)':
+  '@nomicfoundation/hardhat-zod-utils@3.0.8(patch_hash=37519ea549c65f14f08a337d6409e4d91ac4df7a00f6c8ab60df42179d72822d)(zod@4.6.7)':
     dependencies:
       '@nomicfoundation/hardhat-errors': 3.1.3
       '@nomicfoundation/hardhat-utils': 5.0.0
-      zod: 3.25.76
+      zod: 4.6.7
 
   '@nomicfoundation/solidity-analyzer-darwin-arm64@0.1.2':
     optional: true
@@ -816,13 +829,13 @@ snapshots:
   fsevents@2.3.3:
     optional: true
 
-  hardhat@3.20.0:
+  hardhat@3.20.0(patch_hash=96d2bb53889d1199b2f37e66500519611d5dd7905b4acab9dd2d91f999724cb0):
     dependencies:
       '@nomicfoundation/edr': 0.23.0
       '@nomicfoundation/hardhat-errors': 3.1.3
       '@nomicfoundation/hardhat-utils': 5.0.0
       '@nomicfoundation/hardhat-vendored': 3.0.4
-      '@nomicfoundation/hardhat-zod-utils': 3.0.8(zod@3.25.76)
+      '@nomicfoundation/hardhat-zod-utils': 3.0.8(patch_hash=37519ea549c65f14f08a337d6409e4d91ac4df7a00f6c8ab60df42179d72822d)(zod@4.6.7)
       '@nomicfoundation/solidity-analyzer': 0.1.2
       '@sentry/core': 9.47.2
       adm-zip: 0.6.1
@@ -835,7 +848,7 @@ snapshots:
       semver: 7.8.5
       tsx: 4.23.15
       ws: 8.22.0
-      zod: 3.25.76
+      zod: 4.6.7
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
@@ -893,4 +906,4 @@ snapshots:
 
   ws@8.22.0: {}
 
-  zod@3.25.76: {}
+  zod@4.6.7: {}
