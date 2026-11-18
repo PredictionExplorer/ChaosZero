@@ -162,7 +162,7 @@ describe("independent dashboard closure", () => {
     expect(screen.getByRole("button", { name: "Close current cycle" })).toBeEnabled();
     for (let q = 0; q < 8; q++)
       expect(screen.getByTestId(`question-${q}`)).toHaveTextContent("Trading");
-    expect(screen.getByRole("button", { name: "Buy YES: More gestures?" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^Buy YES .+: More gestures\?$/ })).toBeEnabled();
     expect(screen.queryByText(/Resolved/)).not.toBeInTheDocument();
   });
 });

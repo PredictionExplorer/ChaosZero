@@ -1293,6 +1293,8 @@ body::before {
 }
 .baseline-hashes p a {
   color: var(--color-acid);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 .baseline-hash {
   display: block;

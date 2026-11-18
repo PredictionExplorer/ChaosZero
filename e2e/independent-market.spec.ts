@@ -229,8 +229,8 @@ test("independent pools: isolated prices, direct transfers, full closure, protec
   const knownCard = page.getByTestId("question-0");
   await expect(knownCard).toContainText("Trading");
   await expect(knownCard).not.toContainText("Resolved");
-  await expect(knownCard.getByRole("button", { name: /^Buy YES:/ })).toBeEnabled();
-  await expect(knownCard.getByRole("button", { name: /^Buy NO:/ })).toBeEnabled();
+  await expect(knownCard.getByRole("button", { name: /^Buy YES / })).toBeEnabled();
+  await expect(knownCard.getByRole("button", { name: /^Buy NO / })).toBeEnabled();
   await page.getByRole("button", { name: "Close current cycle", exact: true }).click();
   await expect(page.getByTestId("independent-cycle")).toHaveText("Cycle 2");
   const oldUnsettled = await client.readContract({
