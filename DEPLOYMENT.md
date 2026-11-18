@@ -2,6 +2,8 @@
 
 ## Preparing the V4 successor
 
+Run [bytecode verification](BYTECODE_VERIFICATION.md) to reproduce the historical deployments and check the V4 release fingerprints before preparing a successor.
+
 The existing addresses and V3 launch instructions below describe the original eight-question market. Keep its source, deployment manifest and claim vault intact. The successor binds a new market and vault to the existing game proxy, CST and `V3OutcomeSource`.
 
 1. Build the production artifact with `forge build src/GameFundedOutcomeMarket.sol`. Run `pnpm prepare:game-funded` to check the chain, V3 implementation and adapter, and produce unsigned creation data.

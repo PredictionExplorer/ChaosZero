@@ -1,0 +1,45 @@
+{
+  "chainId": 42161,
+  "legacy": {
+    "address": "0xDe5bC71e94B991265B2DfDCE0921245B70c51b4d",
+    "transaction": "0x77aba10c8de31c9359dc8395291390d4724119e1a939c4aee14672396e013196",
+    "block": 480403593,
+    "blockHash": "0x50880fc538f45e074d57374d0d9dc827c275c8fd31cdd3264cd0e58613c8a9be",
+    "runtimeHash": "0x12986f5de001c2dafa930f20ccd1726ce4619589525f2075742555a7a99327c7"
+  },
+  "deployer": "0x14c82Ce4E5713E88C9462680E9c02BF4a3089871",
+  "source": {
+    "address": "0x099c29624E05506582655417344A17FB71c9d138",
+    "transaction": "0x409542c28b2f78348bed33fe7f128769e7c050af43e4de0fba48a265bd21a4a1",
+    "block": 517037284,
+    "blockHash": "0x0646c9b685472a738337f1516d796d7a591107fcab04afb77683c77fdce0dc90",
+    "nonce": 80,
+    "inputHash": "0xe115d25d34a5de2fe31e5eaf93660ff18a305b2a4950ab8c407ccc0c2ed07628",
+    "runtimeHash": "0xc9eadb53d7d5ce4a3f12baeb6895d895810012e5955f59d2f1e48807adee90d5"
+  },
+  "market": {
+    "address": "0x2BC4759A2b44e1197EAdc4E035Eb8c52299658d2",
+    "transaction": "0x9360e041dc6ff3761f5e8cf96166fec94b533f8c996f71362ded670d8ee48b92",
+    "block": 517037317,
+    "blockHash": "0x14f682a171ae607a5136095f2eae2213eba7b7783acbbd324d8b9fb4079faf4c",
+    "nonce": 81,
+    "inputHash": "0x9e60956a3da241224a1d7c859ffdded2d77b77dc42b0a301a554f3bf6bb984b2",
+    "runtimeHash": "0x77ea5bc10f3ee04197054b565ff6f7d9bfc85188dce8ea5889a730540efaa3b1"
+  },
+  "vault": {
+    "address": "0x60F79aF7378Dc06F7747827446b32157c796dd3e",
+    "runtimeHash": "0xab8612ea15a2ce3b9d51c2f2e45fe7f5b6095064263d9f48f0bc08ca3a59f7ac"
+  },
+  "views": {
+    "address": "0x5E286886fD4073D9ab63829081608aAfB610fD06",
+    "runtimeHash": "0xdcd27e5682077cd16767d8f5f3930ce5ca0d39311b399129575eb0cae694980f"
+  },
+  "successor": {
+    "unsignedInputHash": "0x476fad16c301534a94b5058e0c21d1c216878948f6932f982c3058f95ae86437",
+    "runtimeTemplateHashes": {
+      "market": "0x7dbeb26d1557e06e851a75c2f10eb6926bda020580e853228c9bb9f793cb391e",
+      "vault": "0x3dd884d543cc448c5088e43618746b7c90df40a447fd37a3504880edf2ed8fdf",
+      "views": "0x81baeecab14151a29e34bfbe944682d83309e3b3ac7bc7ac553bc30c987bbd7a"
+    }
+  }
+}
