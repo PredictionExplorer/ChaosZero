@@ -1,36 +1,42 @@
-import { execFileSync } from "node:child_process";
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { Contract, ContractFactory, JsonRpcProvider, getAddress, keccak256 } from "ethers";
+import { pathToFileURL } from "node:url";
+import { Contract, JsonRpcProvider, getAddress, keccak256 } from "ethers";
 import { ARBITRUM, assertChain, assertProductionImplementation } from "./deploy-runtime.mjs";
+
+import {
+  buildSuccessor,
+  childrenOf,
+  creationReceipt,
+  readJson,
+  reviewedSuccessorCreation,
+  requireRuntime,
+} from "./bytecode-identity.mjs";
 
 export const SOURCE = "0x099c29624E05506582655417344A17FB71c9d138";
 const BASELINE_HASH = "0x270bdafae80631bde00ccdad3a78ca455a073a900c3d91fb7ead3d0b870f5891";
 
 /** Match the mined creation input, which also binds both constructor-created children. */
-export async function inspectCreation(provider, expected, creation, hash) {
-  assert.match(hash, /^0x[0-9a-f]{64}$/i, "Expected a deployment transaction hash.");
-  const [transaction, receipt] = await Promise.all([
-    provider.getTransaction(hash),
-    provider.getTransactionReceipt(hash),
-  ]);
-  assert.ok(
-    transaction && receipt?.status === 1 && receipt.contractAddress,
-    "Creation is unconfirmed or failed.",
-  );
-  assert.ok(
-    transaction.to === null &&
-      transaction.chainId === BigInt(expected.chainId) &&
-      transaction.value === 0n,
-    "Expected a contract creation on the reviewed chain.",
-  );
-  assert.equal(
-    keccak256(transaction.data),
-    keccak256(creation),
-    "Creation code or constructor arguments differ from the local production build.",
-  );
+export async function inspectCreation(provider, expected, creation, hash, artifacts) {
+  await assertChain(provider, expected);
+  const receipt = await creationReceipt(provider, expected.chainId, hash, creation);
+  artifacts ??= await buildSuccessor();
   const address = getAddress(receipt.contractAddress);
+  const blockTag = receipt.blockNumber;
+  const { vault, views } = childrenOf(address);
+  await Promise.all([
+    requireRuntime(provider, blockTag, address, artifacts.market, {
+      game: expected.game,
+      cst: expected.cst,
+      source: expected.source,
+      settlementVault: vault,
+      _marketViews: views,
+    }),
+    requireRuntime(provider, blockTag, vault, artifacts.vault, {
+      market: address,
+      cst: expected.cst,
+    }),
+    requireRuntime(provider, blockTag, views, artifacts.views, {}),
+  ]);
   const market = new Contract(
     address,
     [
@@ -43,17 +49,17 @@ export async function inspectCreation(provider, expected, creation, hash) {
     ],
     provider,
   );
-  const [game, cst, source, vault, views, grant] = await Promise.all([
-    market.game(),
-    market.cst(),
-    market.source(),
-    market.settlementVault(),
-    market.marketViews(),
-    market.CYCLE_FUNDING(),
+  const [game, cst, source, reportedVault, reportedViews, grant] = await Promise.all([
+    market.game({ blockTag }),
+    market.cst({ blockTag }),
+    market.source({ blockTag }),
+    market.settlementVault({ blockTag }),
+    market.marketViews({ blockTag }),
+    market.CYCLE_FUNDING({ blockTag }),
   ]);
   assert.deepEqual(
-    [game, cst, source, grant],
-    [expected.game, expected.cst, expected.source, 8000n * 10n ** 18n],
+    [game, cst, source, reportedVault, reportedViews, grant],
+    [expected.game, expected.cst, expected.source, vault, views, 8000n * 10n ** 18n],
     "Unexpected successor identity or cycle amount.",
   );
   const reserve = new Contract(
@@ -61,37 +67,38 @@ export async function inspectCreation(provider, expected, creation, hash) {
     ["function market() view returns(address)", "function cst() view returns(address)"],
     provider,
   );
-  const [vaultMarket, vaultToken, helperCode] = await Promise.all([
-    reserve.market(),
-    reserve.cst(),
-    provider.getCode(views),
+  const [vaultMarket, vaultToken] = await Promise.all([
+    reserve.market({ blockTag }),
+    reserve.cst({ blockTag }),
   ]);
   assert.deepEqual([vaultMarket, vaultToken], [address, expected.cst], "Unexpected claim vault.");
-  assert.notEqual(helperCode, "0x", "Read helper is missing.");
+  assert.equal(
+    (await provider.getBlock(blockTag))?.hash,
+    receipt.blockHash,
+    "Creation block changed during verification.",
+  );
   return { market: address, vault, views, transactionHash: hash, blockNumber: receipt.blockNumber };
 }
 
 async function main() {
   const args = process.argv.slice(2);
   if (args.length > 1) throw Error("Expected at most one public deployment hash.");
-  execFileSync("forge", ["build", "src/GameFundedOutcomeMarket.sol"], {
-    cwd: fileURLToPath(new URL("../", import.meta.url)),
-    env: { ...process.env, FOUNDRY_PROFILE: "default" },
-    stdio: ["ignore", 2, 2],
-  });
+  const artifacts = await buildSuccessor();
   const provider = new JsonRpcProvider(
     process.env.ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc",
   );
   try {
-    const artifact = JSON.parse(
-      await readFile(
-        new URL("../out/GameFundedOutcomeMarket.sol/GameFundedOutcomeMarket.json", import.meta.url),
-        "utf8",
-      ),
-    );
     const expected = { ...ARBITRUM, source: SOURCE };
     await assertChain(provider, expected);
     if (!args.length) await assertProductionImplementation(provider, expected);
+    const witness = await readJson(
+      new URL("../deployment/arbitrum-bytecode.json", import.meta.url),
+    );
+    assert.equal(
+      keccak256(await provider.getCode(SOURCE)),
+      witness.source.runtimeHash,
+      "Unexpected outcome source code.",
+    );
     const source = new Contract(
       SOURCE,
       [
@@ -106,15 +113,9 @@ async function main() {
       [expected.game, expected.cst, BASELINE_HASH],
       "The deployed outcome adapter failed validation.",
     );
-    const creation = (
-      await new ContractFactory(artifact.abi, artifact.bytecode.object).getDeployTransaction(
-        expected.cst,
-        SOURCE,
-        expected.game,
-      )
-    ).data;
+    const creation = await reviewedSuccessorCreation(artifacts, expected, witness.successor);
     const output = args.length
-      ? await inspectCreation(provider, expected, creation, args[0])
+      ? await inspectCreation(provider, expected, creation, args[0], artifacts)
       : { chainId: expected.chainId, value: "0", data: creation };
     process.stdout.write(
       JSON.stringify({ ...expected, creationHash: keccak256(creation), ...output }, null, 2) + "\n",

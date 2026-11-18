@@ -24,6 +24,7 @@
     "test:e2e:install": "playwright install chromium",
     "audit:dependencies": "node scripts/check.mjs audit",
     "build:deployment": "hardhat build --build-profile production",
+    "verify:bytecode": "node scripts/verify-bytecode.mjs",
     "prepare:game-funded": "node scripts/prepare-game-funded-market.mjs",
     "deploy:arbitrum": "node scripts/deploy-arbitrum.mjs deploy",
     "deploy:resume": "node scripts/deploy-arbitrum.mjs resume",

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { ContractFactory, JsonRpcProvider, getAddress } from "ethers";
+import { buildSuccessor } from "./bytecode-identity.mjs";
 import { inspectCreation } from "./prepare-game-funded-market.mjs";
 import { createRequire } from "node:module";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
@@ -87,14 +88,9 @@ assert.equal(
   deployment.vaultAddress.toLowerCase(),
 );
 assert.notEqual(vault.toLowerCase(), deployment.vaultAddress.toLowerCase());
-const successorBuild = JSON.parse(
-  await readFile(
-    path.join(root, "out/GameFundedOutcomeMarket.sol/GameFundedOutcomeMarket.json"),
-    "utf8",
-  ),
-);
+const successorBuild = await buildSuccessor();
 const creation = (
-  await new ContractFactory(successorAbi, successorBuild.bytecode.object).getDeployTransaction(
+  await new ContractFactory(successorAbi, successorBuild.market.creation).getDeployTransaction(
     token,
     source,
     game,
@@ -113,10 +109,17 @@ try {
     expected,
     creation,
     deployment.marketCreationHash,
+    successorBuild,
   );
   assert.equal(info.market, getAddress(deployment.marketAddress));
   await assert.rejects(
-    inspectCreation(inspectionProvider, expected, "0x", deployment.marketCreationHash),
+    inspectCreation(
+      inspectionProvider,
+      expected,
+      "0x",
+      deployment.marketCreationHash,
+      successorBuild,
+    ),
     /Creation code/,
   );
 } finally {
