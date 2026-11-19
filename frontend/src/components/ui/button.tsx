@@ -1,25 +1,28 @@
 "use client";
 
-import type { ButtonHTMLAttributes } from "react";
+import type { ComponentPropsWithRef } from "react";
 import { Loader2 } from "lucide-react";
 
 export type ButtonVariant = "signal" | "higher" | "lower" | "ghost" | "outline" | "ended";
 export type ButtonSize = "sm" | "md" | "lg";
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+type ButtonProps = ComponentPropsWithRef<"button"> & {
   variant?: ButtonVariant;
   size?: ButtonSize;
   loading?: boolean;
 };
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  signal: "bg-signal text-void font-semibold hover:bg-signal-bright shadow-glow-signal disabled:shadow-none",
+  signal:
+    "bg-signal text-void font-semibold hover:bg-signal-bright shadow-glow-signal disabled:shadow-none",
   higher:
     "bg-higher text-void font-semibold hover:brightness-110 shadow-glow-higher disabled:shadow-none",
-  lower: "bg-lower text-void font-semibold hover:brightness-110 shadow-glow-lower disabled:shadow-none",
+  lower:
+    "bg-lower text-void font-semibold hover:brightness-110 shadow-glow-lower disabled:shadow-none",
   ended: "bg-ended text-void font-semibold hover:brightness-110 disabled:shadow-none",
   ghost: "bg-transparent text-ink-dim hover:text-ink hover:bg-surface-2",
-  outline: "border border-line-strong text-ink hover:border-signal/60 hover:text-signal-bright bg-surface/40",
+  outline:
+    "border border-line-strong text-ink hover:border-signal/60 hover:text-signal-bright bg-surface/40",
 };
 
 const SIZES: Record<ButtonSize, string> = {
@@ -42,9 +45,9 @@ export function Button({
       {...rest}
       disabled={disabled || loading}
       className={[
-        "inline-flex items-center justify-center font-medium transition-all duration-150",
+        "inline-flex items-center justify-center font-medium transition-colors duration-150",
         "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal",
-        "disabled:opacity-45 disabled:cursor-not-allowed active:enabled:scale-[0.98]",
+        "disabled:opacity-65 disabled:cursor-not-allowed active:enabled:scale-[0.98]",
         VARIANTS[variant],
         SIZES[size],
         className,

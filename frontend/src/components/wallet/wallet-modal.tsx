@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, m } from "motion/react";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Wallet, X } from "lucide-react";
@@ -25,14 +25,50 @@ export function WalletModal({ open, onClose }: WalletModalProps) {
   const connectors = useConnectors();
   const connect = useConnect();
 
+  const dialog = useRef<HTMLDivElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open || !mounted) return;
+    const trigger = document.activeElement;
+    closeButton.current?.focus();
+    return () => {
+      if (trigger instanceof HTMLElement && trigger.isConnected) trigger.focus();
+    };
+  }, [open, mounted]);
+
+  // Scope the trap to this picker. WalletConnect can present its own prompt
+  // elsewhere in the document while a connection request is pending.
   useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    const handleKey = (event: KeyboardEvent) => {
+      const picker = dialog.current;
+      const target = event.target;
+      if (!picker || !(target instanceof Node)) return;
+      // Clicking static text may leave focus on the body.
+      if (target !== document.body && !picker.contains(target)) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+      }
+      if (event.key !== "Tab") return;
+      const stops = picker.querySelectorAll<HTMLElement>("button:enabled, a[href]");
+      const first = stops[0];
+      const last = stops[stops.length - 1];
+      if (event.shiftKey && (target === first || target === document.body)) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (target === last || target === document.body)) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
   }, [open, onClose]);
 
   const pick = async (connector: Connector) => {
+    // The chosen button becomes disabled while waiting on the wallet.
+    closeButton.current?.focus();
     try {
       await connect.mutateAsync({ connector });
       onClose();
@@ -55,6 +91,7 @@ export function WalletModal({ open, onClose }: WalletModalProps) {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
+          ref={dialog}
           role="dialog"
           aria-modal="true"
           aria-label="Connect a wallet"
@@ -70,6 +107,7 @@ export function WalletModal({ open, onClose }: WalletModalProps) {
             <div className="mb-4 flex items-center justify-between">
               <h2 className="font-display text-lg font-semibold">Connect a wallet</h2>
               <button
+                ref={closeButton}
                 onClick={onClose}
                 aria-label="Close"
                 className="rounded-lg p-1.5 text-ink-dim transition-colors hover:bg-surface-2 hover:text-ink"

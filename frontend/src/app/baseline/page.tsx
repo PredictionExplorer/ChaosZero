@@ -37,7 +37,7 @@ export default function BaselinePage() {
   return (
     <div className="observatory-shell baseline-shell">
       <header className="observatory-header">
-        <Link href="/" className="observatory-logo" aria-label="Chaos Zero home">
+        <Link href="/" className="observatory-logo" aria-label="ChaosZero home">
           <BrandMark className="size-8" />
           <span>
             CHAOS<span className="logo-zero">ZERO</span>

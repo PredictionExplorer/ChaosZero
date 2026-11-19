@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight, FlaskConical, RefreshCw } from "lucide-react";
 import { formatEther, type Address } from "viem";
-import { useConnection, useChainId } from "wagmi";
+import { useConnection } from "wagmi";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { appConfig, resolveRoundOverride } from "@/lib/config";
@@ -53,7 +53,6 @@ export function IndependentDashboard({
   const query = useIndependentMarket(market, override, previous);
   const snapshot = query.data;
   const connection = useConnection();
-  const chainId = useChainId();
   const path = usePathname();
   const [manualRound, setManualRound] = useState<bigint | null>(null);
   const recoveryRound = manualRound ?? override ?? snapshot?.roundId ?? null;
@@ -76,7 +75,8 @@ export function IndependentDashboard({
   const [question, setQuestion] = useState<QuestionId>(0);
   const [yes, setYes] = useState(true);
   const [buy, setBuy] = useState(true);
-  const connected = connection.status === "connected" && chainId === appConfig.chain.id;
+  // wagmi's configured read chain stays selected even when the wallet leaves it.
+  const connected = connection.status === "connected" && connection.chainId === appConfig.chain.id;
   if (query.error)
     return (
       <div>
@@ -157,7 +157,11 @@ export function IndependentDashboard({
             )}
           </>
         ) : (
-          <p>Connect your wallet to see positions for this cycle.</p>
+          <p>
+            {connection.status === "connected"
+              ? `Switch to ${appConfig.chain.name} to manage positions for this cycle.`
+              : "Connect your wallet to see positions for this cycle."}
+          </p>
         )}
         {actions.message && <p role="status">{actions.message}</p>}
       </section>

@@ -30,7 +30,7 @@ export function Footer({ marketAddress, cstAddress }: FooterProps) {
             Game <AddressLink address={COSMIC_GAME_ADDRESS} />
           </span>
         </div>
-        <p className="text-[11px] text-ink-faint/70">
+        <p className="text-[11px] text-ink-faint">
           Prediction markets involve risk. Bet only what you can afford to lose.
         </p>
       </div>

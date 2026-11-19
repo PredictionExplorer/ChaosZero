@@ -24,9 +24,9 @@ vi.mock("./config", () => ({
 vi.mock("wagmi", () => ({
   useConnection: () => ({
     status: "connected",
+    chainId: 31337,
     address: "0x1111111111111111111111111111111111111111",
   }),
-  useChainId: () => 31337,
 }));
 vi.mock("next/navigation", () => ({
   usePathname: () => "/shared",
@@ -162,7 +162,7 @@ describe("independent dashboard closure", () => {
     expect(screen.getByRole("button", { name: "Close current cycle" })).toBeEnabled();
     for (let q = 0; q < 8; q++)
       expect(screen.getByTestId(`question-${q}`)).toHaveTextContent("Trading");
-    expect(screen.getByRole("button", { name: "Buy YES: More gestures?" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^Buy YES .+: More gestures\?$/ })).toBeEnabled();
     expect(screen.queryByText(/Resolved/)).not.toBeInTheDocument();
   });
 });

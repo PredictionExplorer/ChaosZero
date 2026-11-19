@@ -48,7 +48,7 @@ export default function FaqPage() {
         actions={
           <Link
             href="/"
-            className="inline-flex h-9 items-center justify-center rounded-xl bg-signal px-4 text-sm font-semibold text-void shadow-glow-signal transition-all hover:bg-signal-bright"
+            className="hidden h-9 items-center justify-center rounded-xl bg-signal px-4 text-sm font-semibold text-void shadow-glow-signal transition-all hover:bg-signal-bright sm:inline-flex"
           >
             Open the market
           </Link>

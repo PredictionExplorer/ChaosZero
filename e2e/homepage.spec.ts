@@ -13,8 +13,8 @@ async function expectLiveLocalMarkets(page: Page) {
     const card = page.getByTestId(`question-${question}`);
     await expect(card).toBeVisible();
     await expect(card.getByTestId(`question-collateral-${question}`)).toHaveText("1,000 CST");
-    await expect(card.getByRole("button", { name: /^Buy YES:/ })).toBeEnabled();
-    await expect(card.getByRole("button", { name: /^Buy NO:/ })).toBeEnabled();
+    await expect(card.getByRole("button", { name: /^Buy YES / })).toBeEnabled();
+    await expect(card.getByRole("button", { name: /^Buy NO / })).toBeEnabled();
     await expect(card.getByTestId(`question-seed-${question}`)).toHaveText("50%");
   }
   await expect(page.getByTestId("current-0")).toHaveText("0");

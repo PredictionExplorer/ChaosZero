@@ -56,7 +56,7 @@ describe("independent question interface", () => {
       />,
     );
     expect(screen.getByText("Trading")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Buy YES: More gestures?" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: /^Buy YES .+: More gestures\?$/ })).toBeEnabled();
     expect(screen.queryByText("Resolved YES")).not.toBeInTheDocument();
   });
   it("a fully known but open cycle keeps every question tradeable and unresolved", () => {
@@ -84,7 +84,7 @@ describe("independent question interface", () => {
       const card = within(screen.getByTestId(`question-${q}`));
       expect(card.getByText("Trading")).toBeInTheDocument();
       expect(card.queryByText(/Resolved (YES|NO)/)).not.toBeInTheDocument();
-      for (const side of [/^Buy YES:/, /^Buy NO:/]) {
+      for (const side of [/^Buy YES /, /^Buy NO /]) {
         const button = card.getByRole("button", { name: side });
         expect(button).toBeEnabled();
         expect(button).not.toHaveTextContent(/(^|[^.\d])(100|0)%/);
@@ -169,10 +169,10 @@ describe("independent question interface", () => {
     render(
       <IndependentQuestionCard question={0} snapshot={state} selected={false} onSelect={vi.fn()} />,
     );
-    expect(screen.getByRole("button", { name: "Buy YES: More gestures?" })).not.toHaveTextContent(
-      "100%",
-    );
-    expect(screen.getByRole("button", { name: "Buy NO: More gestures?" })).toHaveTextContent(
+    expect(
+      screen.getByRole("button", { name: /^Buy YES .+: More gestures\?$/ }),
+    ).not.toHaveTextContent("100%");
+    expect(screen.getByRole("button", { name: /^Buy NO .+: More gestures\?$/ })).toHaveTextContent(
       "<0.01%",
     );
   });
@@ -189,7 +189,7 @@ describe("independent question interface", () => {
     expect(screen.getByText("Reserved for claims")).toBeInTheDocument();
     expect(screen.getByTestId("question-collateral-0")).toHaveTextContent("7 CST");
     expect(screen.getByTestId("question-reserve-0")).toHaveTextContent("0 CST");
-    expect(screen.getByRole("button", { name: "Buy YES: More gestures?" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /^Buy YES .+: More gestures\?$/ })).toBeDisabled();
   });
   it("does not enable early claims when source facts are known", () => {
     render(<IndependentPortfolio snapshot={snapshot()} actions={noopActions()} onSell={vi.fn()} />);
@@ -236,7 +236,7 @@ describe("trading through automatic absorption", () => {
     );
     expect(screen.getByText("Opens with the first trade")).toBeInTheDocument();
     expect(screen.getByTestId("question-incoming-0")).toHaveTextContent("+3 CST");
-    expect(screen.getByRole("button", { name: "Buy YES: More gestures?" })).toHaveTextContent(
+    expect(screen.getByRole("button", { name: /^Buy YES .+: More gestures\?$/ })).toHaveTextContent(
       "50%",
     );
   });
@@ -248,7 +248,9 @@ describe("trading through automatic absorption", () => {
     );
     expect(screen.getByText("Needs funding")).toBeInTheDocument();
     expect(screen.queryByTestId("question-incoming-0")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Buy YES: More gestures?" })).toHaveTextContent("—");
+    expect(screen.getByRole("button", { name: /^Buy YES .+: More gestures\?$/ })).toHaveTextContent(
+      "—",
+    );
   });
   it("enables a trade that opens the pools, with an honest notice and an effective quote", async () => {
     const state = startable();

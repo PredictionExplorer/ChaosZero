@@ -149,20 +149,21 @@ export function IndependentQuestionCard({
         <p>Every cycle opens at 50% YES / 50% NO.</p>
       </div>
       <div className="mt-auto grid grid-cols-2 gap-2">
-        {[true, false].map((yes) => (
-          <button
-            key={String(yes)}
-            aria-label={`Buy ${yes ? "YES" : "NO"}: ${item.title}`}
-            disabled={snapshot.finalized || !snapshot.open}
-            onClick={() => onSelect(yes)}
-            className={`flex min-h-11 items-center justify-between rounded-xl border px-3 text-sm font-semibold focus-visible:outline-2 disabled:cursor-default disabled:opacity-65 ${yes ? "border-higher/25 bg-higher/5 text-higher hover:bg-higher/15 focus-visible:outline-higher" : "border-lower/25 bg-lower/5 text-lower hover:bg-lower/15 focus-visible:outline-lower"}`}
-          >
-            <span>{yes ? "YES" : "NO"}</span>
-            <span className="font-mono">
-              {percent(yes ? probability : noProbability, snapshot.finalized)}
-            </span>
-          </button>
-        ))}
+        {[true, false].map((yes) => {
+          const side = yes ? "YES" : "NO";
+          const price = percent(yes ? probability : noProbability, snapshot.finalized);
+          return (
+            <button
+              key={String(yes)}
+              aria-label={`Buy ${side} ${price}: ${item.title}`}
+              disabled={snapshot.finalized || !snapshot.open}
+              onClick={() => onSelect(yes)}
+              className={`flex min-h-11 items-center justify-between rounded-xl border px-3 text-sm font-semibold focus-visible:outline-2 disabled:cursor-default disabled:opacity-65 ${yes ? "border-higher/25 bg-higher/5 text-higher hover:bg-higher/15 focus-visible:outline-higher" : "border-lower/25 bg-lower/5 text-lower hover:bg-lower/15 focus-visible:outline-lower"}`}
+            >
+              <span>{side}</span> <span className="font-mono">{price}</span>
+            </button>
+          );
+        })}
       </div>
       <details className="mt-3 text-xs leading-5 text-ink-dim">
         <summary className="cursor-pointer text-ink-faint">Settlement rule</summary>
