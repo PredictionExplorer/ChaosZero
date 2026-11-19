@@ -154,3 +154,30 @@ also inspect settlement rules, mint/burn authority, numerical boundaries,
 cross-market isolation, and the upstream game integration. The production adapter targets V3 and a reviewed historical launch baseline.
 Successful local gates do not authorize a public deployment; use the explicit
 operator workflow in DEPLOYMENT.md when a release is approved.
+
+## V4 workflow and credential checks
+
+Pull requests into `V4` and pushes to `V4` run the security-extended CodeQL
+queries for JavaScript/TypeScript and GitHub Actions. The workflow also checks
+Actions syntax and shell scripts with actionlint and ShellCheck, audits action
+permissions and references with zizmor, and scans the checked-out Git history
+(including merge changes) with Gitleaks. CodeQL reports in GitHub code scanning.
+The other tools return failures directly in the workflow.
+
+To reproduce the local checks, install the actionlint, zizmor, and Gitleaks
+versions pinned in `.github/workflows/v4-security.yml` and put ShellCheck on
+your path. The workflow records the SHA-256 pins for its Linux x64 archives.
+Run from the repository root in a full clone with history.
+
+```sh
+actionlint
+zizmor --offline --strict-collection --no-ignores .github
+python3 verification/ci/test_gitleaks.py gitleaks
+gitleaks git --config .gitleaks.toml --log-opts='--diff-merges=first-parent HEAD' \
+  --redact=100 --ignore-gitleaks-allow --gitleaks-ignore-path /dev/null --no-banner .
+```
+
+CI also checks zizmor's online rules with its read-only job token. Gitleaks uses
+the upstream detectors and adds rules for EVM signing-key assignments and
+credential-bearing RPC URLs. The two documented exceptions in `.gitleaks.toml`
+apply to the public CST address and the published Anvil key in local examples.

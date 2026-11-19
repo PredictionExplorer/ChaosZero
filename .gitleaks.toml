@@ -1,0 +1,32 @@
+title = "Chaos Zero credential scanning"
+
+[extend]
+useDefault = true
+
+# A public CST contract address appears after "token" in docs and tests.
+# Scope this exception to that address and the generic classifier.
+[[allowlists]]
+targetRules = ["generic-api-key"]
+regexTarget = "secret"
+regexes = ['''(?i)^0xad91843e6a58ba560f577e676986afb1dba6fba0\.?$''']
+
+[[rules]]
+id = "evm-private-key"
+description = "EVM signing key literal in a private-key assignment or command"
+regex = '''(?i)\b(?:[a-z0-9]+[_-])*private[-_]?key\b["']?[ \t:=]+["']?((?:0x)?[a-f0-9]{64})\b'''
+secretGroup = 1
+keywords = ["private"]
+
+# The published default Anvil account appears in these local command examples.
+[[rules.allowlists]]
+condition = "AND"
+paths = ['''^script/DeployLocal\.s\.sol$''', '''^frontend/README\.md$''']
+regexTarget = "secret"
+regexes = ['''(?i)^(?:0x)?ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80$''']
+
+[[rules]]
+id = "rpc-provider-url-key"
+description = "RPC provider URL containing a credential"
+regex = '''(?i)https?://(?:[a-z0-9.-]+\.(?:alchemy\.com/v2|infura\.io/v3|quiknode\.pro|blastapi\.io|chainstack\.com|nodereal\.io/v1)|rpc\.ankr\.com/[a-z0-9_-]+)/([a-z0-9_-]{16,})'''
+secretGroup = 1
+keywords = ["alchemy", "infura", "quiknode", "blastapi", "chainstack", "nodereal", "ankr"]

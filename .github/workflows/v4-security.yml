@@ -1,0 +1,86 @@
+name: V4 security checks
+
+on:
+  pull_request:
+    branches: [V4]
+  push:
+    branches: [V4]
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, javascript-typescript]
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-extended
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: /language:${{ matrix.language }}
+
+  hygiene:
+    name: Workflow lint and secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Install checksum-pinned Linux x64 tools
+        id: install
+        working-directory: ${{ runner.temp }}
+        shell: bash
+        run: |
+          install_tool() {
+            local binary="$1" url="$2" checksum="$3"
+            curl --fail --silent --show-error --location --retry 3 "$url" --output "$binary.tar.gz"
+            echo "$checksum  $binary.tar.gz" | sha256sum --check --strict
+            tar -xzf "$binary.tar.gz" "$binary"
+          }
+          install_tool actionlint \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+          install_tool zizmor \
+            https://github.com/zizmorcore/zizmor/releases/download/v1.32.0/zizmor-x86_64-unknown-linux-gnu.tar.gz \
+            bb110cc765eca9cd7efb2e284a956be5974c60027b0970f16397d86208a9957b
+          install_tool gitleaks \
+            https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz \
+            551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+      - name: Check workflow syntax and inline shell scripts
+        run: '"$RUNNER_TEMP/actionlint" .github/workflows/*.yml'
+      - name: Audit GitHub Actions
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: '"$RUNNER_TEMP/zizmor" --strict-collection --no-ignores --format=github .github'
+      - name: Check credential-detection rules
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: python3 verification/ci/test_gitleaks.py "$RUNNER_TEMP/gitleaks"
+      - name: Scan the checked-out history for credentials
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: |
+          "$RUNNER_TEMP/gitleaks" git --config .gitleaks.toml --log-opts='--diff-merges=first-parent HEAD' \
+            --redact=100 --ignore-gitleaks-allow --gitleaks-ignore-path /dev/null --no-banner .
