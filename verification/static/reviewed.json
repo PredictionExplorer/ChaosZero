@@ -1,0 +1,80 @@
+[
+  {
+    "impact": "High",
+    "check": "reentrancy-balance",
+    "site": "_push",
+    "id": "55d189a39ceb366874ca4ccd3c4ab8c2b30c4678124c9a3ce56a509dd80355d3"
+  },
+  {
+    "impact": "High",
+    "check": "reentrancy-balance",
+    "site": "_pull",
+    "id": "5cb3c2025e516438e251cb2a6fbe6ba16f4d7a32634868c62a05579f0c761c2b"
+  },
+  {
+    "impact": "High",
+    "check": "reentrancy-balance",
+    "site": "_pull",
+    "id": "b001e65b3283a1b055f89153da0fc71dca8cfd54f9b0ea91307f3e392a0375e2"
+  },
+  {
+    "impact": "High",
+    "check": "reentrancy-balance",
+    "site": "_push",
+    "id": "c33242763c65984f8580a73ab80f8d79e88e27ab44fde7db45a79cc35ee0988c"
+  },
+  {
+    "impact": "Medium",
+    "check": "reentrancy-no-eth",
+    "site": "buy",
+    "id": "0a9f8578331ca70e2203fa82e153e963d484d4c3a07f7a0deddeb00637ec22e2"
+  },
+  {
+    "impact": "Medium",
+    "check": "reentrancy-no-eth",
+    "site": "splitPosition",
+    "id": "14f769e65ba50f8bb00cb139546cce4ee4308d87eb91373218a0b61f91a428af"
+  },
+  {
+    "impact": "Medium",
+    "check": "reentrancy-no-eth",
+    "site": "_applyGameFunding",
+    "id": "583a542709ce434d2b70567880fe684b64638790e3849d2945b4dda2d234b5b2"
+  },
+  {
+    "impact": "Medium",
+    "check": "reentrancy-no-eth",
+    "site": "sell",
+    "id": "aba780d8ad83f61f7873c6df3ad0b9992b72b9edcb3b0442fc7924080504eea0"
+  },
+  {
+    "impact": "Medium",
+    "check": "reentrancy-no-eth",
+    "site": "claimKnown",
+    "id": "fd3dd92070440e034a06aa51c606fa2a795157eaf5576880b339b8b6a36bad6f"
+  },
+  {
+    "impact": "Medium",
+    "check": "uninitialized-local",
+    "site": "_merge.count",
+    "id": "74cc7851431bb877d0edbea773ebaa223d54bb0c698f8246fc092dc54d59c13a"
+  },
+  {
+    "impact": "Medium",
+    "check": "uninitialized-local",
+    "site": "_merge.index",
+    "id": "e64eda17b42cd02d7d2e2f3a4207f562ba112fbb3c013ef51aa2727e01b56b8b"
+  },
+  {
+    "impact": "Medium",
+    "check": "uninitialized-local",
+    "site": "_settleRound.owed",
+    "id": "f5e34d635668a0b85f6fd2e254c9a4b0447284f2e50cab1542a17ef4adcb9cd0"
+  },
+  {
+    "impact": "Medium",
+    "check": "unused-return",
+    "site": "fundingPreview",
+    "id": "4786ef80dcaf3b34cebfb810ef7e3ce0c0b4b7d8af8b580e9d27e14a2d4ceb4c"
+  }
+]
